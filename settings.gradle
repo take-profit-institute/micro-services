@@ -1,0 +1,13 @@
+rootProject.name = 'candle'
+
+include 'common'
+include 'services:auth-service'
+include 'services:user-service'
+include 'services:market-service'
+include 'services:trading-service'
+include 'services:portfolio-service'
+include 'services:ranking-service'
+include 'services:mission-service'
+include 'services:learning-service'
+include 'services:notification-service'
+include 'services:bff-service'

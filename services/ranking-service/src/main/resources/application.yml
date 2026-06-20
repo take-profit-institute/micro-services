@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: ranking-service
+server:
+  port: 8086
