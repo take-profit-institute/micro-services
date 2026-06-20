@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package candle.auth.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.auth.v1";
+
+import "candle/common/v1/common.proto";
+
+message ListProvidersRequest {}
+message OAuthProvider { string name = 1; string authorization_url = 2; }
+message ListProvidersResponse { repeated OAuthProvider providers = 1; }
+
+message OAuthLoginRequest { string provider = 1; string authorization_code = 2; candle.common.v1.CommandMetadata command_metadata = 3; }
+message OAuthLoginResponse { string access_token = 1; string refresh_token = 2; int64 expires_in_seconds = 3; }
+message RefreshTokenRequest { string refresh_token = 1; candle.common.v1.CommandMetadata command_metadata = 2; }
+message RefreshTokenResponse { string access_token = 1; string refresh_token = 2; int64 expires_in_seconds = 3; }
+message LogoutRequest { string refresh_token = 1; candle.common.v1.CommandMetadata command_metadata = 2; }
+message LogoutResponse {}
+
+service AuthService {
+  rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse);
+  rpc OAuthLogin(OAuthLoginRequest) returns (OAuthLoginResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+}

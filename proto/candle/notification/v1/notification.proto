@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package candle.notification.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.notification.v1";
+
+import "candle/common/v1/common.proto";
+
+message RegisterPushTokenRequest { string user_id = 1; string token = 2; string platform = 3; candle.common.v1.CommandMetadata command_metadata = 4; }
+message RegisterPushTokenResponse { string token_id = 1; }
+
+service NotificationService {
+  rpc RegisterPushToken(RegisterPushTokenRequest) returns (RegisterPushTokenResponse);
+}

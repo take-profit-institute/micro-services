@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package candle.mission.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.mission.v1";
+
+import "candle/common/v1/common.proto";
+
+message Mission { string id = 1; string title = 2; string description = 3; int64 reward_points = 4; }
+message UserMissionState { string mission_id = 1; bool joined = 2; bool completed = 3; bool claimed = 4; int64 progress = 5; }
+message ListMissionsRequest { string user_id = 1; candle.common.v1.PageRequest page = 2; }
+message ListMissionsResponse { repeated Mission missions = 1; candle.common.v1.PageResponse page = 2; }
+message JoinMissionRequest { string user_id = 1; string mission_id = 2; candle.common.v1.CommandMetadata command_metadata = 3; }
+message JoinMissionResponse { UserMissionState state = 1; }
+
+service MissionService {
+  rpc ListMissions(ListMissionsRequest) returns (ListMissionsResponse);
+  rpc JoinMission(JoinMissionRequest) returns (JoinMissionResponse);
+}

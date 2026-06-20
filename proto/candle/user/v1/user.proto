@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package candle.user.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.user.v1";
+
+import "candle/common/v1/common.proto";
+
+message UserProfile {
+  string user_id = 1;
+  string nickname = 2;
+  string profile_image_url = 3;
+  bool deleted = 4;
+  candle.common.v1.Audit audit = 5;
+}
+
+message GetMeRequest { string user_id = 1; }
+message GetMeResponse { UserProfile profile = 1; }
+message UpdateProfileRequest { string user_id = 1; string nickname = 2; string profile_image_url = 3; candle.common.v1.CommandMetadata command_metadata = 4; }
+message UpdateProfileResponse { UserProfile profile = 1; }
+
+service UserService {
+  rpc GetMe(GetMeRequest) returns (GetMeResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+}

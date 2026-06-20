@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package candle.market.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.market.v1";
+
+import "candle/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message Stock { string symbol = 1; string name = 2; string market = 3; }
+message Quote { string symbol = 1; int64 price = 2; int64 change = 3; google.protobuf.Timestamp quoted_at = 4; }
+message SearchStocksRequest { string query = 1; string market = 2; candle.common.v1.PageRequest page = 3; }
+message SearchStocksResponse { repeated Stock stocks = 1; candle.common.v1.PageResponse page = 2; }
+message GetQuoteRequest { string symbol = 1; }
+message GetQuoteResponse { Quote quote = 1; }
+message BatchQuotesRequest { repeated string symbols = 1; }
+message BatchQuotesResponse { repeated Quote quotes = 1; }
+
+service MarketService {
+  rpc SearchStocks(SearchStocksRequest) returns (SearchStocksResponse);
+  rpc GetQuote(GetQuoteRequest) returns (GetQuoteResponse);
+  rpc BatchQuotes(BatchQuotesRequest) returns (BatchQuotesResponse);
+}

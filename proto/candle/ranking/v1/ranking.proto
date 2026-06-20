@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package candle.ranking.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.ranking.v1";
+
+import "candle/common/v1/common.proto";
+
+message RankingEntry { int64 rank = 1; string user_id = 2; string nickname = 3; string return_rate = 4; }
+message ListRankingsRequest { candle.common.v1.PageRequest page = 1; }
+message ListRankingsResponse { repeated RankingEntry rankings = 1; candle.common.v1.PageResponse page = 2; }
+message GetMyRankingRequest { string user_id = 1; }
+message GetMyRankingResponse { RankingEntry ranking = 1; }
+
+service RankingService {
+  rpc ListRankings(ListRankingsRequest) returns (ListRankingsResponse);
+  rpc GetMyRanking(GetMyRankingRequest) returns (GetMyRankingResponse);
+}

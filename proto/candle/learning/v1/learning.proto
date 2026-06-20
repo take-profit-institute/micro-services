@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package candle.learning.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.learning.v1";
+
+import "candle/common/v1/common.proto";
+
+message Content { string id = 1; string title = 2; string category = 3; string level = 4; string body = 5; }
+message ListContentsRequest { string user_id = 1; string query = 2; candle.common.v1.PageRequest page = 3; }
+message ListContentsResponse { repeated Content contents = 1; candle.common.v1.PageResponse page = 2; }
+message CompleteContentRequest { string user_id = 1; string content_id = 2; candle.common.v1.CommandMetadata command_metadata = 3; }
+message UserContentState { string content_id = 1; bool completed = 2; bool favorite = 3; }
+message CompleteContentResponse { UserContentState state = 1; }
+
+service LearningService {
+  rpc ListContents(ListContentsRequest) returns (ListContentsResponse);
+  rpc CompleteContent(CompleteContentRequest) returns (CompleteContentResponse);
+}
