@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: candle-batch
+  main:
+    web-application-type: none
+  batch:
+    job:
+      enabled: false
