@@ -1,0 +1,101 @@
+package org.profit.candle.auth.api;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import lombok.RequiredArgsConstructor;
+import org.profit.candle.auth.config.AuthProperties;
+import org.profit.candle.auth.exception.AuthErrorCode;
+import org.profit.candle.auth.exception.AuthException;
+import org.profit.candle.auth.api.dto.OAuthLoginRequest;
+import org.profit.candle.auth.api.dto.ProviderResponse;
+import org.profit.candle.auth.api.dto.ProvidersResponse;
+import org.profit.candle.auth.identity.service.GoogleLoginService;
+import org.profit.candle.auth.token.service.RefreshTokenService;
+import org.profit.candle.auth.token.service.IssuedTokens;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+public class AuthController {
+    private final AuthProperties properties;
+    private final GoogleLoginService googleLoginService;
+    private final RefreshTokenService refreshTokenService;
+
+    @GetMapping("/providers")
+    public ProvidersResponse listProviders() {
+        return ProvidersResponse.google(googleAuthorizationUrl());
+    }
+
+    @PostMapping("/oauth/google")
+    public ResponseEntity<Void> login(@RequestBody OAuthLoginRequest request) {
+        if (request.authorizationCode() == null || request.authorizationCode().isBlank()) {
+            throw new AuthException(AuthErrorCode.INVALID_OAUTH_REQUEST);
+        }
+        return tokenCookies(googleLoginService.login(request.authorizationCode()));
+    }
+
+    @PostMapping("/token/refresh")
+    public ResponseEntity<Void> refresh(@CookieValue(name = "refresh_token", required = false) String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        return tokenCookies(refreshTokenService.rotate(refreshToken));
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public ResponseEntity<Void> logout(@CookieValue(name = "refresh_token", required = false) String refreshToken) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            refreshTokenService.revoke(refreshToken);
+        }
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, expiredCookie("access_token", "/").toString())
+                .header(HttpHeaders.SET_COOKIE, expiredCookie("refresh_token", "/api/v1/auth").toString())
+                .build();
+    }
+
+    private String googleAuthorizationUrl() {
+        return "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id="
+                + encode(properties.google().clientId()) + "&redirect_uri=" + encode(properties.google().redirectUri())
+                + "&scope=" + encode("openid email profile") + "&access_type=offline&prompt=consent";
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private ResponseEntity<Void> tokenCookies(IssuedTokens tokens) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie("access_token", tokens.accessToken(), "/",
+                        properties.jwt().accessTokenTtl()).toString())
+                .header(HttpHeaders.SET_COOKIE, cookie("refresh_token", tokens.refreshToken(), "/api/v1/auth",
+                        properties.jwt().refreshTokenTtl()).toString())
+                .build();
+    }
+
+    private ResponseCookie cookie(String name, String value, String path, java.time.Duration maxAge) {
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value).httpOnly(true)
+                .secure(properties.cookies().secure()).sameSite(properties.cookies().sameSite())
+                .path(path).maxAge(maxAge);
+        if (!properties.cookies().domain().isBlank()) {
+            builder.domain(properties.cookies().domain());
+        }
+        return builder.build();
+    }
+
+    private ResponseCookie expiredCookie(String name, String path) {
+        return cookie(name, "", path, java.time.Duration.ZERO);
+    }
+
+}
