@@ -1,1 +1,49 @@
 description = 'Orders, account balance, holdings, and trade return service'
+
+apply plugin: 'com.google.protobuf'
+
+dependencies {
+    // gRPC 서버 (Spring Boot 4.1 BOM이 spring-grpc 1.1.0 / grpc-java 1.80.0 관리)
+    implementation 'org.springframework.boot:spring-boot-grpc-server'
+    implementation 'com.google.protobuf:protobuf-java'
+    implementation 'io.grpc:grpc-stub'
+    implementation 'io.grpc:grpc-protobuf'
+    // 생성된 grpc 코드의 javax.annotation.Generated 용
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+
+    // 영속/멱등성
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'org.postgresql:postgresql'
+    runtimeOnly 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
+    // 도메인 이벤트 발행 (outbox → Kafka)
+    implementation 'org.springframework.kafka:spring-kafka'
+}
+
+// 공용 proto 디렉터리(리포 루트 /proto)에서 stub 생성
+sourceSets {
+    main {
+        proto {
+            srcDir "${rootDir}/proto"
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:4.34.2'
+    }
+    plugins {
+        grpc {
+            artifact = 'io.grpc:protoc-gen-grpc-java:1.80.0'
+        }
+    }
+    generateProtoTasks {
+        all().configureEach { task ->
+            task.plugins {
+                grpc {}
+            }
+        }
+    }
+}

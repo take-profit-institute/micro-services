@@ -13,8 +13,11 @@ message ListMissionsRequest { string user_id = 1; candle.common.v1.PageRequest p
 message ListMissionsResponse { repeated Mission missions = 1; candle.common.v1.PageResponse page = 2; }
 message JoinMissionRequest { string user_id = 1; string mission_id = 2; candle.common.v1.CommandMetadata command_metadata = 3; }
 message JoinMissionResponse { UserMissionState state = 1; }
+message ClaimRewardRequest { string user_id = 1; string mission_id = 2; candle.common.v1.CommandMetadata command_metadata = 3; }
+message ClaimRewardResponse { UserMissionState state = 1; int64 rewarded_points = 2; }
 
 service MissionService {
   rpc ListMissions(ListMissionsRequest) returns (ListMissionsResponse);
   rpc JoinMission(JoinMissionRequest) returns (JoinMissionResponse);
+  rpc ClaimReward(ClaimRewardRequest) returns (ClaimRewardResponse);
 }

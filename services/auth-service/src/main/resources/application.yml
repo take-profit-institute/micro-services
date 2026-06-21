@@ -10,6 +10,8 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:migration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
 server:
   port: ${AUTH_SERVER_PORT:8081}
@@ -28,3 +30,5 @@ auth:
     domain: ${AUTH_COOKIE_DOMAIN:}
     secure: ${AUTH_COOKIE_SECURE:false}
     same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
+  outbox:
+    publish-interval-ms: ${AUTH_OUTBOX_PUBLISH_INTERVAL_MS:5000}

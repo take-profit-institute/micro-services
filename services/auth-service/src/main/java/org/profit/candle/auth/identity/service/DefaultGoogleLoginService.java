@@ -10,6 +10,7 @@ import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.identity.entity.OAuthAccount;
 import org.profit.candle.auth.identity.repository.OAuthAccountRepository;
 import org.profit.candle.auth.token.service.AuthTokenIssuer;
+import org.profit.candle.auth.event.OutboxWriter;
 import org.profit.candle.auth.token.service.IssuedTokens;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ public class DefaultGoogleLoginService implements GoogleLoginService {
     private final GoogleOAuthClient googleOAuthClient;
     private final OAuthAccountRepository accountRepository;
     private final AuthTokenIssuer tokenIssuer;
+    private final OutboxWriter outboxWriter;
 
     @Override
     @Transactional
@@ -29,8 +31,12 @@ public class DefaultGoogleLoginService implements GoogleLoginService {
             throw new AuthException(AuthErrorCode.GOOGLE_ACCOUNT_NOT_VERIFIED);
         }
         OAuthAccount account = accountRepository.findByProviderAndProviderSubject("google", profile.subject())
-                .orElseGet(() -> accountRepository.save(new OAuthAccount(UUID.randomUUID(), "google", profile.subject(),
-                        profile.email(), Instant.now())));
+                .orElseGet(() -> {
+                    OAuthAccount created = accountRepository.save(new OAuthAccount(UUID.randomUUID(), "google", profile.subject(),
+                            profile.email(), Instant.now()));
+                    outboxWriter.recordUserCreated(created.userId(), created.email());
+                    return created;
+                });
         return tokenIssuer.issue(account.userId());
     }
 }

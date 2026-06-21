@@ -8,6 +8,8 @@ Candle 마이크로서비스 전용 Gradle 모노레포입니다.
 - 쓰기 명령 멱등성: [docs/IDEMPOTENCY.md](docs/IDEMPOTENCY.md)
 - Spring Batch 운영 규칙: [docs/BATCH.md](docs/BATCH.md)
 - 서비스별 환경 변수 관리: [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md)
+- 이벤트·Outbox 계약: [docs/EVENTS.md](docs/EVENTS.md)
+- Fastify BFF 내부 gRPC 계약: [docs/BFF_GRPC_CONTRACT.md](docs/BFF_GRPC_CONTRACT.md)
 - 내부 gRPC 계약: [proto/README.md](proto/README.md)
 
 ## 서비스

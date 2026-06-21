@@ -1,5 +1,8 @@
 spring:
   application:
     name: trading-service
+  grpc:
+    server:
+      port: ${TRADING_GRPC_PORT:50054}
 server:
-  port: 8084
+  port: ${TRADING_SERVER_PORT:8084}

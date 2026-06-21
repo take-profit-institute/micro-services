@@ -1,0 +1,91 @@
+# 로컬 개발용 백킹 서비스 (AWS 없이 전 서비스 로컬 실행)
+# 기본: postgres / timescaledb / redis / redpanda(kafka) / mailhog
+# 옵션 profile: ui(redpanda console) · bff(이미지로 bff 실행)
+#
+#   docker compose up -d                 # 백킹 서비스만
+#   docker compose --profile ui up -d    # + redpanda console
+#   docker compose --profile bff up -d   # + bff 컨테이너
+# 서비스(Spring)는 호스트에서: ./gradlew :services:auth-service:bootRun --args='--spring.profiles.active=local'
+name: candle-local
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/local/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # market 전용 시계열 DB (운영의 TimescaleDB StatefulSet 대용)
+  timescaledb:
+    image: timescale/timescaledb:2.17.1-pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: market
+    ports: ["5433:5432"]
+    volumes:
+      - tsdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  # Kafka 호환 단일 바이너리(가벼움). 운영 MSK 대용(로컬은 PLAINTEXT)
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --kafka-addr=internal://0.0.0.0:29092,external://0.0.0.0:9092
+      - --advertise-kafka-addr=internal://redpanda:29092,external://localhost:9092
+    ports:
+      - "9092:9092" # 호스트 앱 → localhost:9092
+    volumes:
+      - rpdata:/var/lib/redpanda/data
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025" # SMTP (notification-service가 발송)
+      - "8025:8025" # 웹 UI (받은 메일 확인)
+
+  # ── 옵션: redpanda console (Kafka UI) ──
+  redpanda-console:
+    image: redpandadata/console:v2.7.2
+    profiles: ["ui"]
+    environment:
+      KAFKA_BROKERS: redpanda:29092
+    ports: ["8088:8080"]
+    depends_on: [redpanda]
+
+  # ── 옵션: bff 컨테이너 (소스 대신 이미지로) ──
+  # webapp repo에서 빌드/푸시한 이미지를 가져다 씀. 안 쓰면 webapp repo에서 직접 실행.
+  bff:
+    image: ${BFF_IMAGE:-yyubin/candle-bff:dev}
+    profiles: ["bff"]
+    environment:
+      PORT: "8080" # bff는 PORT 사용(기본 4000)
+      HOST: "0.0.0.0"
+      REDIS_URL: redis://redis:6379
+      # bff는 호스트에서 실행 중인 gRPC 서비스에 붙음(기본 50051~)
+      GRPC_AUTH_ADDR: host.docker.internal:50051
+      GRPC_MARKET_ADDR: host.docker.internal:50053
+    ports: ["8080:8080"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+volumes:
+  pgdata:
+  tsdata:
+  rpdata:

@@ -39,4 +39,5 @@ public class OAuthAccount {
     public UUID userId() { return userId; }
     public String provider() { return provider; }
     public String providerSubject() { return providerSubject; }
+    public String email() { return email; }
 }

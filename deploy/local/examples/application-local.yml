@@ -1,0 +1,22 @@
+# 예제: 운영과 "다른 것만" 로컬 프로파일로 override.
+# 활성화: --spring.profiles.active=local  (또는 SPRING_PROFILES_ACTIVE=local)
+# 배치: services/<svc>/src/main/resources/application-local.yml
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    properties:
+      # 운영은 SASL_SSL + AWS_MSK_IAM, 로컬 redpanda는 평문
+      security.protocol: PLAINTEXT
+
+# market-service 전용(시계열은 5433 timescaledb 컨테이너):
+#   spring.datasource.url: jdbc:postgresql://localhost:5433/market
+#
+# batch 전용(JobRepository = batch DB, 웹 비활성):
+#   spring.datasource.url: jdbc:postgresql://localhost:5432/batch
+#   spring.main.web-application-type: none
+#   spring.batch.job.enabled: false   # CronJob이 --spring.batch.job.name 으로 지정
+#
+# 로컬은 AWS 미사용:
+#   - notification-service: SES 대신 SMTP(mailhog) → spring.mail.host=localhost, port=1025
+#   - Secrets Manager/ESO 없음(자격증명은 위 기본값/env)
+#   - MSK IAM 없음(위 PLAINTEXT)
