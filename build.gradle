@@ -12,9 +12,11 @@ allprojects {
     }
 }
 
-def serviceProjects = subprojects.findAll { it.path.startsWith(':services:') }
+def bootProjects = subprojects.findAll {
+    it.path.startsWith(':services:') || it.path == ':batch'
+}
 
-configure(serviceProjects) {
+configure(bootProjects) {
     apply plugin: 'java'
     apply plugin: 'org.springframework.boot'
     apply plugin: 'io.spring.dependency-management'
@@ -34,10 +36,15 @@ configure(serviceProjects) {
 
     dependencies {
         implementation project(':common')
-        implementation 'org.springframework.boot:spring-boot-starter-web'
         implementation 'org.springframework.boot:spring-boot-starter-actuator'
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
         testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+        if (project.path == ':batch') {
+            implementation 'org.springframework.boot:spring-boot-starter-batch'
+        } else {
+            implementation 'org.springframework.boot:spring-boot-starter-web'
+        }
     }
 }
 
