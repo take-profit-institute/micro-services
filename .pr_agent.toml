@@ -1,0 +1,153 @@
+# Qodo PR-Agent / Qodo Code Review repository configuration.
+# Project conventions are maintained in docs/CONVENTIONS.md and docs/TRADING_SERVICE.md.
+
+comments_location_policy = "both"
+inline_comments_severity_threshold = 2
+
+[config]
+enable_custom_labels = true
+ignore_pr_labels = ["skip-review", "no-qodo"]
+
+[review_agent]
+issues_user_guidelines = """
+Review this repository as a Java 21, Spring Boot, gRPC, Kafka, PostgreSQL service codebase.
+Prioritize real correctness, security, data consistency, and production operability issues over cosmetic style.
+
+Focus especially on:
+- Transaction boundaries: public service methods should own @Transactional, read paths should use readOnly = true, and DB writes plus Kafka publication must use the outbox pattern instead of direct Kafka send inside the business transaction.
+- Idempotency: every write RPC must preserve client-provided idempotency_key semantics, reject key reuse with a different payload, and store idempotency records in the same transaction as the business change.
+- Concurrency and integrity: do not rely on pre-checks alone for duplicate orders, balance changes, or unique domain rules; expect DB constraints, locks, or idempotency where appropriate.
+- gRPC boundaries: endpoints should parse/validate protobuf requests, extract actor identity, call services, and convert results; they should not contain business decisions or direct persistence logic.
+- Error handling: do not leak SQL, tokens, account numbers, external API raw responses, stack traces, or 5xx internals to clients. Preserve causes when wrapping exceptions.
+- Money and time: use BigDecimal or minimum-currency-unit long for money, never double/float. Prefer Instant for server-side timestamps.
+- External calls: require connect/read timeouts, explicit retry conditions, and no automatic retry for non-idempotent writes.
+- Tests: flag missing tests when a change touches entity invariants, service flows, repository queries, gRPC contracts, Kafka/outbox behavior, idempotency, migrations, or concurrency-sensitive logic.
+
+When a finding is based on project conventions, mention the relevant convention area, not generic Java advice.
+"""
+
+compliance_user_guidelines = """
+Enforce the Candle service conventions from docs/CONVENTIONS.md and, for trading-service changes, docs/TRADING_SERVICE.md.
+
+Repository and module boundaries:
+- Each services:<name>-service module is independently deployable. Do not directly reference another service's Java code, Entity, Repository, or DB table.
+- Use gRPC for synchronous service-to-service calls and Kafka events for asynchronous communication. Do not add REST controllers except in auth-service.
+- common may contain only shared error contracts, event envelopes, broad value objects, and shared utilities. Do not put service domains, JPA entities, repositories, service-specific protobuf DTOs, or service-specific error codes in common.
+- Add new dependencies only to modules that need them.
+
+Package and layering:
+- Organize service code by domain first, then grpc/service/repository/entity/dto/event/exception under that domain.
+- Do not create broad util/common/manager/helper packages inside a service.
+- Allowed call direction is gRPC endpoint -> Service -> Repository/Client/Event publisher, with Entity enforcing its own state rules.
+- Repository code must only handle persistence, not business decisions, event publication, or other service calls.
+- Entity must not be returned directly as protobuf output; endpoint converts service Result to protobuf.
+
+Interfaces and dependency injection:
+- Define service, repository, client, and event publisher interfaces by consumer need.
+- Split read/write or capability-specific interfaces when responsibilities differ.
+- Do not create meaningless Foo/FooImpl pairs; implementation names should express technology or role such as Default, Jpa, Kafka, Redis, Cached.
+- Use constructor injection only; field injection is forbidden.
+
+Naming and DTOs:
+- Classes/enums/records use PascalCase, methods/variables/packages use camelCase, constants use UPPER_SNAKE_CASE.
+- Prefer business verbs such as placeOrder/cancel/approve over CRUD names such as createOrder/updateStatus.
+- find... returns Optional only when absence is valid. get.../load... is for required data and should throw service errors.
+- Collections must not return null.
+- Boolean fields should be named as state, e.g. deleted/active/expired, not isDeleted.
+- Conversion methods should be explicit: toProto, fromProto, toResult, from. Avoid process/handle/doSomething.
+- If a method has more than four parameters, group them into Command, Criteria, or value objects.
+- gRPC endpoint input/output is protobuf, service input is Command, service output is Result, search input is Criteria.
+- Prefer Java record for simple immutable transfer objects.
+
+Entity, validation, and errors:
+- JPA entities belong in entity packages and must have protected no-arg constructors.
+- Do not add public setters to entities. State changes must be meaningful behavior methods such as cancel() or execute(...).
+- Request validation, service validation, entity invariants, and DB constraints are separate layers; do not collapse them into only one layer.
+- Service-owned <Service>ErrorCode decides exposed messages. Entity/service/client/endpoint code should not create ad hoc client-facing error string literals.
+- gRPC services should map CandleException/ErrorCode to StatusRuntimeException in a handler/interceptor where possible.
+
+gRPC, Kafka, outbox, and proto:
+- Proto package, service, and RPC names must express the domain.
+- gRPC request/response messages must not expose JPA Entity types.
+- List RPCs must define page_size, page_token, max page size, and stable ordering. Prefer cursor/page token over offset for large or changing lists.
+- Write RPCs require idempotency_key. Server-side identity should be actor/account + operation + idempotency key.
+- Kafka events must be past-tense facts such as TradeExecuted or MissionAchieved, not commands.
+- Events should include event id, type, aggregate id, occurredAt, schema version, and payload.
+- When DB state change and Kafka publication both happen, write an outbox row in the same transaction and publish later.
+- Proto field numbers are permanent. Do not change or reuse existing field/RPC/enum numbers or meanings; removed fields must be reserved. Breaking changes require a v2 package or new RPC/message.
+
+Database and migrations:
+- Schema changes must be versioned service migrations. Do not rely on manual DB changes.
+- Migration names must follow VYYYYMMDD_NNN__lower_snake_case_description.sql.
+- Already-applied migrations must not be edited, deleted, or renamed; add a forward migration instead.
+- Review indexes against real query predicates and ordering. Unique constraints are data integrity rules, not optional performance details.
+- Idempotency tables need uniqueness on actor/user, operation, and idempotency_key and must retain request hash plus stored response.
+
+Trading service specifics:
+- Trading service handles balances, order creation, cancellation, and order listing.
+- PlaceOrder and CancelOrder are write flows and must be protected by idempotency.
+- Balance reservation/order save/outbox/idempotency record should succeed or fail as one transaction.
+- Outbox publication is at-least-once; consumers must be idempotent by event id.
+"""
+
+[review_agent_ux]
+finding_overflow_count = 3
+resolved_overflow_count = 2
+expand_description = true
+expand_code = true
+expand_evidence = true
+expand_prompt = false
+
+[custom_labels."area:auth"]
+description = "pr_agent: Suggest when the PR changes auth-service, OAuth login, JWT/token issuing, refresh tokens, auth HTTP endpoints, auth error handling, or auth outbox events."
+
+[custom_labels."area:user"]
+description = "pr_agent: Suggest when the PR changes user-service, user profile gRPC APIs, profile persistence, user idempotency, or consumed user events."
+
+[custom_labels."area:trading"]
+description = "pr_agent: Suggest when the PR changes trading-service order placement, order cancellation, balance reservation, trading gRPC APIs, trading idempotency, or trading outbox behavior."
+
+[custom_labels."area:market"]
+description = "pr_agent: Suggest when the PR changes market-service, market data contracts, market clients, or quote ingestion logic."
+
+[custom_labels."area:portfolio"]
+description = "pr_agent: Suggest when the PR changes portfolio-service, portfolio gRPC APIs, holding/account aggregation, or portfolio persistence."
+
+[custom_labels."area:mission"]
+description = "pr_agent: Suggest when the PR changes mission-service, mission progress, mission events, or mission reward logic."
+
+[custom_labels."area:ranking"]
+description = "pr_agent: Suggest when the PR changes ranking-service, leaderboard calculation, score persistence, or ranking APIs."
+
+[custom_labels."area:learning"]
+description = "pr_agent: Suggest when the PR changes learning-service, learning content, progress tracking, or learning APIs."
+
+[custom_labels."area:notification"]
+description = "pr_agent: Suggest when the PR changes notification-service, notification delivery, notification events, or templates."
+
+[custom_labels."area:batch"]
+description = "pr_agent: Suggest when the PR changes batch jobs, scheduled/background processing, or batch operational behavior."
+
+[custom_labels."area:common"]
+description = "pr_agent: Suggest when the PR changes the common module, shared error contracts, shared event envelopes, broad value objects, or shared utilities."
+
+[custom_labels."area:proto"]
+description = "pr_agent: Suggest when the PR changes proto files, gRPC service/message contracts, enum values, generated-stub assumptions, pagination contracts, or breaking compatibility concerns."
+
+[custom_labels."area:db"]
+description = "pr_agent: Suggest when the PR changes migrations, database schema, indexes, constraints, query patterns, JPA mappings, or transaction-sensitive persistence."
+
+[custom_labels."area:kafka-outbox"]
+description = "pr_agent: Suggest when the PR changes Kafka event production/consumption, outbox table writes, outbox publishers, event payload schemas, or at-least-once delivery handling."
+
+[custom_labels."area:idempotency"]
+description = "pr_agent: Suggest when the PR changes idempotency keys, request hashing, duplicate request replay, idempotency records, or write-RPC retry safety."
+
+[custom_labels."risk:security"]
+description = "pr_agent: Suggest when the PR touches authentication, authorization, secrets, tokens, PII, account identifiers, external API credentials, logging of sensitive data, or client-visible error messages."
+
+[custom_labels."risk:concurrency"]
+description = "pr_agent: Suggest when the PR touches locking, duplicate prevention, balance/order mutations, unique constraints, retries, transactions, or race-prone business flows."
+
+[custom_labels."needs-tests"]
+description = "pr_agent: Suggest when changed behavior lacks focused tests for entity invariants, service flows, repository queries, gRPC contracts, migrations, Kafka/outbox, idempotency, or concurrency."
