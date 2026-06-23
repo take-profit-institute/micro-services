@@ -1,0 +1,26 @@
+# 빌드 아티팩트
+**/build/
+**/.gradle/
+
+# 로컬 환경 설정·비밀값
+**/.env
+**/.env.local
+**/.env.production
+**/.env.*.local
+**/.env.development
+**/.env.development.example
+**/.env.production.example
+
+# VCS·IDE·OS
+.git/
+.gitignore
+.idea/
+*.iml
+**/.DS_Store
+**/*.swp
+
+# 문서
+docs/
+
+# CI 설정 (빌드와 무관)
+.github/

@@ -1,0 +1,212 @@
+# main 브랜치 push → 변경된 서비스만 Docker Hub 빌드·푸시
+# PR        → 빌드만 (push 없음), 컴파일 오류 조기 감지
+# 수동 실행  → 전체 또는 지정 서비스 강제 빌드
+#
+# 필수 Repository Secrets:
+#   DOCKERHUB_USERNAME  – Docker Hub 사용자명 (예: yyubin)
+#   DOCKERHUB_TOKEN     – Docker Hub Access Token (Settings → Security → New Token)
+
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      services:
+        description: '빌드할 서비스 (쉼표 구분, 비우면 전체 빌드)'
+        required: false
+        default: ''
+
+env:
+  IMAGE_PREFIX: ${{ secrets.DOCKERHUB_USERNAME }}/candle
+
+jobs:
+  # ── 1. 변경 감지 ────────────────────────────────────────────────────────
+  detect:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      empty: ${{ steps.set-matrix.outputs.empty }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # workflow_dispatch가 아닌 경우에만 diff 기반 감지
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            auth-service:
+              - 'services/auth-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
+            user-service:
+              - 'services/user-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
+            market-service:
+              - 'services/market-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
+            trading-service:
+              - 'services/trading-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
+            portfolio-service:
+              - 'services/portfolio-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
+            ranking-service:
+              - 'services/ranking-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
+            mission-service:
+              - 'services/mission-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
+            learning-service:
+              - 'services/learning-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
+            notification-service:
+              - 'services/notification-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
+
+      - name: Set build matrix
+        id: set-matrix
+        env:
+          # workflow_dispatch 입력
+          DISPATCH_INPUT: ${{ github.event.inputs.services }}
+          # 각 서비스 변경 여부 (filter가 실행 안 된 경우 빈 문자열)
+          F_AUTH:         ${{ steps.filter.outputs.auth-service }}
+          F_USER:         ${{ steps.filter.outputs.user-service }}
+          F_MARKET:       ${{ steps.filter.outputs.market-service }}
+          F_TRADING:      ${{ steps.filter.outputs.trading-service }}
+          F_PORTFOLIO:    ${{ steps.filter.outputs.portfolio-service }}
+          F_RANKING:      ${{ steps.filter.outputs.ranking-service }}
+          F_MISSION:      ${{ steps.filter.outputs.mission-service }}
+          F_LEARNING:     ${{ steps.filter.outputs.learning-service }}
+          F_NOTIFICATION: ${{ steps.filter.outputs.notification-service }}
+        run: |
+          ALL='["auth-service","user-service","market-service","trading-service","portfolio-service","ranking-service","mission-service","learning-service","notification-service"]'
+
+          # workflow_dispatch: 입력값 파싱 (비어 있으면 전체)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -z "$DISPATCH_INPUT" ]; then
+              echo "matrix=$ALL" >> "$GITHUB_OUTPUT"
+            else
+              # "auth-service, user-service" → ["auth-service","user-service"]
+              JSON=$(echo "$DISPATCH_INPUT" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' \
+                    | jq -R . | jq -sc .)
+              echo "matrix=$JSON" >> "$GITHUB_OUTPUT"
+            fi
+            echo "empty=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # push / PR: paths-filter 결과로 빌드 대상 결정
+          SERVICES=()
+          [ "$F_AUTH"         = "true" ] && SERVICES+=(auth-service)
+          [ "$F_USER"         = "true" ] && SERVICES+=(user-service)
+          [ "$F_MARKET"       = "true" ] && SERVICES+=(market-service)
+          [ "$F_TRADING"      = "true" ] && SERVICES+=(trading-service)
+          [ "$F_PORTFOLIO"    = "true" ] && SERVICES+=(portfolio-service)
+          [ "$F_RANKING"      = "true" ] && SERVICES+=(ranking-service)
+          [ "$F_MISSION"      = "true" ] && SERVICES+=(mission-service)
+          [ "$F_LEARNING"     = "true" ] && SERVICES+=(learning-service)
+          [ "$F_NOTIFICATION" = "true" ] && SERVICES+=(notification-service)
+
+          if [ ${#SERVICES[@]} -eq 0 ]; then
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
+            echo "empty=true"  >> "$GITHUB_OUTPUT"
+          else
+            JSON="["
+            for i in "${!SERVICES[@]}"; do
+              [ "$i" -gt 0 ] && JSON+=","
+              JSON+="\"${SERVICES[$i]}\""
+            done
+            JSON+="]"
+            echo "matrix=$JSON" >> "$GITHUB_OUTPUT"
+            echo "empty=false"  >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── 2. 빌드 & 푸시 (변경된 서비스 병렬 실행) ──────────────────────────
+  build:
+    name: Build ${{ matrix.service }}
+    needs: detect
+    if: needs.detect.outputs.empty == 'false'
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false   # 한 서비스 실패해도 나머지 계속
+      matrix:
+        service: ${{ fromJSON(needs.detect.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: SERVICE_MODULE=${{ matrix.service }}
+          # PR은 빌드만, push/dispatch는 실제 푸시
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:dev
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:${{ github.sha }}
+          # GHA 캐시 — 서비스별 독립 스코프
+          cache-from: type=gha,scope=docker-${{ matrix.service }}
+          cache-to:   type=gha,mode=max,scope=docker-${{ matrix.service }}

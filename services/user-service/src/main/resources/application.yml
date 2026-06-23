@@ -1,5 +1,33 @@
 spring:
   application:
     name: user-service
+  grpc:
+    server:
+      port: ${USER_GRPC_PORT:50052}
+  datasource:
+    url: ${USER_DB_URL:jdbc:postgresql://localhost:5432/candle_users}
+    username: ${USER_DB_USERNAME:candle}
+    password: ${USER_DB_PASSWORD:candle}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    locations: classpath:migration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: user-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+
 server:
-  port: 8082
+  port: ${USER_SERVER_PORT:8082}
+
+user:
+  idempotency:
+    default-ttl: ${USER_IDEMPOTENCY_TTL:P1D}

@@ -13,6 +13,7 @@ message UserProfile {
   string profile_image_url = 3;
   bool deleted = 4;
   candle.common.v1.Audit audit = 5;
+  string email = 6;
 }
 
 message GetMeRequest { string user_id = 1; }

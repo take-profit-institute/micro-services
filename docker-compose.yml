@@ -1,16 +1,17 @@
 # 로컬 개발용 백킹 서비스 (AWS 없이 전 서비스 로컬 실행)
 # 기본: postgres / timescaledb / redis / redpanda(kafka) / mailhog
-# 옵션 profile: ui(redpanda console) · bff(이미지로 bff 실행)
+# 옵션 profile: ui(redpanda console) · services(Spring 컨테이너) · bff
 #
-#   docker compose up -d                 # 백킹 서비스만
-#   docker compose --profile ui up -d    # + redpanda console
-#   docker compose --profile bff up -d   # + bff 컨테이너
-# 서비스(Spring)는 호스트에서: ./gradlew :services:auth-service:bootRun --args='--spring.profiles.active=local'
+#   docker compose up -d                      # 백킹 서비스만
+#   docker compose --profile ui up -d         # + redpanda console
+#   docker compose --profile services up -d   # + Spring 서비스 컨테이너
+#   docker compose --profile bff up -d        # + bff 컨테이너
+# Spring을 호스트에서 실행: ./gradlew :services:user-service:bootRun
 name: candle-local
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -60,6 +61,27 @@ services:
     ports:
       - "1025:1025" # SMTP (notification-service가 발송)
       - "8025:8025" # 웹 UI (받은 메일 확인)
+
+  # ── 옵션: Spring 서비스 컨테이너 ──────────────────────────────────────
+  user-service:
+    image: ${USER_SERVICE_IMAGE:-yyubin/candle-user-service:dev}
+    profiles: ["services"]
+    environment:
+      USER_DB_URL: jdbc:postgresql://postgres:5432/candle_users
+      USER_DB_USERNAME: ${POSTGRES_USER:-postgres}
+      USER_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      USER_GRPC_PORT: "50052"
+      USER_SERVER_PORT: "8082"
+    ports:
+      - "50052:50052"
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_started
+    restart: on-failure
 
   # ── 옵션: redpanda console (Kafka UI) ──
   redpanda-console:
