@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
+import org.profit.candle.auth.identity.repository.OAuthAccountRepository;
 import org.profit.candle.auth.token.entity.RefreshToken;
 import org.profit.candle.auth.token.repository.RefreshTokenRepository;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -24,21 +25,30 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class DefaultAuthTokenService implements AuthTokenIssuer, RefreshTokenService {
+
     private final AuthProperties properties;
     private final JwtEncoder jwtEncoder;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final OAuthAccountRepository oAuthAccountRepository;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Override
     @Transactional
-    public IssuedTokens issue(UUID userId) {
+    public IssuedTokens issue(UUID userId, String email) {
         Instant now = Instant.now();
         Instant accessExpiresAt = now.plus(properties.jwt().accessTokenTtl());
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(MacAlgorithm.HS256).build(),
-                JwtClaimsSet.builder().issuer(properties.jwt().issuer()).subject(userId.toString())
-                        .issuedAt(now).expiresAt(accessExpiresAt).id(UUID.randomUUID().toString())
-                        .claim("role", "USER").build())).getTokenValue();
+                JwtClaimsSet.builder()
+                        .issuer(properties.jwt().issuer())
+                        .subject(userId.toString())
+                        .issuedAt(now)
+                        .expiresAt(accessExpiresAt)
+                        .id(UUID.randomUUID().toString())
+                        .claim("role", "USER")
+                        .claim("email", email)
+                        .build()))
+                .getTokenValue();
         String refreshToken = newRefreshToken();
         refreshTokenRepository.save(new RefreshToken(UUID.randomUUID(), userId, hash(refreshToken),
                 now.plus(properties.jwt().refreshTokenTtl())));
@@ -52,13 +62,17 @@ public class DefaultAuthTokenService implements AuthTokenIssuer, RefreshTokenSer
                 .filter(token -> token.usableAt(Instant.now()))
                 .orElseThrow(() -> new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN));
         stored.revoke(Instant.now());
-        return issue(stored.userId());
+        String email = oAuthAccountRepository.findById(stored.userId())
+                .map(account -> account.email())
+                .orElse("");
+        return issue(stored.userId(), email);
     }
 
     @Override
     @Transactional
     public void revoke(String refreshToken) {
-        refreshTokenRepository.findByTokenHash(hash(refreshToken)).ifPresent(token -> token.revoke(Instant.now()));
+        refreshTokenRepository.findByTokenHash(hash(refreshToken))
+                .ifPresent(token -> token.revoke(Instant.now()));
     }
 
     private String newRefreshToken() {

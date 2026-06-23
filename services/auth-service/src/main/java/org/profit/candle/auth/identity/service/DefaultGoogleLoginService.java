@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class DefaultGoogleLoginService implements GoogleLoginService {
+
     private final GoogleOAuthClient googleOAuthClient;
     private final OAuthAccountRepository accountRepository;
     private final AuthTokenIssuer tokenIssuer;
@@ -30,13 +31,14 @@ public class DefaultGoogleLoginService implements GoogleLoginService {
         if (!profile.emailVerified() || profile.subject().isBlank()) {
             throw new AuthException(AuthErrorCode.GOOGLE_ACCOUNT_NOT_VERIFIED);
         }
-        OAuthAccount account = accountRepository.findByProviderAndProviderSubject("google", profile.subject())
+        OAuthAccount account = accountRepository
+                .findByProviderAndProviderSubject("google", profile.subject())
                 .orElseGet(() -> {
-                    OAuthAccount created = accountRepository.save(new OAuthAccount(UUID.randomUUID(), "google", profile.subject(),
-                            profile.email(), Instant.now()));
+                    OAuthAccount created = accountRepository.save(new OAuthAccount(
+                            UUID.randomUUID(), "google", profile.subject(), profile.email(), Instant.now()));
                     outboxWriter.recordUserCreated(created.userId(), created.email());
                     return created;
                 });
-        return tokenIssuer.issue(account.userId());
+        return tokenIssuer.issue(account.userId(), account.email());
     }
 }
