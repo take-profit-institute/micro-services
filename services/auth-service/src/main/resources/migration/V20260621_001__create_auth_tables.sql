@@ -11,7 +11,7 @@ CREATE TABLE oauth_accounts (
 CREATE TABLE refresh_tokens (
   id UUID PRIMARY KEY,
   user_id UUID NOT NULL,
-  token_hash CHAR(64) NOT NULL,
+  token_hash VARCHAR(64) NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   revoked_at TIMESTAMPTZ,
   CONSTRAINT uk_refresh_tokens_token_hash UNIQUE (token_hash)

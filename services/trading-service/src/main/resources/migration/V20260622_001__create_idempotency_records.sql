@@ -3,7 +3,7 @@ CREATE TABLE idempotency_records (
   actor_id         VARCHAR(120) NOT NULL,
   operation        VARCHAR(200) NOT NULL,
   idempotency_key  VARCHAR(64) NOT NULL,
-  request_hash     CHAR(64) NOT NULL,
+  request_hash     VARCHAR(64) NOT NULL,
   response_payload BYTEA NOT NULL,
   response_type    VARCHAR(200) NOT NULL,
   grpc_code        VARCHAR(40) NOT NULL DEFAULT 'OK',

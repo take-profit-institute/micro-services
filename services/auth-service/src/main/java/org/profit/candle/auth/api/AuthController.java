@@ -7,9 +7,11 @@ import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.api.dto.OAuthLoginRequest;
+import org.profit.candle.auth.api.dto.OAuthLoginResponse;
 import org.profit.candle.auth.api.dto.ProviderResponse;
 import org.profit.candle.auth.api.dto.ProvidersResponse;
 import org.profit.candle.auth.identity.service.GoogleLoginService;
+import org.profit.candle.auth.identity.service.LoginResult;
 import org.profit.candle.auth.token.service.RefreshTokenService;
 import org.profit.candle.auth.token.service.IssuedTokens;
 import org.springframework.http.HttpHeaders;
@@ -38,19 +40,21 @@ public class AuthController {
     }
 
     @PostMapping("/oauth/google")
-    public ResponseEntity<Void> login(@RequestBody OAuthLoginRequest request) {
+    public ResponseEntity<OAuthLoginResponse> login(@RequestBody OAuthLoginRequest request) {
         if (request.authorizationCode() == null || request.authorizationCode().isBlank()) {
             throw new AuthException(AuthErrorCode.INVALID_OAUTH_REQUEST);
         }
-        return tokenCookies(googleLoginService.login(request.authorizationCode()));
+        LoginResult result = googleLoginService.login(request.authorizationCode());
+        return tokenResponse(result.tokens(), result.isNewUser());
     }
 
     @PostMapping("/token/refresh")
-    public ResponseEntity<Void> refresh(@CookieValue(name = "refresh_token", required = false) String refreshToken) {
+    public ResponseEntity<OAuthLoginResponse> refresh(
+            @CookieValue(name = "refresh_token", required = false) String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
-        return tokenCookies(refreshTokenService.rotate(refreshToken));
+        return tokenResponse(refreshTokenService.rotate(refreshToken), false);
     }
 
     @PostMapping("/logout")
@@ -75,13 +79,18 @@ public class AuthController {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
-    private ResponseEntity<Void> tokenCookies(IssuedTokens tokens) {
+    private ResponseEntity<OAuthLoginResponse> tokenResponse(IssuedTokens tokens, boolean isNewUser) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie("access_token", tokens.accessToken(), "/",
                         properties.jwt().accessTokenTtl()).toString())
                 .header(HttpHeaders.SET_COOKIE, cookie("refresh_token", tokens.refreshToken(), "/api/v1/auth",
                         properties.jwt().refreshTokenTtl()).toString())
-                .build();
+                .body(new OAuthLoginResponse(
+                        tokens.accessToken(),
+                        tokens.refreshToken(),
+                        properties.jwt().accessTokenTtl().toSeconds(),
+                        properties.jwt().refreshTokenTtl().toSeconds(),
+                        isNewUser));
     }
 
     private ResponseCookie cookie(String name, String value, String path, java.time.Duration maxAge) {
