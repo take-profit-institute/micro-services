@@ -3,6 +3,7 @@ package org.profit.candle.auth.api;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
     private final AuthProperties properties;
     private final GoogleLoginService googleLoginService;
@@ -52,8 +54,10 @@ public class AuthController {
     public ResponseEntity<OAuthLoginResponse> refresh(
             @CookieValue(name = "refresh_token", required = false) String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
+            log.info("refresh token is null");
             throw new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
+        log.info("refresh token is {}", refreshToken);
         return tokenResponse(refreshTokenService.rotate(refreshToken), false);
     }
 
