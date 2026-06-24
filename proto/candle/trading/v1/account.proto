@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package candle.trading.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.trading.v1";
+
+import "candle/common/v1/common.proto";
+import "candle/trading/v1/trading_common.proto";
+
+message AccountBalance {
+  string user_id = 1;
+  int64 cash = 2;
+  int64 reserved_balance = 3;
+  int64 available_cash = 4;
+  int64 total_asset = 5;
+}
+
+message GetBalanceRequest { string user_id = 1; }
+message GetBalanceResponse { AccountBalance balance = 1; }
+
+service AccountService {
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+}
