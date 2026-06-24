@@ -123,7 +123,7 @@ services:
     profiles: ["gateway"]
     environment:
       GATEWAY_PORT: "8000"
-      AUTH_JWT_HMAC_SECRET: ${AUTH_JWT_HMAC_SECRET:-change-me-in-production-change-me-in-production}
+      AUTH_JWT_HMAC_SECRET: ${AUTH_JWT_HMAC_SECRET:?AUTH_JWT_HMAC_SECRET must be set in .env}
       # auth-service 주소: 'services' 프로파일 사용 시 http://auth-service:8081
       GATEWAY_AUTH_URI: ${GATEWAY_AUTH_URI:-http://host.docker.internal:8081}
       # BFF 주소: 'bff' 프로파일 사용 시 http://bff:8080
