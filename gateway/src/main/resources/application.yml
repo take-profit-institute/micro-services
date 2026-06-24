@@ -13,6 +13,8 @@ gateway:
   route:
     auth-uri: ${GATEWAY_AUTH_URI:http://localhost:8081}
     bff-uri: ${GATEWAY_BFF_URI:http://localhost:8080}
+  cors:
+    allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 management:
   endpoints:
