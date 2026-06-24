@@ -12,6 +12,7 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Set;
 
 @Component
@@ -43,17 +44,18 @@ public class ProxyWebFilter implements WebFilter, Ordered {
         String path = request.getPath().value();
         String query = request.getURI().getRawQuery();
 
-        // /api/auth/** → auth-service, /api/v1/auth/**를 재작성하여 전달 (프론트엔드 경로 통일)
-        // /api/v1/auth/** → auth-service, 경로 유지
         String targetBase;
         String targetPath;
-        if (path.startsWith("/api/auth/") || path.equals("/api/auth")) {
-            targetBase = authServiceUri;
-            targetPath = "/api/v1" + path.substring("/api".length());
-        } else if (path.startsWith("/api/v1/auth/") || path.equals("/api/v1/auth")) {
+        if (path.startsWith("/api/v1/auth/")) {
+            // /api/v1/auth/** → auth-service, 경로 유지
             targetBase = authServiceUri;
             targetPath = path;
+        } else if (isAuthServicePath(path)) {
+            // /api/auth/{providers|oauth/**|token/refresh|logout} → auth-service, /api/v1/auth/** 재작성
+            targetBase = authServiceUri;
+            targetPath = "/api/v1" + path.substring("/api".length());
         } else {
+            // /api/auth/me, /api/auth/token/validate 등 BFF 전용 경로
             targetBase = bffUri;
             targetPath = path;
         }
@@ -73,14 +75,34 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                 .exchangeToMono(clientResponse -> {
                     var response = exchange.getResponse();
                     response.setStatusCode(clientResponse.statusCode());
+                    final String routedBase = targetBase;
                     clientResponse.headers().asHttpHeaders().forEach((name, values) -> {
-                        if (!EXCLUDED_RESPONSE_HEADERS.contains(name.toLowerCase())) {
+                        if (EXCLUDED_RESPONSE_HEADERS.contains(name.toLowerCase())) return;
+                        if (name.equalsIgnoreCase(HttpHeaders.SET_COOKIE) && routedBase.equals(authServiceUri)) {
+                            // Rewrite cookie Path: auth-service uses /api/v1/auth internally,
+                            // but the browser sees the gateway path /api/auth.
+                            List<String> rewritten = values.stream()
+                                    .map(v -> v.replace("Path=/api/v1/auth", "Path=/api/auth"))
+                                    .toList();
+                            response.getHeaders().put(name, rewritten);
+                        } else {
                             response.getHeaders().put(name, values);
                         }
                     });
                     Flux<DataBuffer> body = clientResponse.bodyToFlux(DataBuffer.class);
                     return response.writeWith(body);
                 });
+    }
+
+    /**
+     * auth-service가 실제로 처리하는 경로만 true.
+     * /me, /token/validate 등 BFF 전용 경로는 false → BFF로 라우팅.
+     */
+    private static boolean isAuthServicePath(String path) {
+        return path.equals("/api/auth/providers")
+                || path.startsWith("/api/auth/oauth/")
+                || path.equals("/api/auth/token/refresh")
+                || path.equals("/api/auth/logout");
     }
 
     @Override
