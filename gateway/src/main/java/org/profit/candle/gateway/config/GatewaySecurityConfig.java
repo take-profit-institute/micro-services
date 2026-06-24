@@ -30,7 +30,8 @@ public class GatewaySecurityConfig {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(auth -> auth
-                        .pathMatchers("/api/v1/auth/**").permitAll()
+                        .pathMatchers("/api/v1/auth/**").permitAll()  // auth-service 직접 경로
+                        .pathMatchers("/api/auth/**").permitAll()      // BFF 인증 경로 (로그인/갱신)
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
