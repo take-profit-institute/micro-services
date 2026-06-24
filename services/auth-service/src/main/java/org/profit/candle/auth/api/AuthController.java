@@ -1,7 +1,5 @@
 package org.profit.candle.auth.api;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.auth.config.AuthProperties;
@@ -9,10 +7,10 @@ import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.api.dto.OAuthLoginRequest;
 import org.profit.candle.auth.api.dto.OAuthLoginResponse;
-import org.profit.candle.auth.api.dto.ProviderResponse;
 import org.profit.candle.auth.api.dto.ProvidersResponse;
 import org.profit.candle.auth.identity.service.GoogleLoginService;
 import org.profit.candle.auth.identity.service.LoginResult;
+import org.profit.candle.auth.identity.service.OAuthProvidersService;
 import org.profit.candle.auth.token.service.RefreshTokenService;
 import org.profit.candle.auth.token.service.IssuedTokens;
 import org.springframework.http.HttpHeaders;
@@ -35,10 +33,11 @@ public class AuthController {
     private final AuthProperties properties;
     private final GoogleLoginService googleLoginService;
     private final RefreshTokenService refreshTokenService;
+    private final OAuthProvidersService oAuthProvidersService;
 
     @GetMapping("/providers")
     public ProvidersResponse listProviders() {
-        return ProvidersResponse.google(googleAuthorizationUrl());
+        return oAuthProvidersService.listProviders();
     }
 
     @PostMapping("/oauth/google")
@@ -71,16 +70,6 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, expiredCookie("access_token", "/").toString())
                 .header(HttpHeaders.SET_COOKIE, expiredCookie("refresh_token", "/api/v1/auth").toString())
                 .build();
-    }
-
-    private String googleAuthorizationUrl() {
-        return "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id="
-                + encode(properties.google().clientId()) + "&redirect_uri=" + encode(properties.google().redirectUri())
-                + "&scope=" + encode("openid email profile") + "&access_type=offline&prompt=consent";
-    }
-
-    private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private ResponseEntity<OAuthLoginResponse> tokenResponse(IssuedTokens tokens, boolean isNewUser) {
