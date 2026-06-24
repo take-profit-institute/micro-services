@@ -128,6 +128,7 @@ services:
       GATEWAY_AUTH_URI: ${GATEWAY_AUTH_URI:-http://host.docker.internal:8081}
       # BFF 주소: 'bff' 프로파일 사용 시 http://bff:8080
       GATEWAY_BFF_URI: ${GATEWAY_BFF_URI:-http://host.docker.internal:8080}
+      GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
     ports: ["8000:8000"]
     extra_hosts: ["host.docker.internal:host-gateway"]
 
