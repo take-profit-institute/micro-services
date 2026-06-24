@@ -43,8 +43,21 @@ public class ProxyWebFilter implements WebFilter, Ordered {
         String path = request.getPath().value();
         String query = request.getURI().getRawQuery();
 
-        String targetBase = path.startsWith("/api/v1/auth/") ? authServiceUri : bffUri;
-        String targetUri = targetBase + path + (query != null ? "?" + query : "");
+        // /api/auth/** → auth-service, /api/v1/auth/**를 재작성하여 전달 (프론트엔드 경로 통일)
+        // /api/v1/auth/** → auth-service, 경로 유지
+        String targetBase;
+        String targetPath;
+        if (path.startsWith("/api/auth/") || path.equals("/api/auth")) {
+            targetBase = authServiceUri;
+            targetPath = "/api/v1" + path.substring("/api".length());
+        } else if (path.startsWith("/api/v1/auth/") || path.equals("/api/v1/auth")) {
+            targetBase = authServiceUri;
+            targetPath = path;
+        } else {
+            targetBase = bffUri;
+            targetPath = path;
+        }
+        String targetUri = targetBase + targetPath + (query != null ? "?" + query : "");
 
         HttpHeaders forwardHeaders = new HttpHeaders();
         request.getHeaders().forEach((name, values) -> {
