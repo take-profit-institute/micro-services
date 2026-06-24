@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package candle.auth.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.auth.v1";
+
+message Provider {
+  string name = 1;
+  string authorization_url = 2;
+}
+
+message ListProvidersRequest {}
+
+message ListProvidersResponse {
+  repeated Provider providers = 1;
+}
+
+service AuthService {
+  rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse);
+}
