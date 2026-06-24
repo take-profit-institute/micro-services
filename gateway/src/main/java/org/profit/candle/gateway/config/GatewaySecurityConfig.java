@@ -19,6 +19,8 @@ import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.ServerAuthenticationConverter;
+import org.springframework.security.web.server.util.matcher.OrServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -36,17 +38,28 @@ public class GatewaySecurityConfig {
     @Value("${gateway.cors.allowed-origins:http://localhost:3000}")
     private List<String> allowedOrigins;
 
+    // auth 경로 + preflight: JWT 검증 없이 통과
     @Bean
-    public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) {
+    @Order(1)
+    public SecurityWebFilterChain publicFilterChain(ServerHttpSecurity http) {
+        return http
+                .securityMatcher(new OrServerWebExchangeMatcher(
+                        ServerWebExchangeMatchers.pathMatchers(HttpMethod.OPTIONS, "/**"),
+                        ServerWebExchangeMatchers.pathMatchers("/api/auth/**"),
+                        ServerWebExchangeMatchers.pathMatchers("/api/v1/auth/**")
+                ))
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .authorizeExchange(auth -> auth.anyExchange().permitAll())
+                .build();
+    }
+
+    // 나머지 경로: JWT 필수
+    @Bean
+    @Order(2)
+    public SecurityWebFilterChain securedFilterChain(ServerHttpSecurity http) {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .cors(withDefaults())
-                .authorizeExchange(auth -> auth
-                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .pathMatchers("/api/v1/auth/**").permitAll()
-                        .pathMatchers("/api/auth/**").permitAll()
-                        .anyExchange().authenticated()
-                )
+                .authorizeExchange(auth -> auth.anyExchange().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(withDefaults())
                         .bearerTokenConverter(bearerTokenConverter())
@@ -54,7 +67,6 @@ public class GatewaySecurityConfig {
                 .build();
     }
 
-    // Security 체인보다 먼저 실행되어 모든 응답(401 포함)에 CORS 헤더를 붙임
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public CorsWebFilter corsWebFilter() {
