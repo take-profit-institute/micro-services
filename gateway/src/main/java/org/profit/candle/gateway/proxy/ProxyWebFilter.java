@@ -99,8 +99,7 @@ public class ProxyWebFilter implements WebFilter, Ordered {
      * /me, /token/validate 등 BFF 전용 경로는 false → BFF로 라우팅.
      */
     private static boolean isAuthServicePath(String path) {
-        return path.equals("/api/auth/providers")
-                || path.startsWith("/api/auth/oauth/")
+        return path.startsWith("/api/auth/oauth/")
                 || path.equals("/api/auth/token/refresh")
                 || path.equals("/api/auth/logout");
     }
