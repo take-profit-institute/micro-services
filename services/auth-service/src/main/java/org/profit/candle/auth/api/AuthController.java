@@ -8,7 +8,7 @@ import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.api.dto.OAuthLoginRequest;
 import org.profit.candle.auth.api.dto.OAuthLoginResponse;
 import org.profit.candle.auth.api.dto.ProvidersResponse;
-import org.profit.candle.auth.identity.service.GoogleLoginService;
+import org.profit.candle.auth.identity.service.OAuthLoginService;
 import org.profit.candle.auth.identity.service.LoginResult;
 import org.profit.candle.auth.identity.service.OAuthProvidersService;
 import org.profit.candle.auth.token.service.RefreshTokenService;
@@ -19,6 +19,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class AuthController {
     private final AuthProperties properties;
-    private final GoogleLoginService googleLoginService;
+    private final OAuthLoginService oAuthLoginService;
     private final RefreshTokenService refreshTokenService;
     private final OAuthProvidersService oAuthProvidersService;
 
@@ -40,12 +41,13 @@ public class AuthController {
         return oAuthProvidersService.listProviders();
     }
 
-    @PostMapping("/oauth/google")
-    public ResponseEntity<OAuthLoginResponse> login(@RequestBody OAuthLoginRequest request) {
+    @PostMapping("/oauth/{provider}")
+    public ResponseEntity<OAuthLoginResponse> login(@PathVariable String provider,
+            @RequestBody OAuthLoginRequest request) {
         if (request.authorizationCode() == null || request.authorizationCode().isBlank()) {
             throw new AuthException(AuthErrorCode.INVALID_OAUTH_REQUEST);
         }
-        LoginResult result = googleLoginService.login(request.authorizationCode());
+        LoginResult result = oAuthLoginService.login(provider, request.authorizationCode());
         return tokenResponse(result.tokens(), result.isNewUser());
     }
 

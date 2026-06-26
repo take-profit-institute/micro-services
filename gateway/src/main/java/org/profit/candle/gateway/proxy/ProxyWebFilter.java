@@ -79,12 +79,7 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                     clientResponse.headers().asHttpHeaders().forEach((name, values) -> {
                         if (EXCLUDED_RESPONSE_HEADERS.contains(name.toLowerCase())) return;
                         if (name.equalsIgnoreCase(HttpHeaders.SET_COOKIE) && routedBase.equals(authServiceUri)) {
-                            // Rewrite cookie Path: auth-service uses /api/v1/auth internally,
-                            // but the browser sees the gateway path /api/auth.
-                            List<String> rewritten = values.stream()
-                                    .map(v -> v.replace("Path=/api/v1/auth", "Path=/api/auth"))
-                                    .toList();
-                            response.getHeaders().put(name, rewritten);
+                            response.getHeaders().put(name, rewriteAuthCookiePaths(values));
                         } else {
                             response.getHeaders().put(name, values);
                         }
@@ -92,6 +87,13 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                     Flux<DataBuffer> body = clientResponse.bodyToFlux(DataBuffer.class);
                     return response.writeWith(body);
                 });
+    }
+
+    /** auth-service 내부 경로(/api/v1/auth)를 게이트웨이 공개 경로(/api/auth)로 재작성. */
+    static List<String> rewriteAuthCookiePaths(List<String> values) {
+        return values.stream()
+                .map(v -> v.replace("Path=/api/v1/auth", "Path=/api/auth"))
+                .toList();
     }
 
     /**
