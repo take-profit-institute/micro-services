@@ -1,11 +1,11 @@
 package org.profit.candle.trading.order.event;
 
+import lombok.RequiredArgsConstructor;
+import org.profit.candle.trading.support.event.OutboxOperations;
+import org.profit.candle.trading.order.repository.OutboxEventRepository;
+import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import org.profit.candle.trading.order.repository.OutboxEventRepository;
-import org.profit.candle.trading.support.event.OutboxOperations;
-import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor

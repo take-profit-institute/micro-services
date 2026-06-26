@@ -1,13 +1,11 @@
 package org.profit.candle.trading.order.event;
 
-import java.time.Instant;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.trading.order.repository.IdempotencyRecordRepository;
 import org.profit.candle.trading.support.idempotency.IdempotencyOperations;
-import org.profit.candle.trading.support.idempotency.entity.IdempotencyRecord;
-import org.profit.candle.trading.support.idempotency.entity.IdempotencyRecordId;
 import org.springframework.stereotype.Component;
+import java.time.Instant;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor

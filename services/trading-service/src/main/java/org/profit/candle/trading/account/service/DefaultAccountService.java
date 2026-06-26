@@ -18,12 +18,14 @@ public class DefaultAccountService implements AccountService {
 
     @Override
     public AccountBalanceEntity getBalance(String actorId) {
-        return loadOrCreateBalance(actorId);
+        // 단순 조회 — 락 불필요
+        return balanceRepository.findById(actorId)
+                .orElseGet(() -> balanceRepository.save(new AccountBalanceEntity(actorId, startingCash, 0)));
     }
 
     @Override
     public void reserveBalance(String actorId, long amount) {
-        AccountBalanceEntity balance = loadOrCreateBalance(actorId);
+        AccountBalanceEntity balance = loadOrCreateForUpdate(actorId);
         if (balance.availableCash() < amount) {
             throw Status.FAILED_PRECONDITION.withDescription("가용 금액이 부족합니다").asRuntimeException();
         }
@@ -33,13 +35,14 @@ public class DefaultAccountService implements AccountService {
 
     @Override
     public void releaseBalance(String actorId, long amount) {
-        AccountBalanceEntity balance = loadOrCreateBalance(actorId);
+        AccountBalanceEntity balance = loadOrCreateForUpdate(actorId);
         balance.releaseReservation(amount);
         balanceRepository.save(balance);
     }
 
-    private AccountBalanceEntity loadOrCreateBalance(String actorId) {
-        return balanceRepository.findById(actorId)
+    /** 잔고 변경 직전 락을 걸고 조회한다. 없으면 생성 (생성 시점엔 동시성 충돌이 없으므로 락 불필요). */
+    private AccountBalanceEntity loadOrCreateForUpdate(String actorId) {
+        return balanceRepository.findByIdForUpdate(actorId)
                 .orElseGet(() -> balanceRepository.save(new AccountBalanceEntity(actorId, startingCash, 0)));
     }
 }
