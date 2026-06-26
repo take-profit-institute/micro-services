@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** account 스키마 전용 outbox 테이블 — SQL 컨벤션 9장, 11.2절. */
-@Entity
+@Entity(name = "AccountOutboxEvent")
 @Table(name = "outbox_events", schema = "account")
 public class OutboxEvent {
 

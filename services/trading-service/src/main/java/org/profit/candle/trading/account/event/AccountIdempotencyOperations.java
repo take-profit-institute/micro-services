@@ -1,7 +1,7 @@
 package org.profit.candle.trading.account.event;
 
 import lombok.RequiredArgsConstructor;
-import org.profit.candle.trading.account.repository.IdempotencyRecordRepository;
+import org.profit.candle.trading.account.repository.AccountIdempotencyRecordRepository;
 import org.profit.candle.trading.support.idempotency.IdempotencyOperations;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
@@ -12,7 +12,7 @@ import java.util.Optional;
 public class AccountIdempotencyOperations
         implements IdempotencyOperations<IdempotencyRecordId, IdempotencyRecord> {
 
-    private final IdempotencyRecordRepository repository;
+    private final AccountIdempotencyRecordRepository repository;
 
     @Override
     public IdempotencyRecordId newId(String actorId, String operation, String idempotencyKey) {

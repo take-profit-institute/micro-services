@@ -13,10 +13,10 @@ dependencies {
 
     // 영속/멱등성
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'com.fasterxml.jackson.core:jackson-databind'
     runtimeOnly 'org.postgresql:postgresql'
     runtimeOnly 'org.flywaydb:flyway-core'
     runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.springframework.boot:spring-boot-flyway'
 
     // 도메인 이벤트 발행 (outbox → Kafka)
     implementation 'org.springframework.kafka:spring-kafka'

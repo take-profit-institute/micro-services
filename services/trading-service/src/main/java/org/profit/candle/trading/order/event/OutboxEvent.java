@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** order_svc 스키마 전용 outbox 테이블 — SQL 컨벤션 9장, 1장 스키마 목록. */
-@Entity
+@Entity(name = "OrderOutboxEvent")
 @Table(name = "outbox_events", schema = "order_svc")
 public class OutboxEvent {
 

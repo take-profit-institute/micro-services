@@ -11,7 +11,7 @@ import java.time.Instant;
  * 멱등성 레코드 (스펙 §4). 성공 response protobuf bytes를 함께 저장해
  * 같은 키 재시도 시 재생(replay)한다. 도메인 변경·outbox와 한 트랜잭션에서 commit된다.
  */
-@Entity
+@Entity(name = "OrderIdempotencyRecord")
 @Table(name = "idempotency_records", schema = "order_svc")
 public class IdempotencyRecord {
 

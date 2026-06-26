@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.trading.account.entity.AccountBalanceEntity;
 import org.profit.candle.trading.account.repository.AccountBalanceRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -40,9 +41,23 @@ public class DefaultAccountService implements AccountService {
         balanceRepository.save(balance);
     }
 
-    /** 잔고 변경 직전 락을 걸고 조회한다. 없으면 생성 (생성 시점엔 동시성 충돌이 없으므로 락 불필요). */
+    /**
+     * 잔고 변경 직전 락을 걸고 조회한다. 없으면 생성한다.
+     * 동시에 같은 actorId로 최초 생성이 시도되면 unique 제약 충돌이 날 수 있으므로,
+     * 충돌 시 패자는 승자가 commit한 row를 락 걸고 재조회한다.
+     */
     private AccountBalanceEntity loadOrCreateForUpdate(String actorId) {
         return balanceRepository.findByIdForUpdate(actorId)
-                .orElseGet(() -> balanceRepository.save(new AccountBalanceEntity(actorId, startingCash, 0)));
+                .orElseGet(() -> createOrFetchExisting(actorId));
+    }
+
+    private AccountBalanceEntity createOrFetchExisting(String actorId) {
+        try {
+            return balanceRepository.save(new AccountBalanceEntity(actorId, startingCash, 0));
+        } catch (DataIntegrityViolationException race) {
+            // 동시 요청이 먼저 commit — PK 충돌. 승자의 row를 락 걸고 재조회한다.
+            return balanceRepository.findByIdForUpdate(actorId)
+                    .orElseThrow(() -> race);
+        }
     }
 }

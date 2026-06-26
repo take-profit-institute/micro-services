@@ -2,7 +2,7 @@ package org.profit.candle.trading.order.event;
 
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.trading.support.event.OutboxOperations;
-import org.profit.candle.trading.order.repository.OutboxEventRepository;
+import org.profit.candle.trading.order.repository.OrderOutboxEventRepository;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.UUID;
@@ -11,7 +11,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderOutboxOperations implements OutboxOperations<OutboxEvent> {
 
-    private final OutboxEventRepository repository;
+    private final OrderOutboxEventRepository repository;
 
     @Override
     public OutboxEvent newEvent(UUID id, String eventType, String aggregateId, String payload, Instant occurredAt) {
