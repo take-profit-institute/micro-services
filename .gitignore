@@ -44,3 +44,12 @@ out/
 !**/.env.example
 !**/.env.development.example
 !**/.env.production.example
+
+
+# Claude / AI 컨텍스트
+claude.md
+CLAUDE.md
+
+# Docker Compose 로컬 오버라이드
+docker-compose.override.yml
+docker-compose.override.yaml

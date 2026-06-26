@@ -1,19 +1,22 @@
-package org.profit.candle.auth.google.client;
+package org.profit.candle.auth.oauth.google;
 
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
+import org.profit.candle.auth.oauth.OAuthClient;
+import org.profit.candle.auth.oauth.OAuthProfile;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.util.LinkedMultiValueMap;
 
 @Component
 @RequiredArgsConstructor
-public class GoogleRestClient implements GoogleOAuthClient {
+public class GoogleOAuthClient implements OAuthClient {
+
     private static final String TOKEN_URI = "https://oauth2.googleapis.com/token";
     private static final String USER_INFO_URI = "https://openidconnect.googleapis.com/v1/userinfo";
 
@@ -21,7 +24,12 @@ public class GoogleRestClient implements GoogleOAuthClient {
     private final RestClient restClient = RestClient.create();
 
     @Override
-    public GoogleProfile exchangeAuthorizationCode(String authorizationCode) {
+    public String provider() {
+        return "google";
+    }
+
+    @Override
+    public OAuthProfile fetch(String authorizationCode) {
         validateConfiguration();
         try {
             var form = new LinkedMultiValueMap<String, String>();
@@ -30,16 +38,22 @@ public class GoogleRestClient implements GoogleOAuthClient {
             form.add("client_secret", properties.google().clientSecret());
             form.add("redirect_uri", properties.google().redirectUri());
             form.add("grant_type", "authorization_code");
+
             Map<?, ?> token = restClient.post().uri(TOKEN_URI)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(form).retrieve().body(Map.class);
+
             String accessToken = String.valueOf(token.get("access_token"));
+
             Map<?, ?> profile = restClient.get().uri(USER_INFO_URI)
                     .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(Map.class);
-            return new GoogleProfile(String.valueOf(profile.get("sub")), String.valueOf(profile.get("email")),
+
+            return new OAuthProfile(
+                    String.valueOf(profile.get("sub")),
+                    String.valueOf(profile.get("email")),
                     Boolean.parseBoolean(String.valueOf(profile.get("email_verified"))));
-        } catch (RestClientException exception) {
-            throw new AuthException(AuthErrorCode.GOOGLE_OAUTH_EXCHANGE_FAILED, exception);
+        } catch (RestClientException e) {
+            throw new AuthException(AuthErrorCode.GOOGLE_OAUTH_EXCHANGE_FAILED, e);
         }
     }
 
