@@ -4,22 +4,23 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.user.profile.dto.UserProfileResult;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.profit.candle.user.profile.event.entity.OutboxEvent;
+import org.profit.candle.user.profile.event.repository.OutboxEventRepository;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class UserProfileEventPublisher {
+public class OutboxWriter {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
 
-    public void publishUserProfileUpdated(UserProfileResult result) {
+    public void writeUserProfileUpdated(UserProfileResult result) {
         UserProfileUpdatedEvent event = UserProfileUpdatedEvent.of(
                 result.userId(), result.nickname(), result.profileImageUrl());
         try {
-            kafkaTemplate.send(UserProfileUpdatedEvent.TOPIC, result.userId(),
-                    objectMapper.writeValueAsString(event));
+            String payload = objectMapper.writeValueAsString(event);
+            outboxEventRepository.save(new OutboxEvent(UserProfileEvents.TOPIC, result.userId(), payload));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("UserProfileUpdated 이벤트 직렬화 실패", e);
         }

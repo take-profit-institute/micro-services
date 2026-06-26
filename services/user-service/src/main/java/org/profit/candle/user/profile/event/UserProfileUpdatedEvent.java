@@ -12,13 +12,9 @@ public record UserProfileUpdatedEvent(
         String profileImageUrl,
         Instant occurredAt) {
 
-    static final String EVENT_TYPE = "UserProfileUpdated";
-    static final String TOPIC = "user.profile-updated.v1";
-    static final int VERSION = 1;
-
-    static UserProfileUpdatedEvent of(String userId, String nickname, String profileImageUrl) {
+    public static UserProfileUpdatedEvent of(String userId, String nickname, String profileImageUrl) {
         return new UserProfileUpdatedEvent(
-                UUID.randomUUID(), EVENT_TYPE, VERSION,
+                UUID.randomUUID(), UserProfileEvents.EVENT_TYPE, UserProfileEvents.VERSION,
                 userId, nickname, profileImageUrl,
                 Instant.now());
     }
