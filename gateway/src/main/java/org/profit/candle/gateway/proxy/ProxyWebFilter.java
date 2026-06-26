@@ -79,12 +79,7 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                     clientResponse.headers().asHttpHeaders().forEach((name, values) -> {
                         if (EXCLUDED_RESPONSE_HEADERS.contains(name.toLowerCase())) return;
                         if (name.equalsIgnoreCase(HttpHeaders.SET_COOKIE) && routedBase.equals(authServiceUri)) {
-                            // Rewrite cookie Path: auth-service uses /api/v1/auth internally,
-                            // but the browser sees the gateway path /api/auth.
-                            List<String> rewritten = values.stream()
-                                    .map(v -> v.replace("Path=/api/v1/auth", "Path=/api/auth"))
-                                    .toList();
-                            response.getHeaders().put(name, rewritten);
+                            response.getHeaders().put(name, rewriteAuthCookiePaths(values));
                         } else {
                             response.getHeaders().put(name, values);
                         }
@@ -94,13 +89,19 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                 });
     }
 
+    /** auth-service 내부 경로(/api/v1/auth)를 게이트웨이 공개 경로(/api/auth)로 재작성. */
+    static List<String> rewriteAuthCookiePaths(List<String> values) {
+        return values.stream()
+                .map(v -> v.replace("Path=/api/v1/auth", "Path=/api/auth"))
+                .toList();
+    }
+
     /**
      * auth-service가 실제로 처리하는 경로만 true.
      * /me, /token/validate 등 BFF 전용 경로는 false → BFF로 라우팅.
      */
     private static boolean isAuthServicePath(String path) {
-        return path.equals("/api/auth/providers")
-                || path.startsWith("/api/auth/oauth/")
+        return path.startsWith("/api/auth/oauth/")
                 || path.equals("/api/auth/token/refresh")
                 || path.equals("/api/auth/logout");
     }
