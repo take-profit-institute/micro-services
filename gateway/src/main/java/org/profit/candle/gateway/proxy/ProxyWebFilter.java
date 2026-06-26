@@ -12,7 +12,9 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Component
@@ -63,8 +65,8 @@ public class ProxyWebFilter implements WebFilter, Ordered {
 
         HttpHeaders forwardHeaders = new HttpHeaders();
         request.getHeaders().forEach((name, values) -> {
-            if (!EXCLUDED_REQUEST_HEADERS.contains(name.toLowerCase())) {
-                forwardHeaders.put(name, values);
+            if (!EXCLUDED_REQUEST_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+                forwardHeaders.addAll(name, new ArrayList<>(values));
             }
         });
 
@@ -76,13 +78,10 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                     var response = exchange.getResponse();
                     response.setStatusCode(clientResponse.statusCode());
                     final String routedBase = targetBase;
-                    clientResponse.headers().asHttpHeaders().forEach((name, values) -> {
-                        if (EXCLUDED_RESPONSE_HEADERS.contains(name.toLowerCase())) return;
-                        if (name.equalsIgnoreCase(HttpHeaders.SET_COOKIE) && routedBase.equals(authServiceUri)) {
-                            response.getHeaders().put(name, rewriteAuthCookiePaths(values));
-                        } else {
-                            response.getHeaders().put(name, values);
-                        }
+                    HttpHeaders upstreamHeaders = clientResponse.headers().asHttpHeaders();
+                    response.beforeCommit(() -> {
+                        copyResponseHeaders(upstreamHeaders, response.getHeaders(), routedBase, authServiceUri);
+                        return Mono.empty();
                     });
                     Flux<DataBuffer> body = clientResponse.bodyToFlux(DataBuffer.class);
                     return response.writeWith(body);
@@ -96,9 +95,20 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                 .toList();
     }
 
+    static void copyResponseHeaders(HttpHeaders source, HttpHeaders target, String routedBase, String authServiceUri) {
+        source.forEach((name, values) -> {
+            if (EXCLUDED_RESPONSE_HEADERS.contains(name.toLowerCase(Locale.ROOT))) return;
+            List<String> copiedValues = new ArrayList<>(values);
+            if (name.equalsIgnoreCase(HttpHeaders.SET_COOKIE) && routedBase.equals(authServiceUri)) {
+                copiedValues = rewriteAuthCookiePaths(copiedValues);
+            }
+            target.remove(name);
+            target.addAll(name, copiedValues);
+        });
+    }
+
     private static boolean isAuthServicePath(String path) {
-        return path.equals("/api/auth/providers")
-                || path.startsWith("/api/auth/oauth/")
+        return path.startsWith("/api/auth/oauth/")
                 || path.equals("/api/auth/token/refresh")
                 || path.equals("/api/auth/logout");
     }
