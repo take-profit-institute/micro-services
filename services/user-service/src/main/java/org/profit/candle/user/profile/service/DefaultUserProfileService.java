@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.user.profile.dto.UpdateProfileCommand;
 import org.profit.candle.user.profile.dto.UserProfileResult;
 import org.profit.candle.user.profile.entity.UserProfileEntity;
+import org.profit.candle.user.profile.event.UserProfileEventPublisher;
 import org.profit.candle.user.profile.exception.UserErrorCode;
 import org.profit.candle.user.profile.exception.UserException;
 import org.profit.candle.user.profile.repository.UserProfileReader;
@@ -17,6 +18,7 @@ public class DefaultUserProfileService implements UserProfileService {
 
     private final UserProfileReader userProfileReader;
     private final UserProfileWriter userProfileWriter;
+    private final UserProfileEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -39,6 +41,8 @@ public class DefaultUserProfileService implements UserProfileService {
         UserProfileEntity profile = userProfileReader.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
         profile.updateProfile(command.nickname(), command.profileImageUrl());
-        return UserProfileResult.from(userProfileWriter.save(profile));
+        UserProfileResult result = UserProfileResult.from(userProfileWriter.save(profile));
+        eventPublisher.publishUserProfileUpdated(result);
+        return result;
     }
 }

@@ -55,7 +55,7 @@ public class ProxyWebFilter implements WebFilter, Ordered {
             targetBase = authServiceUri;
             targetPath = "/api/v1" + path.substring("/api".length());
         } else {
-            // /api/auth/me, /api/auth/token/validate 등 BFF 전용 경로
+            // /api/auth/me 등 BFF 전용 경로
             targetBase = bffUri;
             targetPath = path;
         }
@@ -96,12 +96,9 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                 .toList();
     }
 
-    /**
-     * auth-service가 실제로 처리하는 경로만 true.
-     * /me, /token/validate 등 BFF 전용 경로는 false → BFF로 라우팅.
-     */
     private static boolean isAuthServicePath(String path) {
-        return path.startsWith("/api/auth/oauth/")
+        return path.equals("/api/auth/providers")
+                || path.startsWith("/api/auth/oauth/")
                 || path.equals("/api/auth/token/refresh")
                 || path.equals("/api/auth/logout");
     }
