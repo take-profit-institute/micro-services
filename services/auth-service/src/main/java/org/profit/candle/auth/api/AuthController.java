@@ -1,17 +1,16 @@
 package org.profit.candle.auth.api;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.api.dto.OAuthLoginRequest;
 import org.profit.candle.auth.api.dto.OAuthLoginResponse;
-import org.profit.candle.auth.api.dto.ProviderResponse;
 import org.profit.candle.auth.api.dto.ProvidersResponse;
-import org.profit.candle.auth.identity.service.GoogleLoginService;
+import org.profit.candle.auth.identity.service.OAuthLoginService;
 import org.profit.candle.auth.identity.service.LoginResult;
+import org.profit.candle.auth.identity.service.OAuthProvidersService;
 import org.profit.candle.auth.token.service.RefreshTokenService;
 import org.profit.candle.auth.token.service.IssuedTokens;
 import org.springframework.http.HttpHeaders;
@@ -20,6 +19,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,22 +29,25 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
     private final AuthProperties properties;
-    private final GoogleLoginService googleLoginService;
+    private final OAuthLoginService oAuthLoginService;
     private final RefreshTokenService refreshTokenService;
+    private final OAuthProvidersService oAuthProvidersService;
 
     @GetMapping("/providers")
     public ProvidersResponse listProviders() {
-        return ProvidersResponse.google(googleAuthorizationUrl());
+        return oAuthProvidersService.listProviders();
     }
 
-    @PostMapping("/oauth/google")
-    public ResponseEntity<OAuthLoginResponse> login(@RequestBody OAuthLoginRequest request) {
+    @PostMapping("/oauth/{provider}")
+    public ResponseEntity<OAuthLoginResponse> login(@PathVariable String provider,
+            @RequestBody OAuthLoginRequest request) {
         if (request.authorizationCode() == null || request.authorizationCode().isBlank()) {
             throw new AuthException(AuthErrorCode.INVALID_OAUTH_REQUEST);
         }
-        LoginResult result = googleLoginService.login(request.authorizationCode());
+        LoginResult result = oAuthLoginService.login(provider, request.authorizationCode());
         return tokenResponse(result.tokens(), result.isNewUser());
     }
 
@@ -52,8 +55,10 @@ public class AuthController {
     public ResponseEntity<OAuthLoginResponse> refresh(
             @CookieValue(name = "refresh_token", required = false) String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
+            log.info("refresh token is null");
             throw new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
+        log.info("refresh token is {}", refreshToken);
         return tokenResponse(refreshTokenService.rotate(refreshToken), false);
     }
 
@@ -67,16 +72,6 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, expiredCookie("access_token", "/").toString())
                 .header(HttpHeaders.SET_COOKIE, expiredCookie("refresh_token", "/api/v1/auth").toString())
                 .build();
-    }
-
-    private String googleAuthorizationUrl() {
-        return "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id="
-                + encode(properties.google().clientId()) + "&redirect_uri=" + encode(properties.google().redirectUri())
-                + "&scope=" + encode("openid email profile") + "&access_type=offline&prompt=consent";
-    }
-
-    private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private ResponseEntity<OAuthLoginResponse> tokenResponse(IssuedTokens tokens, boolean isNewUser) {

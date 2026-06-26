@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package candle.trading.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.trading.v1";
+
+enum OrderSide {
+  ORDER_SIDE_UNSPECIFIED = 0;
+  ORDER_SIDE_BUY = 1;
+  ORDER_SIDE_SELL = 2;
+}
+
+enum OrderKind {
+  ORDER_KIND_UNSPECIFIED = 0;
+  ORDER_KIND_MARKET = 1;
+  ORDER_KIND_LIMIT = 2;
+  ORDER_KIND_AFTER_HOURS_CLOSE = 3;
+}
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_PENDING = 1;
+  ORDER_STATUS_FILLED = 2;
+  ORDER_STATUS_CANCELLED = 3;
+  ORDER_STATUS_REJECTED = 4;
+}
+
+enum ReservationTiming {
+  RESERVATION_TIMING_UNSPECIFIED = 0;
+  RESERVATION_TIMING_OPEN = 1;
+  RESERVATION_TIMING_PREV_CLOSE = 2;
+  RESERVATION_TIMING_TODAY_CLOSE = 3;
+}
+
+enum ReservationStatus {
+  RESERVATION_STATUS_UNSPECIFIED = 0;
+  RESERVATION_STATUS_RESERVED = 1;
+  RESERVATION_STATUS_EXECUTED = 2;
+  RESERVATION_STATUS_CANCELLED = 3;
+}

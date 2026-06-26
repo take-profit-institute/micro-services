@@ -21,6 +21,7 @@ public class AccountIdInjectionFilter implements WebFilter, Ordered {
                 .cast(JwtAuthenticationToken.class)
                 .flatMap(auth -> {
                     String accountId = auth.getToken().getSubject();
+                    if (accountId == null) return chain.filter(exchange);
                     ServerWebExchange mutated = exchange.mutate()
                             .request(r -> r.header("X-Account-Id", accountId))
                             .build();
