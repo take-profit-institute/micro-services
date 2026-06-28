@@ -6,8 +6,8 @@ spring:
 
   datasource:
     url: ${BATCH_DB_URL:jdbc:postgresql://localhost:5432/candle_batch}
-    username: ${BATCH_DB_USERNAME:postgres}
-    password: ${BATCH_DB_PASSWORD:postgres}
+    username: ${BATCH_DB_USERNAME:candle}
+    password: ${BATCH_DB_PASSWORD:candle}
     driver-class-name: org.postgresql.Driver
 
   flyway:
@@ -18,7 +18,7 @@ spring:
     job:
       enabled: false
     jdbc:
-      initialize-schema: never
+      initialize-schema: always
 
 batch:
   schedule:
