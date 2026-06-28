@@ -1,1 +1,7 @@
 description = 'Scheduled and operational Spring Batch jobs'
+
+dependencies {
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.postgresql:postgresql'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+}
