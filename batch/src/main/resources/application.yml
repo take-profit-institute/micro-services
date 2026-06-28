@@ -3,6 +3,31 @@ spring:
     name: candle-batch
   main:
     web-application-type: none
+
+  datasource:
+    url: ${BATCH_DB_URL:jdbc:postgresql://localhost:5432/candle_batch}
+    username: ${BATCH_DB_USERNAME:candle}
+    password: ${BATCH_DB_PASSWORD:candle}
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    locations: classpath:migration
+
   batch:
     job:
       enabled: false
+    jdbc:
+      initialize-schema: always
+
+batch:
+  schedule:
+    zone-id: Asia/Seoul
+    smoke:
+      enabled: ${BATCH_SMOKE_ENABLED:true}
+      cron: "${BATCH_SMOKE_CRON:0 */1 * * * *}"
+
+logging:
+  level:
+    org.profit.candle.batch: info
+    org.springframework.batch: info
