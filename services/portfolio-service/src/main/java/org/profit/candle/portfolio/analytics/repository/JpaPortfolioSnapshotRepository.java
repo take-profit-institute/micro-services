@@ -19,4 +19,12 @@ public interface JpaPortfolioSnapshotRepository
     @Override
     @Query("SELECT s FROM PortfolioSnapshotEntity s WHERE s.userId = :userId AND s.snapshotDate = :date")
     Optional<PortfolioSnapshotEntity> findByUserIdAndDate(@Param("userId") String userId, @Param("date") LocalDate date);
+
+    @Override
+    default Optional<PortfolioSnapshotEntity> findLatestBefore(String userId, LocalDate date) {
+        return findFirstByUserIdAndSnapshotDateLessThanOrderBySnapshotDateDesc(userId, date);
+    }
+
+    Optional<PortfolioSnapshotEntity> findFirstByUserIdAndSnapshotDateLessThanOrderBySnapshotDateDesc(
+            String userId, LocalDate date);
 }

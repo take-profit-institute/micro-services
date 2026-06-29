@@ -4,10 +4,13 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.portfolio.analytics.dto.PortfolioHistoryResult;
+import org.profit.candle.portfolio.analytics.dto.PortfolioSnapshotResult;
 import org.profit.candle.portfolio.analytics.dto.PortfolioSummaryResult;
+import org.profit.candle.portfolio.analytics.dto.RecordDailySnapshotCommand;
 import org.profit.candle.portfolio.analytics.dto.SectorBreakdownResult;
 import org.profit.candle.portfolio.analytics.dto.TradingStatsResult;
 import org.profit.candle.portfolio.analytics.service.PortfolioAnalyticsService;
+import org.profit.candle.portfolio.analytics.service.PortfolioSnapshotService;
 import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsRequest;
 import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsResponse;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioHistoryRequest;
@@ -22,15 +25,20 @@ import org.profit.candle.proto.portfolio.v1.MonthlyReturn;
 import org.profit.candle.proto.portfolio.v1.PortfolioServiceGrpc;
 import org.profit.candle.proto.portfolio.v1.PortfolioSnapshot;
 import org.profit.candle.proto.portfolio.v1.PortfolioSummary;
+import org.profit.candle.proto.portfolio.v1.RecordDailySnapshotRequest;
+import org.profit.candle.proto.portfolio.v1.RecordDailySnapshotResponse;
 import org.profit.candle.proto.portfolio.v1.SectorWeight;
 import org.profit.candle.proto.portfolio.v1.TradingStats;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
 
 @Component
 @RequiredArgsConstructor
 public class PortfolioGrpcService extends PortfolioServiceGrpc.PortfolioServiceImplBase {
 
     private final PortfolioAnalyticsService analyticsService;
+    private final PortfolioSnapshotService snapshotService;
 
     @Override
     public void getPortfolioSummary(GetPortfolioSummaryRequest request,
@@ -93,6 +101,33 @@ public class PortfolioGrpcService extends PortfolioServiceGrpc.PortfolioServiceI
                             .setCount(r.count())
                             .build()));
             observer.onNext(builder.build());
+            observer.onCompleted();
+        } catch (Exception e) {
+            observer.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+        }
+    }
+
+    @Override
+    public void recordDailySnapshot(RecordDailySnapshotRequest request,
+                                    StreamObserver<RecordDailySnapshotResponse> observer) {
+        try {
+            PortfolioSnapshotResult result = snapshotService.recordDailySnapshot(
+                    new RecordDailySnapshotCommand(
+                            request.getUserId(),
+                            LocalDate.parse(request.getSnapshotDate()),
+                            request.getTotalAsset(),
+                            request.getStockValue(),
+                            request.getSeedCapital(),
+                            request.getIdempotencyKey()));
+            observer.onNext(RecordDailySnapshotResponse.newBuilder()
+                    .setSnapshot(PortfolioSnapshot.newBuilder()
+                            .setDate(result.date())
+                            .setTotalAsset(result.totalAsset())
+                            .setStockValue(result.stockValue())
+                            .setDailyProfit(result.dailyProfit())
+                            .setCumulativeReturnRate(result.cumulativeReturnRate())
+                            .build())
+                    .build());
             observer.onCompleted();
         } catch (Exception e) {
             observer.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
