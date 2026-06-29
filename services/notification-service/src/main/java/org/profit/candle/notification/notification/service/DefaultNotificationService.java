@@ -22,6 +22,7 @@ import org.profit.candle.notification.notification.exception.NotificationErrorCo
 import org.profit.candle.notification.notification.exception.NotificationException;
 import org.profit.candle.notification.notification.repository.NotificationReader;
 import org.profit.candle.notification.notification.repository.NotificationWriter;
+import org.profit.candle.notification.outbox.service.OutboxEventService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -39,6 +40,7 @@ public class DefaultNotificationService implements NotificationService {
     private final DeviceTokenReader deviceTokenReader;
     private final NotificationDeliveryService notificationDeliveryService;
     private final TransactionTemplate transactionTemplate;
+    private final OutboxEventService outboxEventService;
 
     @Override
     public NotificationResult createAndSend(CreateNotificationCommand command) {
@@ -51,7 +53,7 @@ public class DefaultNotificationService implements NotificationService {
         );
 
         Notification saved = transactionTemplate.execute(status ->
-                notificationWriter.save(notification)
+                saveNotificationWithOutbox(notification, command.idempotencyKey())
         );
         deviceTokenReader.listActiveByUserId(saved.getUserId())
                 .forEach(deviceToken -> notificationDeliveryService.deliver(saved, deviceToken));
@@ -88,7 +90,7 @@ public class DefaultNotificationService implements NotificationService {
 
     @Override
     @Transactional
-    public NotificationResult markAsRead(UUID userId, UUID notificationId) {
+    public NotificationResult markAsRead(UUID userId, UUID notificationId, String idempotencyKey) {
         Notification notification = notificationReader.findById(notificationId)
                 .orElseThrow(() -> new NotificationException(
                         NotificationErrorCode.NOTIFICATION_NOT_FOUND));
@@ -98,6 +100,7 @@ public class DefaultNotificationService implements NotificationService {
         }
 
         notification.markAsRead();
+        outboxEventService.recordNotificationRead(notification, idempotencyKey);
 
         return toResult(notification);
     }
@@ -122,6 +125,15 @@ public class DefaultNotificationService implements NotificationService {
             return DEFAULT_PAGE_SIZE;
         }
         return Math.min(pageSize, MAX_PAGE_SIZE);
+    }
+
+    private Notification saveNotificationWithOutbox(
+            Notification notification,
+            String idempotencyKey
+    ) {
+        Notification saved = notificationWriter.save(notification);
+        outboxEventService.recordNotificationCreated(saved, idempotencyKey);
+        return saved;
     }
 
     private PageCursor decodePageToken(String pageToken) {

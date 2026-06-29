@@ -63,13 +63,14 @@ public class NotificationGrpcService
                     userId,
                     requireText(request.getFcmToken()),
                     toDevicePlatform(request.getPlatform()),
-                    blankToNull(request.getDeviceId())
+                    blankToNull(request.getDeviceId()),
+                    requireIdempotencyKey(request.getCommandMetadata().getIdempotencyKey())
             );
 
             DeviceTokenResult result = idempotencyExecutor.execute(
                     userId,
                     "RegisterDeviceToken",
-                    requireIdempotencyKey(request.getCommandMetadata().getIdempotencyKey()),
+                    command.idempotencyKey(),
                     requestHash(request.toBuilder()
                             .clearCommandMetadata()
                             .build()
@@ -183,10 +184,14 @@ public class NotificationGrpcService
                     requireIdempotencyKey(request.getCommandMetadata().getIdempotencyKey()),
                     requestHash(request.toBuilder()
                             .clearCommandMetadata()
-                            .build()
-                            .toByteArray()),
+                    .build()
+                    .toByteArray()),
                     NotificationResult.class,
-                    () -> notificationService.markAsRead(userId, notificationId)
+                    () -> notificationService.markAsRead(
+                            userId,
+                            notificationId,
+                            request.getCommandMetadata().getIdempotencyKey()
+                    )
             );
 
             MarkAsReadResponse response = MarkAsReadResponse.newBuilder()

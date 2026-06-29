@@ -8,6 +8,7 @@ public record RegisterDeviceTokenCommand(
         UUID userId,
         String fcmToken,
         DevicePlatform platform,
-        String deviceId
+        String deviceId,
+        String idempotencyKey
 ) {
 }

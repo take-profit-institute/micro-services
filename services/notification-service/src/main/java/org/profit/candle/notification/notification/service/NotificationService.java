@@ -14,7 +14,7 @@ public interface NotificationService {
 
     ListNotificationsResult list(UUID userId, int pageSize, String pageToken);
 
-    NotificationResult markAsRead(UUID userId, UUID notificationId);
+    NotificationResult markAsRead(UUID userId, UUID notificationId, String idempotencyKey);
 
     long countUnread(UUID userId);
 

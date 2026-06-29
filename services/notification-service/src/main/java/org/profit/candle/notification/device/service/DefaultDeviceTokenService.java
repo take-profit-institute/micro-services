@@ -6,6 +6,7 @@ import org.profit.candle.notification.device.dto.RegisterDeviceTokenCommand;
 import org.profit.candle.notification.device.entity.DeviceToken;
 import org.profit.candle.notification.device.repository.DeviceTokenReader;
 import org.profit.candle.notification.device.repository.DeviceTokenWriter;
+import org.profit.candle.notification.outbox.service.OutboxEventService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ public class DefaultDeviceTokenService implements DeviceTokenService {
 
     private final DeviceTokenReader deviceTokenReader;
     private final DeviceTokenWriter deviceTokenWriter;
+    private final OutboxEventService outboxEventService;
 
     @Override
     @Transactional
@@ -36,6 +38,7 @@ public class DefaultDeviceTokenService implements DeviceTokenService {
                 ));
 
         DeviceToken saved = deviceTokenWriter.save(deviceToken);
+        outboxEventService.recordDeviceTokenRegistered(saved, command.idempotencyKey());
 
         return toResult(saved);
     }
