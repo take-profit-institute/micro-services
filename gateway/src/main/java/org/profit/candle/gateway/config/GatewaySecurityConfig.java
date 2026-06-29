@@ -35,17 +35,23 @@ public class GatewaySecurityConfig {
     @Value("${gateway.jwt.hmac-secret}")
     private String hmacSecret;
 
-    @Value("${gateway.cors.allowed-origins:http://localhost:3000}")
+    @Value("${gateway.cors.allowed-origin-patterns:http://localhost:3000}")
     private List<String> allowedOrigins;
 
     // auth 경로 + preflight: JWT 검증 없이 통과
+    // /api/auth/me, /api/auth/token/validate 등 인증 필요 경로는 제외
     @Bean
     @Order(1)
     public SecurityWebFilterChain publicFilterChain(ServerHttpSecurity http) {
         return http
                 .securityMatcher(new OrServerWebExchangeMatcher(
                         ServerWebExchangeMatchers.pathMatchers(HttpMethod.OPTIONS, "/**"),
-                        ServerWebExchangeMatchers.pathMatchers("/api/auth/**"),
+                        ServerWebExchangeMatchers.pathMatchers(
+                                "/api/auth/providers",
+                                "/api/auth/oauth/**",
+                                "/api/auth/token/refresh",
+                                "/api/auth/logout"
+                        ),
                         ServerWebExchangeMatchers.pathMatchers("/api/v1/auth/**")
                 ))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
@@ -71,7 +77,9 @@ public class GatewaySecurityConfig {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(allowedOrigins);
+        // allowCredentials(true)와 와일드카드를 함께 쓰려면 setAllowedOrigins가 아닌
+        // setAllowedOriginPatterns를 써야 한다. (vercel 프리뷰 도메인 매칭용)
+        config.setAllowedOriginPatterns(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of(HttpHeaders.AUTHORIZATION, "X-Account-Id"));

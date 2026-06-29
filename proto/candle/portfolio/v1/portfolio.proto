@@ -5,10 +5,113 @@ package candle.portfolio.v1;
 option java_multiple_files = true;
 option java_package = "org.profit.candle.proto.portfolio.v1";
 
-message PortfolioSummary { string user_id = 1; int64 total_asset = 2; int64 total_profit = 3; string total_return_rate = 4; }
+import "candle/common/v1/common.proto";
+
+// ─── Holding ───────────────────────────────────────────────────────────────
+// trading-service의 체결 이벤트를 구독해 유지하는 read model.
+// 미실현손익(current_price 기반)은 BFF가 MarketService.BatchQuotes와 머지한다.
+
+message Holding {
+  string symbol          = 1;
+  string name            = 2;  // 종목명 (market data로 채움)
+  int64  quantity        = 3;  // 보유 수량
+  int64  average_price   = 4;  // 평균 매입단가 (원)
+  int64  book_value      = 5;  // quantity × average_price
+  int64  realized_profit = 6;  // 누적 실현손익
+  bool   active          = 7;  // 수량 > 0 이면 true
+  string sector          = 8;  // 업종 (e.g. "반도체")
+  string market          = 9;  // KOSPI / KOSDAQ
+}
+
+message ListHoldingsRequest {
+  string user_id         = 1;
+  bool   include_inactive = 2;
+  candle.common.v1.PageRequest page = 3;
+}
+
+message ListHoldingsResponse {
+  repeated Holding holdings       = 1;
+  int64  total_book_value         = 2;  // 총 매입금액
+  int64  total_realized_profit    = 3;  // 누적 실현손익 합계
+  candle.common.v1.PageResponse page = 4;
+}
+
+message GetHoldingRequest {
+  string user_id = 1;
+  string symbol  = 2;
+}
+
+message GetHoldingResponse {
+  Holding holding = 1;
+}
+
+// ─── Portfolio Summary ─────────────────────────────────────────────────────
+// GET /api/account 대시보드에서 병렬 호출되는 snapshot.
+// total_stock_value는 마지막으로 캐시된 시세 기준 근사값이다.
+// BFF가 GetBalance.available_cash와 합산해 total_asset을 표시한다.
+
+message PortfolioSummary {
+  string user_id                = 1;
+  int64  total_book_value       = 2;  // 총 매입금액
+  int64  total_stock_value      = 3;  // 총 주식 평가금액 (캐시 시세 기준)
+  int64  total_unrealized_profit = 4; // total_stock_value − total_book_value
+  int64  total_realized_profit  = 5;  // 누적 실현손익
+  string total_return_rate      = 6;  // 총 수익률 "12.34" (%)
+  string day_return_rate        = 7;  // 당일 수익률
+  int64  day_profit             = 8;  // 당일 손익
+  int32  holding_count          = 9;  // 활성 보유 종목 수
+}
+
 message GetPortfolioSummaryRequest { string user_id = 1; }
 message GetPortfolioSummaryResponse { PortfolioSummary summary = 1; }
 
+// ─── Portfolio History ─────────────────────────────────────────────────────
+// GET /api/account/portfolio-history?days=N
+// 매 거래일 EOD 시점의 스냅샷을 반환한다.
+
+message PortfolioSnapshot {
+  string date                   = 1;  // "2026-06-26" (YYYY-MM-DD)
+  int64  total_asset            = 2;  // 현금 + 주식 평가금액
+  int64  stock_value            = 3;  // 주식 평가금액
+  int64  daily_profit           = 4;  // 당일 손익
+  string cumulative_return_rate = 5;  // 기간 시작일 대비 누적 수익률 "3.21" (%)
+}
+
+message GetPortfolioHistoryRequest {
+  string user_id = 1;
+  int32  days    = 2;  // 7 / 30 / 90 / 365
+}
+
+message GetPortfolioHistoryResponse {
+  repeated PortfolioSnapshot snapshots    = 1;
+  string period_return_rate               = 2;  // 기간 전체 수익률
+  int64  period_profit                    = 3;  // 기간 전체 손익
+}
+
+// ─── Sector Breakdown ──────────────────────────────────────────────────────
+// 보유 종목의 업종별 비중 (GET /api/account/portfolio-history 하단 차트용 등)
+
+message SectorWeight {
+  string sector     = 1;
+  string weight     = 2;  // total_book_value 대비 비중 "34.5" (%)
+  int64  book_value = 3;
+  int32  count      = 4;  // 해당 섹터 종목 수
+}
+
+message GetSectorBreakdownRequest  { string user_id = 1; }
+message GetSectorBreakdownResponse { repeated SectorWeight sectors = 1; }
+
+// ─── Services ──────────────────────────────────────────────────────────────
+
+// BFF 테이블의 HoldingService → portfolio-service 가 구현
+service HoldingService {
+  rpc ListHoldings(ListHoldingsRequest) returns (ListHoldingsResponse);
+  rpc GetHolding(GetHoldingRequest)     returns (GetHoldingResponse);
+}
+
+// BFF 테이블의 PortfolioService → portfolio-service 가 구현
 service PortfolioService {
-  rpc GetPortfolioSummary(GetPortfolioSummaryRequest) returns (GetPortfolioSummaryResponse);
+  rpc GetPortfolioSummary(GetPortfolioSummaryRequest)   returns (GetPortfolioSummaryResponse);
+  rpc GetPortfolioHistory(GetPortfolioHistoryRequest)   returns (GetPortfolioHistoryResponse);
+  rpc GetSectorBreakdown(GetSectorBreakdownRequest)     returns (GetSectorBreakdownResponse);
 }

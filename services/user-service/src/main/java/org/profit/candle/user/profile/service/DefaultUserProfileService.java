@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.user.profile.dto.UpdateProfileCommand;
 import org.profit.candle.user.profile.dto.UserProfileResult;
 import org.profit.candle.user.profile.entity.UserProfileEntity;
+import org.profit.candle.user.profile.event.OutboxWriter;
 import org.profit.candle.user.profile.exception.UserErrorCode;
 import org.profit.candle.user.profile.exception.UserException;
 import org.profit.candle.user.profile.repository.UserProfileReader;
@@ -17,6 +18,7 @@ public class DefaultUserProfileService implements UserProfileService {
 
     private final UserProfileReader userProfileReader;
     private final UserProfileWriter userProfileWriter;
+    private final OutboxWriter outboxWriter;
 
     @Override
     @Transactional(readOnly = true)
@@ -29,16 +31,11 @@ public class DefaultUserProfileService implements UserProfileService {
     @Override
     @Transactional
     public UserProfileResult updateProfile(String userId, UpdateProfileCommand command) {
-        if (command.nickname() != null && command.nickname().length() > 50) {
-            throw new UserException(UserErrorCode.NICKNAME_TOO_LONG);
-        }
-        if (command.profileImageUrl() != null && command.profileImageUrl().length() > 500) {
-            throw new UserException(UserErrorCode.PROFILE_IMAGE_URL_TOO_LONG);
-        }
-
         UserProfileEntity profile = userProfileReader.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
         profile.updateProfile(command.nickname(), command.profileImageUrl());
-        return UserProfileResult.from(userProfileWriter.save(profile));
+        UserProfileResult result = UserProfileResult.from(userProfileWriter.save(profile));
+        outboxWriter.writeUserProfileUpdated(result);
+        return result;
     }
 }
