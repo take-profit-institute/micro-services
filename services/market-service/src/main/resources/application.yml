@@ -3,3 +3,6 @@ spring:
     name: market-service
 server:
   port: 8083
+kiwoom:
+  app-key: "9jWBWEc9qQPXYPvQBU9xCkQqX_MAAUGtEP8op9WFZwM"
+  secret-key: "bC3CoO7bv69WjU2W4mbUg5rDXbgIbRIofu2SIPwC-Tc"
