@@ -19,6 +19,7 @@ public class KakaoOAuthClient implements OAuthClient {
 
     private static final String TOKEN_URI = "https://kauth.kakao.com/oauth/token";
     private static final String USER_INFO_URI = "https://kapi.kakao.com/v2/user/me";
+    private static final String EMAIL_SUFFIX = "@kakao.com";
 
     private final AuthProperties properties;
     private final RestClient restClient = RestClient.create();
@@ -48,13 +49,11 @@ public class KakaoOAuthClient implements OAuthClient {
             Map<?, ?> profile = restClient.get().uri(USER_INFO_URI)
                     .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(Map.class);
 
-            Object account = profile.get("kakao_account");
-            Map<?, ?> kakaoAccount = account instanceof Map<?, ?> map ? map : Map.of();
-
-            return new OAuthProfile(
-                    String.valueOf(profile.get("id")),
-                    String.valueOf(kakaoAccount.get("email")),
-                    Boolean.parseBoolean(String.valueOf(kakaoAccount.get("is_email_verified"))));
+            // 모킹앱에선 account_email 동의 항목을 쓸 수 없어 profile_nickname 스코프만 요청한다.
+            // 카카오 계정 이메일을 받지 못하므로, 항상 존재하고 유니크한 카카오 id로 합성 이메일을 만든다.
+            // 계정 식별은 provider+subject(id)로 이뤄지므로 합성 이메일은 토큰/표시용으로만 쓰인다.
+            String subject = String.valueOf(profile.get("id"));
+            return new OAuthProfile(subject, subject + EMAIL_SUFFIX, true);
         } catch (RestClientException e) {
             throw new AuthException(AuthErrorCode.KAKAO_OAUTH_EXCHANGE_FAILED, e);
         }

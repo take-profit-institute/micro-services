@@ -83,7 +83,7 @@ class OAuthProvidersServiceTest {
         assertThat(url).startsWith("https://kauth.kakao.com/oauth/authorize");
         assertThat(url).contains("response_type=code");
         assertThat(url).contains("client_id=test-kakao-id");
-        assertThat(url).contains("scope=account_email");
+        assertThat(url).contains("scope=profile_nickname");
     }
 
     @Test

@@ -31,7 +31,7 @@ public class OAuthProvidersService {
     public String kakaoAuthorizationUrl() {
         return "https://kauth.kakao.com/oauth/authorize?response_type=code&client_id="
                 + encode(properties.kakao().clientId()) + "&redirect_uri=" + encode(properties.kakao().redirectUri())
-                + "&scope=" + encode("account_email");
+                + "&scope=" + encode("profile_nickname");
     }
 
     // state는 CSRF 방지를 위해 프론트가 생성·검증한다. 프론트가 이 URL에 &state=... 를 덧붙이며,
