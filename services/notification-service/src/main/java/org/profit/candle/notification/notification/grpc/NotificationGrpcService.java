@@ -8,6 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.notification.delivery.entity.DeliveryStatus;
 import org.profit.candle.notification.device.dto.DeviceTokenResult;
@@ -24,6 +25,7 @@ import org.profit.candle.notification.notification.entity.NotificationType;
 import org.profit.candle.notification.notification.exception.NotificationErrorCode;
 import org.profit.candle.notification.notification.exception.NotificationException;
 import org.profit.candle.notification.notification.service.NotificationService;
+import org.profit.candle.proto.common.v1.PageResponse;
 import org.profit.candle.proto.notification.v1.CreateNotificationRequest;
 import org.profit.candle.proto.notification.v1.CreateNotificationResponse;
 import org.profit.candle.proto.notification.v1.CountUnreadRequest;
@@ -47,6 +49,8 @@ public class NotificationGrpcService
     private final NotificationService notificationService;
     private final DeviceTokenService deviceTokenService;
     private final IdempotencyExecutor idempotencyExecutor;
+    private static final Pattern IDEMPOTENCY_KEY_PATTERN =
+            Pattern.compile("^[A-Za-z0-9._:-]{8,128}$");
 
     @Override
     public void registerDeviceToken(
@@ -83,8 +87,8 @@ public class NotificationGrpcService
         } catch (NotificationException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         } catch (RuntimeException e) {
-            observer.onError(Status.INVALID_ARGUMENT
-                    .withDescription(NotificationErrorCode.INVALID_REQUEST.code())
+            observer.onError(Status.INTERNAL
+                    .withDescription(NotificationErrorCode.INTERNAL_ERROR.code())
                     .asRuntimeException());
         }
     }
@@ -111,7 +115,6 @@ public class NotificationGrpcService
                     command.idempotencyKey(),
                     requestHash(request.toBuilder()
                             .clearCommandMetadata()
-                            .clearIdempotencyKey()
                             .build()
                             .toByteArray()),
                     NotificationResult.class,
@@ -127,8 +130,8 @@ public class NotificationGrpcService
         } catch (NotificationException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         } catch (RuntimeException e) {
-            observer.onError(Status.INVALID_ARGUMENT
-                    .withDescription(NotificationErrorCode.INVALID_REQUEST.code())
+            observer.onError(Status.INTERNAL
+                    .withDescription(NotificationErrorCode.INTERNAL_ERROR.code())
                     .asRuntimeException());
         }
     }
@@ -141,12 +144,14 @@ public class NotificationGrpcService
         try {
             ListNotificationsResult result = notificationService.list(
                     parseUuid(request.getUserId(), NotificationErrorCode.INVALID_USER_ID),
-                    request.getPageSize(),
-                    blankToNull(request.getPageToken())
+                    request.getPageRequest().getPageSize(),
+                    blankToNull(request.getPageRequest().getPageToken())
             );
 
             ListNotificationsResponse.Builder response = ListNotificationsResponse.newBuilder()
-                    .setNextPageToken(result.nextPageToken());
+                    .setPageResponse(PageResponse.newBuilder()
+                            .setNextPageToken(result.nextPageToken())
+                            .build());
             result.notifications().forEach(notification ->
                     response.addNotifications(toNotificationProto(notification)));
 
@@ -155,8 +160,8 @@ public class NotificationGrpcService
         } catch (NotificationException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         } catch (RuntimeException e) {
-            observer.onError(Status.INVALID_ARGUMENT
-                    .withDescription(NotificationErrorCode.INVALID_REQUEST.code())
+            observer.onError(Status.INTERNAL
+                    .withDescription(NotificationErrorCode.INTERNAL_ERROR.code())
                     .asRuntimeException());
         }
     }
@@ -193,8 +198,8 @@ public class NotificationGrpcService
         } catch (NotificationException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         } catch (RuntimeException e) {
-            observer.onError(Status.INVALID_ARGUMENT
-                    .withDescription(NotificationErrorCode.INVALID_REQUEST.code())
+            observer.onError(Status.INTERNAL
+                    .withDescription(NotificationErrorCode.INTERNAL_ERROR.code())
                     .asRuntimeException());
         }
     }
@@ -218,8 +223,8 @@ public class NotificationGrpcService
         } catch (NotificationException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         } catch (RuntimeException e) {
-            observer.onError(Status.INVALID_ARGUMENT
-                    .withDescription(NotificationErrorCode.INVALID_REQUEST.code())
+            observer.onError(Status.INTERNAL
+                    .withDescription(NotificationErrorCode.INTERNAL_ERROR.code())
                     .asRuntimeException());
         }
     }
@@ -241,8 +246,8 @@ public class NotificationGrpcService
         } catch (NotificationException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         } catch (RuntimeException e) {
-            observer.onError(Status.INVALID_ARGUMENT
-                    .withDescription(NotificationErrorCode.INVALID_REQUEST.code())
+            observer.onError(Status.INTERNAL
+                    .withDescription(NotificationErrorCode.INTERNAL_ERROR.code())
                     .asRuntimeException());
         }
     }
@@ -268,6 +273,9 @@ public class NotificationGrpcService
     private String requireIdempotencyKey(String value) {
         if (value == null || value.isBlank()) {
             throw new NotificationException(NotificationErrorCode.IDEMPOTENCY_KEY_REQUIRED);
+        }
+        if (!IDEMPOTENCY_KEY_PATTERN.matcher(value).matches()) {
+            throw new NotificationException(NotificationErrorCode.INVALID_IDEMPOTENCY_KEY);
         }
         return value;
     }
@@ -407,7 +415,23 @@ public class NotificationGrpcService
             return Status.NOT_FOUND.withDescription(code);
         }
 
+        if (code.equals(NotificationErrorCode.DEVICE_TOKEN_NOT_FOUND.code())) {
+            return Status.NOT_FOUND.withDescription(code);
+        }
+
+        if (code.equals(NotificationErrorCode.NOTIFICATION_ACCESS_DENIED.code())) {
+            return Status.PERMISSION_DENIED.withDescription(code);
+        }
+
+        if (code.equals(NotificationErrorCode.IDEMPOTENCY_REQUEST_MISMATCH.code())) {
+            return Status.ALREADY_EXISTS.withDescription(code);
+        }
+
         if (code.equals(NotificationErrorCode.FCM_SEND_FAILED.code())) {
+            return Status.UNAVAILABLE.withDescription(code);
+        }
+
+        if (code.equals(NotificationErrorCode.FIREBASE_CREDENTIAL_INVALID.code())) {
             return Status.UNAVAILABLE.withDescription(code);
         }
 

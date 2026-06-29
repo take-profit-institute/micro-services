@@ -6,6 +6,8 @@ import com.google.firebase.FirebaseOptions;
 import com.google.firebase.messaging.FirebaseMessaging;
 import java.io.IOException;
 import java.io.InputStream;
+import org.profit.candle.notification.notification.exception.NotificationErrorCode;
+import org.profit.candle.notification.notification.exception.NotificationException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,18 +31,27 @@ public class FirebaseConfig {
     }
 
     @Bean
-    public FirebaseApp firebaseApp() throws IOException {
+    public FirebaseApp firebaseApp() {
         if (!FirebaseApp.getApps().isEmpty()) {
             return FirebaseApp.getInstance();
         }
 
         Resource resource = credentialResource();
+        if (!resource.exists()) {
+            throw new NotificationException(NotificationErrorCode.FIREBASE_CREDENTIAL_INVALID);
+        }
+
         try (InputStream inputStream = resource.getInputStream()) {
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(inputStream))
                     .build();
 
             return FirebaseApp.initializeApp(options);
+        } catch (IOException e) {
+            throw new NotificationException(
+                    NotificationErrorCode.FIREBASE_CREDENTIAL_INVALID,
+                    e
+            );
         }
     }
 

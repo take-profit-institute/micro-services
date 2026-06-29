@@ -1,12 +1,10 @@
 package org.profit.candle.notification.delivery.service;
 
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.FirebaseMessagingException;
-import com.google.firebase.messaging.Message;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.notification.delivery.entity.NotificationDelivery;
 import org.profit.candle.notification.delivery.repository.NotificationDeliveryWriter;
 import org.profit.candle.notification.device.entity.DeviceToken;
+import org.profit.candle.notification.fcm.client.FcmClient;
 import org.profit.candle.notification.notification.entity.Notification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -16,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FcmNotificationDeliveryService implements NotificationDeliveryService {
 
-    private final FirebaseMessaging firebaseMessaging;
+    private final FcmClient fcmClient;
     private final NotificationDeliveryWriter notificationDeliveryWriter;
 
     @Override
@@ -27,29 +25,17 @@ public class FcmNotificationDeliveryService implements NotificationDeliveryServi
         );
 
         try {
-            String fcmMessageId = firebaseMessaging.send(toMessage(notification, deviceToken));
+            String fcmMessageId = fcmClient.send(
+                    deviceToken.getFcmToken(),
+                    notification.getTitle(),
+                    notification.getBody(),
+                    notification.getMeta()
+            );
             delivery.sent(fcmMessageId);
-        } catch (FirebaseMessagingException e) {
-            delivery.failed(e.getMessage());
         } catch (RuntimeException e) {
             delivery.failed(e.getMessage());
         }
 
         notificationDeliveryWriter.save(delivery);
-    }
-
-    private Message toMessage(Notification notification, DeviceToken deviceToken) {
-        Message.Builder builder = Message.builder()
-                .setToken(deviceToken.getFcmToken())
-                .setNotification(com.google.firebase.messaging.Notification.builder()
-                        .setTitle(notification.getTitle())
-                        .setBody(notification.getBody())
-                        .build());
-
-        if (notification.getMeta() != null && !notification.getMeta().isBlank()) {
-            builder.putData("meta_json", notification.getMeta());
-        }
-
-        return builder.build();
     }
 }

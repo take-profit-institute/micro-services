@@ -1,5 +1,9 @@
 package org.profit.candle.notification.notification.service;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +13,7 @@ import org.profit.candle.notification.delivery.service.NotificationDeliveryServi
 import org.profit.candle.notification.device.repository.DeviceTokenReader;
 import org.profit.candle.notification.notification.dto.CreateNotificationCommand;
 import org.profit.candle.notification.notification.dto.DeliveryResult;
+import org.profit.candle.notification.notification.dto.ListNotificationsCriteria;
 import org.profit.candle.notification.notification.dto.ListNotificationsResult;
 import org.profit.candle.notification.notification.dto.NotificationResult;
 import org.profit.candle.notification.notification.entity.Notification;
@@ -58,21 +63,39 @@ public class DefaultNotificationService implements NotificationService {
     @Transactional(readOnly = true)
     public ListNotificationsResult list(UUID userId, int pageSize, String pageToken) {
         int normalizedPageSize = normalizePageSize(pageSize);
-        List<NotificationResult> notifications = notificationReader
-                .listByUserId(userId, normalizedPageSize)
-                .stream()
+        PageCursor cursor = decodePageToken(pageToken);
+        List<Notification> notifications = notificationReader.listByCriteria(
+                new ListNotificationsCriteria(
+                        userId,
+                        normalizedPageSize + 1,
+                        cursor.createdAt(),
+                        cursor.id()
+                )
+        );
+
+        boolean hasNext = notifications.size() > normalizedPageSize;
+        List<Notification> page = hasNext
+                ? notifications.subList(0, normalizedPageSize)
+                : notifications;
+        String nextPageToken = hasNext ? encodePageToken(page.getLast()) : "";
+
+        List<NotificationResult> results = page.stream()
                 .map(this::toResult)
                 .toList();
 
-        return new ListNotificationsResult(notifications, "");
+        return new ListNotificationsResult(results, nextPageToken);
     }
 
     @Override
     @Transactional
     public NotificationResult markAsRead(UUID userId, UUID notificationId) {
-        Notification notification = notificationReader.findByIdAndUserId(notificationId, userId)
+        Notification notification = notificationReader.findById(notificationId)
                 .orElseThrow(() -> new NotificationException(
                         NotificationErrorCode.NOTIFICATION_NOT_FOUND));
+
+        if (!notification.getUserId().equals(userId)) {
+            throw new NotificationException(NotificationErrorCode.NOTIFICATION_ACCESS_DENIED);
+        }
 
         notification.markAsRead();
 
@@ -101,6 +124,33 @@ public class DefaultNotificationService implements NotificationService {
         return Math.min(pageSize, MAX_PAGE_SIZE);
     }
 
+    private PageCursor decodePageToken(String pageToken) {
+        if (pageToken == null || pageToken.isBlank()) {
+            return new PageCursor(null, null);
+        }
+
+        try {
+            String decoded = new String(
+                    Base64.getUrlDecoder().decode(pageToken),
+                    StandardCharsets.UTF_8
+            );
+            String[] parts = decoded.split("\\|", -1);
+            if (parts.length != 2) {
+                throw new IllegalArgumentException();
+            }
+            return new PageCursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
+        } catch (DateTimeParseException | IllegalArgumentException e) {
+            throw new NotificationException(NotificationErrorCode.INVALID_REQUEST, e);
+        }
+    }
+
+    private String encodePageToken(Notification notification) {
+        String rawToken = notification.getCreatedAt() + "|" + notification.getId();
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(rawToken.getBytes(StandardCharsets.UTF_8));
+    }
+
     private NotificationResult toResult(Notification notification) {
         return new NotificationResult(
                 notification.getId(),
@@ -127,5 +177,11 @@ public class DefaultNotificationService implements NotificationService {
                 delivery.getSentAt(),
                 delivery.getCreatedAt()
         );
+    }
+
+    private record PageCursor(
+            Instant createdAt,
+            UUID id
+    ) {
     }
 }
