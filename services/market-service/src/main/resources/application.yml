@@ -1,8 +1,10 @@
 spring:
   application:
     name: market-service
+  config:
+    import: optional:file:.env[.properties]
 server:
   port: 8083
 kiwoom:
-  app-key: "9jWBWEc9qQPXYPvQBU9xCkQqX_MAAUGtEP8op9WFZwM"
-  secret-key: "bC3CoO7bv69WjU2W4mbUg5rDXbgIbRIofu2SIPwC-Tc"
+  app-key: ${KIWOOM_APP_KEY}
+  secret-key: ${KIWOOM_SECRET_KEY}
