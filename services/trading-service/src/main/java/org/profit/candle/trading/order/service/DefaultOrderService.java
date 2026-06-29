@@ -1,7 +1,6 @@
 package org.profit.candle.trading.order.service;
 
 import io.grpc.Status;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.trading.account.service.AccountService;
 import org.profit.candle.trading.order.dto.CancelResult;
@@ -15,6 +14,8 @@ import org.profit.candle.trading.order.event.OrderPlacedPayload;
 import org.profit.candle.trading.order.repository.OrderRepository;
 import org.profit.candle.trading.support.event.OutboxWriter;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 /**
  * Order 도메인 업무 서비스. 메서드는 IdempotencyExecutor의 트랜잭션 안에서 호출되어
