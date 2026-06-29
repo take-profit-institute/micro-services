@@ -4,9 +4,11 @@ import org.profit.candle.trading.order.dto.CancelResult;
 import org.profit.candle.trading.order.dto.PlaceOrderCommand;
 import org.profit.candle.trading.order.entity.OrderEntity;
 
+import java.util.UUID;
+
 public interface OrderService {
 
-    OrderEntity placeOrder(String actorId, PlaceOrderCommand command);
+    OrderEntity placeOrder(UUID userId, PlaceOrderCommand command);
 
-    CancelResult cancelOrder(String actorId, String orderId);
+    CancelResult cancelOrder(UUID userId, UUID orderId);
 }
