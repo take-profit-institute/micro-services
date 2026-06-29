@@ -9,14 +9,14 @@ import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
-import org.springframework.batch.core.step.builder.ChunkOrientedStepBuilder;
+import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
-import org.springframework.batch.infrastructure.item.ItemReader;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.support.ListItemReader;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @Slf4j
 @Configuration
@@ -42,11 +42,14 @@ public class BatchSmokeJobConfiguration {
     @Bean(name = STEP_NAME)
     public Step batchSmokeStep(
             JobRepository jobRepository,
-            @Qualifier("batchSmokeItemReader") ItemReader<String> reader,
+            PlatformTransactionManager transactionManager,
+            @Qualifier("batchSmokeItemReader") ListItemReader<String> reader,
             @Qualifier("batchSmokeItemProcessor") ItemProcessor<String, String> processor,
             @Qualifier("batchSmokeItemWriter") ItemWriter<String> writer
     ) {
-        return new ChunkOrientedStepBuilder<String, String>(STEP_NAME, jobRepository, CHUNK_SIZE)
+        return new StepBuilder(STEP_NAME, jobRepository)
+                .<String, String>chunk(CHUNK_SIZE)
+                .transactionManager(transactionManager)
                 .reader(reader)
                 .processor(processor)
                 .writer(writer)
@@ -55,7 +58,7 @@ public class BatchSmokeJobConfiguration {
 
     @Bean
     @StepScope
-    public ItemReader<String> batchSmokeItemReader() {
+    public ListItemReader<String> batchSmokeItemReader() {
         return new ListItemReader<>(List.of(
                 "portfolio snapshot",
                 "ranking aggregation",
