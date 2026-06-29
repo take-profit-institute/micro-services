@@ -16,6 +16,22 @@ message ListProvidersResponse {
   repeated Provider providers = 1;
 }
 
+message AuthUser {
+  string user_id = 1;
+  string email = 2;
+  string provider = 3;
+  string provider_subject = 4;
+}
+
+message GetMeRequest {
+  string user_id = 1;
+}
+
+message GetMeResponse {
+  AuthUser user = 1;
+}
+
 service AuthService {
   rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse);
+  rpc GetMe(GetMeRequest) returns (GetMeResponse);
 }

@@ -47,7 +47,7 @@ public class AuthController {
         if (request.authorizationCode() == null || request.authorizationCode().isBlank()) {
             throw new AuthException(AuthErrorCode.INVALID_OAUTH_REQUEST);
         }
-        LoginResult result = oAuthLoginService.login(provider, request.authorizationCode());
+        LoginResult result = oAuthLoginService.login(provider, request.authorizationCode(), request.state());
         return tokenResponse(result.tokens(), result.isNewUser());
     }
 

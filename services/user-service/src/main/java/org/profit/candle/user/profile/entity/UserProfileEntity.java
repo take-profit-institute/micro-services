@@ -5,6 +5,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import org.profit.candle.user.profile.exception.UserErrorCode;
+import org.profit.candle.user.profile.exception.UserException;
+
 import java.time.Instant;
 
 @Entity
@@ -58,6 +61,12 @@ public class UserProfileEntity {
     public long version() { return version; }
 
     public void updateProfile(String nickname, String profileImageUrl) {
+        if (nickname != null && nickname.length() > 50) {
+            throw new UserException(UserErrorCode.NICKNAME_TOO_LONG);
+        }
+        if (profileImageUrl != null && profileImageUrl.length() > 500) {
+            throw new UserException(UserErrorCode.PROFILE_IMAGE_URL_TOO_LONG);
+        }
         this.nickname = nickname;
         this.profileImageUrl = profileImageUrl;
         this.updatedAt = Instant.now();

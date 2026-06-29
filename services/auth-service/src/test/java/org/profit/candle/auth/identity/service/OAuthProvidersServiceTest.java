@@ -6,10 +6,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.profit.candle.auth.api.dto.ProviderResponse;
 import org.profit.candle.auth.api.dto.ProvidersResponse;
 import org.profit.candle.auth.config.AuthProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -17,22 +19,33 @@ class OAuthProvidersServiceTest {
 
     @Mock AuthProperties properties;
     @Mock AuthProperties.Google google;
+    @Mock AuthProperties.Kakao kakao;
+    @Mock AuthProperties.Naver naver;
 
     @InjectMocks OAuthProvidersService service;
 
     @BeforeEach
     void setUp() {
-        when(properties.google()).thenReturn(google);
-        when(google.clientId()).thenReturn("test-client-id");
-        when(google.redirectUri()).thenReturn("http://localhost:3000/auth/google/callback");
+        lenient().when(properties.google()).thenReturn(google);
+        lenient().when(google.clientId()).thenReturn("test-client-id");
+        lenient().when(google.redirectUri()).thenReturn("http://localhost:3000/auth/google/callback");
+
+        lenient().when(properties.kakao()).thenReturn(kakao);
+        lenient().when(kakao.clientId()).thenReturn("test-kakao-id");
+        lenient().when(kakao.redirectUri()).thenReturn("http://localhost:3000/auth/kakao/callback");
+
+        lenient().when(properties.naver()).thenReturn(naver);
+        lenient().when(naver.clientId()).thenReturn("test-naver-id");
+        lenient().when(naver.redirectUri()).thenReturn("http://localhost:3000/auth/naver/callback");
     }
 
     @Test
-    void listProviders_returnsOneGoogleProvider() {
+    void listProviders_returnsAllProviders() {
         ProvidersResponse response = service.listProviders();
 
-        assertThat(response.providers()).hasSize(1);
-        assertThat(response.providers().get(0).name()).isEqualTo("google");
+        assertThat(response.providers()).hasSize(3);
+        assertThat(response.providers()).extracting(ProviderResponse::name)
+                .containsExactly("google", "kakao", "naver");
     }
 
     @Test
@@ -61,5 +74,32 @@ class OAuthProvidersServiceTest {
         // 콜론·슬래시가 퍼센트 인코딩돼야 함
         assertThat(url).doesNotContain("redirect_uri=http://localhost");
         assertThat(url).contains("redirect_uri=http%3A%2F%2Flocalhost");
+    }
+
+    @Test
+    void kakaoAuthorizationUrl_hasRequiredOAuthParams() {
+        String url = service.kakaoAuthorizationUrl();
+
+        assertThat(url).startsWith("https://kauth.kakao.com/oauth/authorize");
+        assertThat(url).contains("response_type=code");
+        assertThat(url).contains("client_id=test-kakao-id");
+        assertThat(url).contains("scope=profile_nickname");
+    }
+
+    @Test
+    void naverAuthorizationUrl_hasRequiredOAuthParams() {
+        String url = service.naverAuthorizationUrl();
+
+        assertThat(url).startsWith("https://nid.naver.com/oauth2.0/authorize");
+        assertThat(url).contains("response_type=code");
+        assertThat(url).contains("client_id=test-naver-id");
+    }
+
+    @Test
+    void naverAuthorizationUrl_omitsState_frontendAppendsIt() {
+        String url = service.naverAuthorizationUrl();
+
+        // state는 CSRF 방지를 위해 프론트가 생성·검증하므로 백엔드 URL엔 포함하지 않는다.
+        assertThat(url).doesNotContain("state=");
     }
 }
