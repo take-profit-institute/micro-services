@@ -6,17 +6,24 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.portfolio.analytics.dto.PortfolioHistoryResult;
 import org.profit.candle.portfolio.analytics.dto.PortfolioSummaryResult;
 import org.profit.candle.portfolio.analytics.dto.SectorBreakdownResult;
+import org.profit.candle.portfolio.analytics.dto.TradingStatsResult;
 import org.profit.candle.portfolio.analytics.service.PortfolioAnalyticsService;
+import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsRequest;
+import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsResponse;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioHistoryRequest;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioHistoryResponse;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioSummaryRequest;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioSummaryResponse;
 import org.profit.candle.proto.portfolio.v1.GetSectorBreakdownRequest;
 import org.profit.candle.proto.portfolio.v1.GetSectorBreakdownResponse;
+import org.profit.candle.proto.portfolio.v1.GetTradingStatsRequest;
+import org.profit.candle.proto.portfolio.v1.GetTradingStatsResponse;
+import org.profit.candle.proto.portfolio.v1.MonthlyReturn;
 import org.profit.candle.proto.portfolio.v1.PortfolioServiceGrpc;
 import org.profit.candle.proto.portfolio.v1.PortfolioSnapshot;
 import org.profit.candle.proto.portfolio.v1.PortfolioSummary;
 import org.profit.candle.proto.portfolio.v1.SectorWeight;
+import org.profit.candle.proto.portfolio.v1.TradingStats;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -84,6 +91,49 @@ public class PortfolioGrpcService extends PortfolioServiceGrpc.PortfolioServiceI
                             .setWeight(r.weight())
                             .setBookValue(r.bookValue())
                             .setCount(r.count())
+                            .build()));
+            observer.onNext(builder.build());
+            observer.onCompleted();
+        } catch (Exception e) {
+            observer.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+        }
+    }
+
+    @Override
+    public void getTradingStats(GetTradingStatsRequest request,
+                                StreamObserver<GetTradingStatsResponse> observer) {
+        try {
+            TradingStatsResult result = analyticsService.getTradingStats(request.getUserId());
+            observer.onNext(GetTradingStatsResponse.newBuilder()
+                    .setStats(TradingStats.newBuilder()
+                            .setUserId(result.userId())
+                            .setTradeCount(result.tradeCount())
+                            .setWinCount(result.winCount())
+                            .setLossCount(result.lossCount())
+                            .setWinRate(result.winRate())
+                            .setAvgHoldingDays(result.avgHoldingDays())
+                            .setBestSymbol(result.bestSymbol())
+                            .setBestProfit(result.bestProfit())
+                            .setWorstSymbol(result.worstSymbol())
+                            .setWorstProfit(result.worstProfit())
+                            .build())
+                    .build());
+            observer.onCompleted();
+        } catch (Exception e) {
+            observer.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+        }
+    }
+
+    @Override
+    public void getMonthlyReturns(GetMonthlyReturnsRequest request,
+                                  StreamObserver<GetMonthlyReturnsResponse> observer) {
+        try {
+            GetMonthlyReturnsResponse.Builder builder = GetMonthlyReturnsResponse.newBuilder();
+            analyticsService.getMonthlyReturns(request.getUserId(), request.getMonths()).forEach(r ->
+                    builder.addReturns(MonthlyReturn.newBuilder()
+                            .setMonth(r.month())
+                            .setReturnRate(r.returnRate())
+                            .setProfit(r.profit())
                             .build()));
             observer.onNext(builder.build());
             observer.onCompleted();

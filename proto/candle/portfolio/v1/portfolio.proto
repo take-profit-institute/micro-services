@@ -101,6 +101,41 @@ message SectorWeight {
 message GetSectorBreakdownRequest  { string user_id = 1; }
 message GetSectorBreakdownResponse { repeated SectorWeight sectors = 1; }
 
+// ─── Trading Stats ─────────────────────────────────────────────────────────
+// 실현 거래 기반 투자 통계. 승률/평균 보유기간/최대 수익·손실 종목.
+// 승률은 본전(손익 0) 거래를 분모에서 제외한다.
+
+message TradingStats {
+  string user_id          = 1;
+  int32  trade_count       = 2;  // 청산된 거래 총 건수
+  int32  win_count         = 3;  // 실현손익 > 0
+  int32  loss_count        = 4;  // 실현손익 < 0
+  string win_rate          = 5;  // "62.50" (%)
+  string avg_holding_days  = 6;  // 평균 보유기간(일) "5.30"
+  string best_symbol       = 7;  // 최대 수익 종목
+  int64  best_profit       = 8;
+  string worst_symbol      = 9;  // 최대 손실 종목
+  int64  worst_profit      = 10;
+}
+
+message GetTradingStatsRequest  { string user_id = 1; }
+message GetTradingStatsResponse { TradingStats stats = 1; }
+
+// ─── Monthly Returns ───────────────────────────────────────────────────────
+// 일별 스냅샷을 월 단위로 집계한 월별 수익률.
+
+message MonthlyReturn {
+  string month       = 1;  // "2026-06" (YYYY-MM)
+  string return_rate = 2;  // 해당 월 수익률 "3.21" (%)
+  int64  profit      = 3;  // 월말 총자산 − 월초 총자산
+}
+
+message GetMonthlyReturnsRequest {
+  string user_id = 1;
+  int32  months  = 2;  // 조회할 개월 수 (e.g. 6 / 12)
+}
+message GetMonthlyReturnsResponse { repeated MonthlyReturn returns = 1; }
+
 // ─── Services ──────────────────────────────────────────────────────────────
 
 // BFF 테이블의 HoldingService → portfolio-service 가 구현
@@ -114,4 +149,6 @@ service PortfolioService {
   rpc GetPortfolioSummary(GetPortfolioSummaryRequest)   returns (GetPortfolioSummaryResponse);
   rpc GetPortfolioHistory(GetPortfolioHistoryRequest)   returns (GetPortfolioHistoryResponse);
   rpc GetSectorBreakdown(GetSectorBreakdownRequest)     returns (GetSectorBreakdownResponse);
+  rpc GetTradingStats(GetTradingStatsRequest)           returns (GetTradingStatsResponse);
+  rpc GetMonthlyReturns(GetMonthlyReturnsRequest)       returns (GetMonthlyReturnsResponse);
 }

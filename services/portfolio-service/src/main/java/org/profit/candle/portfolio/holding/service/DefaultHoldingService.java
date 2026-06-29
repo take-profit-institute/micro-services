@@ -3,10 +3,13 @@ package org.profit.candle.portfolio.holding.service;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.portfolio.holding.dto.HoldingResult;
 import org.profit.candle.portfolio.holding.entity.HoldingEntity;
+import org.profit.candle.portfolio.holding.entity.SellOutcome;
 import org.profit.candle.portfolio.holding.exception.HoldingErrorCode;
 import org.profit.candle.portfolio.holding.exception.HoldingException;
 import org.profit.candle.portfolio.holding.repository.HoldingReader;
 import org.profit.candle.portfolio.holding.repository.HoldingWriter;
+import org.profit.candle.portfolio.holding.trade.entity.RealizedTradeEntity;
+import org.profit.candle.portfolio.holding.trade.repository.RealizedTradeWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +21,7 @@ public class DefaultHoldingService implements HoldingService {
 
     private final HoldingReader holdingReader;
     private final HoldingWriter holdingWriter;
+    private final RealizedTradeWriter realizedTradeWriter;
 
     @Override
     @Transactional(readOnly = true)
@@ -51,7 +55,8 @@ public class DefaultHoldingService implements HoldingService {
     public void applySellFill(String userId, String symbol, long quantity, long executedPrice) {
         HoldingEntity holding = holdingReader.findByUserIdAndSymbol(userId, symbol)
                 .orElseThrow(() -> new HoldingException(HoldingErrorCode.HOLDING_NOT_FOUND));
-        holding.applySell(quantity, executedPrice);
+        SellOutcome outcome = holding.applySell(quantity, executedPrice);
         holdingWriter.save(holding);
+        realizedTradeWriter.save(new RealizedTradeEntity(userId, symbol, outcome));
     }
 }
