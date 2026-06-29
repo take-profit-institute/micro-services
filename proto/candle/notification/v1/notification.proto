@@ -5,11 +5,139 @@ package candle.notification.v1;
 option java_multiple_files = true;
 option java_package = "org.profit.candle.proto.notification.v1";
 
+import "google/protobuf/timestamp.proto";
 import "candle/common/v1/common.proto";
 
-message RegisterPushTokenRequest { string user_id = 1; string token = 2; string platform = 3; candle.common.v1.CommandMetadata command_metadata = 4; }
-message RegisterPushTokenResponse { string token_id = 1; }
-
 service NotificationService {
-  rpc RegisterPushToken(RegisterPushTokenRequest) returns (RegisterPushTokenResponse);
+  rpc RegisterDeviceToken(RegisterDeviceTokenRequest)
+      returns (RegisterDeviceTokenResponse);
+
+  rpc CreateNotification(CreateNotificationRequest)
+      returns (CreateNotificationResponse);
+
+  rpc ListNotifications(ListNotificationsRequest)
+      returns (ListNotificationsResponse);
+
+  rpc MarkAsRead(MarkAsReadRequest)
+      returns (MarkAsReadResponse);
+
+  rpc CountUnread(CountUnreadRequest)
+      returns (CountUnreadResponse);
+
+  rpc GetDeliveryStatus(GetDeliveryStatusRequest)
+      returns (GetDeliveryStatusResponse);
+}
+
+enum NotificationType {
+  NOTIFICATION_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_TYPE_PRICE_RISE = 1;
+  NOTIFICATION_TYPE_PRICE_FALL = 2;
+  NOTIFICATION_TYPE_BUY_FILLED = 3;
+  NOTIFICATION_TYPE_SELL_FILLED = 4;
+  NOTIFICATION_TYPE_MARKET_OPEN = 5;
+  NOTIFICATION_TYPE_MARKET_CLOSE = 6;
+}
+
+enum NotificationStatus {
+  NOTIFICATION_STATUS_UNSPECIFIED = 0;
+  NOTIFICATION_STATUS_UNREAD = 1;
+  NOTIFICATION_STATUS_READ = 2;
+}
+
+enum DevicePlatform {
+  DEVICE_PLATFORM_UNSPECIFIED = 0;
+  DEVICE_PLATFORM_WEB = 1;
+  DEVICE_PLATFORM_ANDROID = 2;
+  DEVICE_PLATFORM_IOS = 3;
+}
+
+enum DeliveryStatus {
+  DELIVERY_STATUS_UNSPECIFIED = 0;
+  DELIVERY_STATUS_PENDING = 1;
+  DELIVERY_STATUS_SENT = 2;
+  DELIVERY_STATUS_FAILED = 3;
+}
+
+message RegisterDeviceTokenRequest {
+  string user_id = 1;
+  string fcm_token = 2;
+  DevicePlatform platform = 3;
+  string device_id = 4;
+}
+
+message RegisterDeviceTokenResponse {
+  string device_token_id = 1;
+}
+
+message CreateNotificationRequest {
+  string user_id = 1;
+  NotificationType type = 2;
+  string title = 3;
+  string body = 4;
+  string meta_json = 5;
+  string idempotency_key = 6;
+}
+
+message CreateNotificationResponse {
+  Notification notification = 1;
+}
+
+message ListNotificationsRequest {
+  string user_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListNotificationsResponse {
+  repeated Notification notifications = 1;
+  string next_page_token = 2;
+}
+
+message MarkAsReadRequest {
+  string user_id = 1;
+  string notification_id = 2;
+}
+
+message MarkAsReadResponse {
+  Notification notification = 1;
+}
+
+message CountUnreadRequest {
+  string user_id = 1;
+}
+
+message CountUnreadResponse {
+  int64 unread_count = 1;
+}
+
+message GetDeliveryStatusRequest {
+  string notification_id = 1;
+}
+
+message GetDeliveryStatusResponse {
+  repeated NotificationDelivery deliveries = 1;
+}
+
+message Notification {
+  string id = 1;
+  string user_id = 2;
+  NotificationType type = 3;
+  string title = 4;
+  string body = 5;
+  NotificationStatus status = 6;
+  string meta_json = 7;
+  google.protobuf.Timestamp triggered_at = 8;
+  google.protobuf.Timestamp read_at = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message NotificationDelivery {
+  string id = 1;
+  string notification_id = 2;
+  string device_token_id = 3;
+  DeliveryStatus status = 4;
+  string fcm_message_id = 5;
+  string error_message = 6;
+  google.protobuf.Timestamp sent_at = 7;
+  google.protobuf.Timestamp created_at = 8;
 }
