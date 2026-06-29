@@ -58,4 +58,24 @@ class NaverOAuthClientTest {
         AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.NAVER_OAUTH_CONFIGURATION_INVALID);
     }
+
+    @Test
+    void fetch_blankState_throwsInvalidRequest_beforeExternalCall() {
+        when(naver.clientId()).thenReturn("client-id");
+        when(naver.clientSecret()).thenReturn("secret");
+        when(naver.redirectUri()).thenReturn("https://example.com/callback");
+
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "  "));
+        assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.INVALID_OAUTH_REQUEST);
+    }
+
+    @Test
+    void fetch_nullState_throwsInvalidRequest() {
+        when(naver.clientId()).thenReturn("client-id");
+        when(naver.clientSecret()).thenReturn("secret");
+        when(naver.redirectUri()).thenReturn("https://example.com/callback");
+
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", null));
+        assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.INVALID_OAUTH_REQUEST);
+    }
 }

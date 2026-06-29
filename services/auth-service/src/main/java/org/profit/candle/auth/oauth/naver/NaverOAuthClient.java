@@ -7,6 +7,7 @@ import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.oauth.OAuthClient;
 import org.profit.candle.auth.oauth.OAuthProfile;
+import org.profit.candle.auth.oauth.OAuthResponses;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -31,6 +32,10 @@ public class NaverOAuthClient implements OAuthClient {
     @Override
     public OAuthProfile fetch(String authorizationCode, String state) {
         validateConfiguration();
+        // naver는 토큰 교환에 state가 필수다. 누락/공백이면 외부 호출 전에 fail-fast 한다.
+        if (state == null || state.isBlank()) {
+            throw new AuthException(AuthErrorCode.INVALID_OAUTH_REQUEST);
+        }
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("code", authorizationCode);
@@ -45,18 +50,22 @@ public class NaverOAuthClient implements OAuthClient {
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(form).retrieve().body(Map.class);
 
-            String accessToken = String.valueOf(token.get("access_token"));
+            String accessToken = OAuthResponses.requireString(
+                    token, "access_token", AuthErrorCode.NAVER_OAUTH_EXCHANGE_FAILED);
 
             Map<?, ?> body = restClient.get().uri(USER_INFO_URI)
                     .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(Map.class);
 
-            Object response = body.get("response");
+            Object response = OAuthResponses.requireBody(body, AuthErrorCode.NAVER_OAUTH_EXCHANGE_FAILED).get("response");
             Map<?, ?> profile = response instanceof Map<?, ?> map ? map : Map.of();
 
+            String subject = OAuthResponses.requireString(
+                    profile, "id", AuthErrorCode.NAVER_OAUTH_EXCHANGE_FAILED);
+            Object email = profile.get("email");
             return new OAuthProfile(
-                    String.valueOf(profile.get("id")),
-                    String.valueOf(profile.get("email")),
-                    profile.get("email") != null);
+                    subject,
+                    email == null ? null : email.toString(),
+                    email != null);
         } catch (RestClientException e) {
             throw new AuthException(AuthErrorCode.NAVER_OAUTH_EXCHANGE_FAILED, e);
         }
