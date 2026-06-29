@@ -39,13 +39,19 @@ public class GatewaySecurityConfig {
     private List<String> allowedOrigins;
 
     // auth 경로 + preflight: JWT 검증 없이 통과
+    // /api/auth/me, /api/auth/token/validate 등 인증 필요 경로는 제외
     @Bean
     @Order(1)
     public SecurityWebFilterChain publicFilterChain(ServerHttpSecurity http) {
         return http
                 .securityMatcher(new OrServerWebExchangeMatcher(
                         ServerWebExchangeMatchers.pathMatchers(HttpMethod.OPTIONS, "/**"),
-                        ServerWebExchangeMatchers.pathMatchers("/api/auth/**"),
+                        ServerWebExchangeMatchers.pathMatchers(
+                                "/api/auth/providers",
+                                "/api/auth/oauth/**",
+                                "/api/auth/token/refresh",
+                                "/api/auth/logout"
+                        ),
                         ServerWebExchangeMatchers.pathMatchers("/api/v1/auth/**")
                 ))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
