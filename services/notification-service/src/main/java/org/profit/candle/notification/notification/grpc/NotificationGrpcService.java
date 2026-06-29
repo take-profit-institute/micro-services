@@ -3,14 +3,18 @@ package org.profit.candle.notification.notification.grpc;
 import com.google.protobuf.Timestamp;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
-import org.profit.candle.notification.delivery.entity.DeliveryStatus;
 import lombok.RequiredArgsConstructor;
+import org.profit.candle.notification.delivery.entity.DeliveryStatus;
 import org.profit.candle.notification.device.dto.DeviceTokenResult;
 import org.profit.candle.notification.device.dto.RegisterDeviceTokenCommand;
 import org.profit.candle.notification.device.entity.DevicePlatform;
 import org.profit.candle.notification.device.service.DeviceTokenService;
+import org.profit.candle.notification.idempotency.service.IdempotencyExecutor;
 import org.profit.candle.notification.notification.dto.CreateNotificationCommand;
 import org.profit.candle.notification.notification.dto.DeliveryResult;
 import org.profit.candle.notification.notification.dto.ListNotificationsResult;
@@ -42,6 +46,7 @@ public class NotificationGrpcService
 
     private final NotificationService notificationService;
     private final DeviceTokenService deviceTokenService;
+    private final IdempotencyExecutor idempotencyExecutor;
 
     @Override
     public void registerDeviceToken(
@@ -49,14 +54,25 @@ public class NotificationGrpcService
             StreamObserver<RegisterDeviceTokenResponse> observer
     ) {
         try {
+            UUID userId = parseUuid(request.getUserId(), NotificationErrorCode.INVALID_USER_ID);
             RegisterDeviceTokenCommand command = new RegisterDeviceTokenCommand(
-                    parseUuid(request.getUserId(), NotificationErrorCode.INVALID_USER_ID),
+                    userId,
                     requireText(request.getFcmToken()),
                     toDevicePlatform(request.getPlatform()),
                     blankToNull(request.getDeviceId())
             );
 
-            DeviceTokenResult result = deviceTokenService.register(command);
+            DeviceTokenResult result = idempotencyExecutor.execute(
+                    userId,
+                    "RegisterDeviceToken",
+                    requireIdempotencyKey(request.getCommandMetadata().getIdempotencyKey()),
+                    requestHash(request.toBuilder()
+                            .clearCommandMetadata()
+                            .build()
+                            .toByteArray()),
+                    DeviceTokenResult.class,
+                    () -> deviceTokenService.register(command)
+            );
 
             RegisterDeviceTokenResponse response = RegisterDeviceTokenResponse.newBuilder()
                     .setDeviceTokenId(result.id().toString())
@@ -79,16 +95,28 @@ public class NotificationGrpcService
             StreamObserver<CreateNotificationResponse> observer
     ) {
         try {
+            UUID userId = parseUuid(request.getUserId(), NotificationErrorCode.INVALID_USER_ID);
             CreateNotificationCommand command = new CreateNotificationCommand(
-                    parseUuid(request.getUserId(), NotificationErrorCode.INVALID_USER_ID),
+                    userId,
                     toNotificationType(request.getType()),
                     requireText(request.getTitle()),
                     requireText(request.getBody()),
                     blankToNull(request.getMetaJson()),
-                    blankToNull(request.getIdempotencyKey())
+                    requireIdempotencyKey(request.getCommandMetadata().getIdempotencyKey())
             );
 
-            NotificationResult result = notificationService.createAndSend(command);
+            NotificationResult result = idempotencyExecutor.execute(
+                    userId,
+                    "CreateNotification",
+                    command.idempotencyKey(),
+                    requestHash(request.toBuilder()
+                            .clearCommandMetadata()
+                            .clearIdempotencyKey()
+                            .build()
+                            .toByteArray()),
+                    NotificationResult.class,
+                    () -> notificationService.createAndSend(command)
+            );
 
             CreateNotificationResponse response = CreateNotificationResponse.newBuilder()
                     .setNotification(toNotificationProto(result))
@@ -139,10 +167,21 @@ public class NotificationGrpcService
             StreamObserver<MarkAsReadResponse> observer
     ) {
         try {
-            NotificationResult result = notificationService.markAsRead(
-                    parseUuid(request.getUserId(), NotificationErrorCode.INVALID_USER_ID),
-                    parseUuid(request.getNotificationId(),
-                            NotificationErrorCode.INVALID_NOTIFICATION_ID)
+            UUID userId = parseUuid(request.getUserId(), NotificationErrorCode.INVALID_USER_ID);
+            UUID notificationId = parseUuid(
+                    request.getNotificationId(),
+                    NotificationErrorCode.INVALID_NOTIFICATION_ID
+            );
+            NotificationResult result = idempotencyExecutor.execute(
+                    userId,
+                    "MarkAsRead",
+                    requireIdempotencyKey(request.getCommandMetadata().getIdempotencyKey()),
+                    requestHash(request.toBuilder()
+                            .clearCommandMetadata()
+                            .build()
+                            .toByteArray()),
+                    NotificationResult.class,
+                    () -> notificationService.markAsRead(userId, notificationId)
             );
 
             MarkAsReadResponse response = MarkAsReadResponse.newBuilder()
@@ -222,6 +261,13 @@ public class NotificationGrpcService
     private String requireText(String value) {
         if (value == null || value.isBlank()) {
             throw new NotificationException(NotificationErrorCode.INVALID_REQUEST);
+        }
+        return value;
+    }
+
+    private String requireIdempotencyKey(String value) {
+        if (value == null || value.isBlank()) {
+            throw new NotificationException(NotificationErrorCode.IDEMPOTENCY_KEY_REQUIRED);
         }
         return value;
     }
@@ -343,6 +389,15 @@ public class NotificationGrpcService
                 .setSeconds(instant.getEpochSecond())
                 .setNanos(instant.getNano())
                 .build();
+    }
+
+    private String requestHash(byte[] requestBytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return Base64.getEncoder().encodeToString(digest.digest(requestBytes));
+        } catch (NoSuchAlgorithmException e) {
+            throw new NotificationException(NotificationErrorCode.INVALID_REQUEST, e);
+        }
     }
 
     private Status toGrpcStatus(NotificationException e) {

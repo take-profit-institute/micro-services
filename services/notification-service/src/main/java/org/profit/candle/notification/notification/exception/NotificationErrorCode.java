@@ -9,6 +9,8 @@ public enum NotificationErrorCode implements ErrorCode {
     INVALID_DEVICE_PLATFORM("NOTIFICATION_INVALID_DEVICE_PLATFORM", "Invalid device platform."),
     INVALID_NOTIFICATION_TYPE("NOTIFICATION_INVALID_NOTIFICATION_TYPE", "Invalid notification type."),
     INVALID_REQUEST("NOTIFICATION_INVALID_REQUEST", "Invalid notification request."),
+    IDEMPOTENCY_KEY_REQUIRED("NOTIFICATION_IDEMPOTENCY_KEY_REQUIRED", "Idempotency key is required."),
+    IDEMPOTENCY_REQUEST_MISMATCH("NOTIFICATION_IDEMPOTENCY_REQUEST_MISMATCH", "Idempotency request hash does not match."),
     NOTIFICATION_NOT_FOUND("NOTIFICATION_NOT_FOUND", "Notification not found."),
     FCM_SEND_FAILED("NOTIFICATION_FCM_SEND_FAILED", "Failed to send FCM notification.");
 

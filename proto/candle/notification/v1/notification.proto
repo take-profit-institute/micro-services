@@ -63,6 +63,7 @@ message RegisterDeviceTokenRequest {
   string fcm_token = 2;
   DevicePlatform platform = 3;
   string device_id = 4;
+  candle.common.v1.CommandMetadata command_metadata = 5;
 }
 
 message RegisterDeviceTokenResponse {
@@ -76,6 +77,7 @@ message CreateNotificationRequest {
   string body = 4;
   string meta_json = 5;
   string idempotency_key = 6;
+  candle.common.v1.CommandMetadata command_metadata = 7;
 }
 
 message CreateNotificationResponse {
@@ -96,6 +98,7 @@ message ListNotificationsResponse {
 message MarkAsReadRequest {
   string user_id = 1;
   string notification_id = 2;
+  candle.common.v1.CommandMetadata command_metadata = 3;
 }
 
 message MarkAsReadResponse {
