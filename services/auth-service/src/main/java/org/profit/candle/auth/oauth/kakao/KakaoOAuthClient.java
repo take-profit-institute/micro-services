@@ -1,4 +1,4 @@
-package org.profit.candle.auth.oauth.google;
+package org.profit.candle.auth.oauth.kakao;
 
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -15,17 +15,17 @@ import org.springframework.web.client.RestClientException;
 
 @Component
 @RequiredArgsConstructor
-public class GoogleOAuthClient implements OAuthClient {
+public class KakaoOAuthClient implements OAuthClient {
 
-    private static final String TOKEN_URI = "https://oauth2.googleapis.com/token";
-    private static final String USER_INFO_URI = "https://openidconnect.googleapis.com/v1/userinfo";
+    private static final String TOKEN_URI = "https://kauth.kakao.com/oauth/token";
+    private static final String USER_INFO_URI = "https://kapi.kakao.com/v2/user/me";
 
     private final AuthProperties properties;
     private final RestClient restClient = RestClient.create();
 
     @Override
     public String provider() {
-        return "google";
+        return "kakao";
     }
 
     @Override
@@ -34,9 +34,9 @@ public class GoogleOAuthClient implements OAuthClient {
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("code", authorizationCode);
-            form.add("client_id", properties.google().clientId());
-            form.add("client_secret", properties.google().clientSecret());
-            form.add("redirect_uri", properties.google().redirectUri());
+            form.add("client_id", properties.kakao().clientId());
+            form.add("client_secret", properties.kakao().clientSecret());
+            form.add("redirect_uri", properties.kakao().redirectUri());
             form.add("grant_type", "authorization_code");
 
             Map<?, ?> token = restClient.post().uri(TOKEN_URI)
@@ -48,19 +48,22 @@ public class GoogleOAuthClient implements OAuthClient {
             Map<?, ?> profile = restClient.get().uri(USER_INFO_URI)
                     .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(Map.class);
 
+            Object account = profile.get("kakao_account");
+            Map<?, ?> kakaoAccount = account instanceof Map<?, ?> map ? map : Map.of();
+
             return new OAuthProfile(
-                    String.valueOf(profile.get("sub")),
-                    String.valueOf(profile.get("email")),
-                    Boolean.parseBoolean(String.valueOf(profile.get("email_verified"))));
+                    String.valueOf(profile.get("id")),
+                    String.valueOf(kakaoAccount.get("email")),
+                    Boolean.parseBoolean(String.valueOf(kakaoAccount.get("is_email_verified"))));
         } catch (RestClientException e) {
-            throw new AuthException(AuthErrorCode.GOOGLE_OAUTH_EXCHANGE_FAILED, e);
+            throw new AuthException(AuthErrorCode.KAKAO_OAUTH_EXCHANGE_FAILED, e);
         }
     }
 
     private void validateConfiguration() {
-        if (properties.google().clientId().isBlank() || properties.google().clientSecret().isBlank()
-                || properties.google().redirectUri().isBlank()) {
-            throw new AuthException(AuthErrorCode.GOOGLE_OAUTH_CONFIGURATION_INVALID);
+        if (properties.kakao().clientId().isBlank() || properties.kakao().clientSecret().isBlank()
+                || properties.kakao().redirectUri().isBlank()) {
+            throw new AuthException(AuthErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID);
         }
     }
 }

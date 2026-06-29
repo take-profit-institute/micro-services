@@ -1,4 +1,4 @@
-package org.profit.candle.auth.oauth.google;
+package org.profit.candle.auth.oauth.kakao;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,46 +16,46 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class GoogleOAuthClientTest {
+class KakaoOAuthClientTest {
 
     @Mock AuthProperties properties;
-    @Mock AuthProperties.Google google;
-    @InjectMocks GoogleOAuthClient client;
+    @Mock AuthProperties.Kakao kakao;
+    @InjectMocks KakaoOAuthClient client;
 
     @BeforeEach
     void setUp() {
-        lenient().when(properties.google()).thenReturn(google);
+        lenient().when(properties.kakao()).thenReturn(kakao);
     }
 
     @Test
-    void provider_returnsGoogle() {
-        assertThat(client.provider()).isEqualTo("google");
+    void provider_returnsKakao() {
+        assertThat(client.provider()).isEqualTo("kakao");
     }
 
     @Test
     void fetch_blankClientId_throwsConfigurationInvalid() {
-        when(google.clientId()).thenReturn("");
+        when(kakao.clientId()).thenReturn("");
 
         AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
-        assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.GOOGLE_OAUTH_CONFIGURATION_INVALID);
+        assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID);
     }
 
     @Test
     void fetch_blankClientSecret_throwsConfigurationInvalid() {
-        when(google.clientId()).thenReturn("client-id");
-        when(google.clientSecret()).thenReturn("  ");
+        when(kakao.clientId()).thenReturn("client-id");
+        when(kakao.clientSecret()).thenReturn("  ");
 
         AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
-        assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.GOOGLE_OAUTH_CONFIGURATION_INVALID);
+        assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID);
     }
 
     @Test
     void fetch_blankRedirectUri_throwsConfigurationInvalid() {
-        when(google.clientId()).thenReturn("client-id");
-        when(google.clientSecret()).thenReturn("secret");
-        when(google.redirectUri()).thenReturn("");
+        when(kakao.clientId()).thenReturn("client-id");
+        when(kakao.clientSecret()).thenReturn("secret");
+        when(kakao.redirectUri()).thenReturn("");
 
         AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
-        assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.GOOGLE_OAUTH_CONFIGURATION_INVALID);
+        assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID);
     }
 }
