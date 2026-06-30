@@ -13,4 +13,6 @@ public interface OrderService {
     CancelResult cancelOrder(UUID userId, UUID orderId);
 
     CancelResult cancelExpiredPendingOrder(UUID orderId);
+
+    int expirePendingOrders();
 }

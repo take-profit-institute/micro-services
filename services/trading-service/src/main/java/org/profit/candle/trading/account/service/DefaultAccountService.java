@@ -40,6 +40,20 @@ public class DefaultAccountService implements AccountService {
         account.release(amount);
     }
 
+    @Override
+    @Transactional
+    public void settleBuy(UUID userId, long lockedAmount, long settledAmount) {
+        AccountEntity account = loadOrCreateForUpdate(userId);
+        account.settleBuy(lockedAmount, settledAmount);
+    }
+
+    @Override
+    @Transactional
+    public void settleSell(UUID userId, long settledAmount) {
+        AccountEntity account = loadOrCreateForUpdate(userId);
+        account.settleSell(settledAmount);
+    }
+
     /**
      * 잔고 변경 직전 락을 걸고 조회한다. 없으면 생성한다.
      * 계좌는 ACC-001(회원가입 완료 시 자동 생성)에 따라 보통 이미 존재해야 하지만,

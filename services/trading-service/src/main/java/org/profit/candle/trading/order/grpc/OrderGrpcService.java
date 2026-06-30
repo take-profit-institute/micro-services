@@ -130,6 +130,8 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             case DUPLICATE_PENDING_ORDER, ORDER_NOT_PENDING, MARKET_ORDER_CANNOT_BE_CANCELLED,
                  OUTSIDE_TRADING_HOURS ->
                     Status.FAILED_PRECONDITION;
+            case MARKET_PRICE_UNAVAILABLE ->
+                    Status.UNAVAILABLE;
         };
         return status.withDescription(errorCode.message()).asRuntimeException();
     }
@@ -237,5 +239,15 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             case CANCELLED -> OrderStatus.ORDER_STATUS_CANCELLED;
             case REJECTED -> OrderStatus.ORDER_STATUS_REJECTED;
         };
+    }
+
+    @Override
+    public void expirePendingOrders(ExpirePendingOrdersRequest request,
+                                    StreamObserver<ExpirePendingOrdersResponse> observer) {
+        int cancelledCount = orderService.expirePendingOrders();
+        observer.onNext(ExpirePendingOrdersResponse.newBuilder()
+                .setCancelledCount(cancelledCount)
+                .build());
+        observer.onCompleted();
     }
 }
