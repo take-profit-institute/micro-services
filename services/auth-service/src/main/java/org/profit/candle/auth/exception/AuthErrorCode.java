@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 public enum AuthErrorCode implements ErrorCode {
     INVALID_OAUTH_REQUEST(HttpStatus.BAD_REQUEST, "AUTH_INVALID_OAUTH_REQUEST", "OAuth 인증 요청이 올바르지 않습니다."),
     UNSUPPORTED_OAUTH_PROVIDER(HttpStatus.BAD_REQUEST, "AUTH_UNSUPPORTED_OAUTH_PROVIDER", "지원하지 않는 OAuth 제공자입니다."),
+    OAUTH_REDIRECT_URI_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "AUTH_OAUTH_REDIRECT_URI_NOT_ALLOWED", "허용되지 않은 redirect_uri입니다."),
     OAUTH_ACCOUNT_NOT_VERIFIED(HttpStatus.UNAUTHORIZED, "AUTH_OAUTH_ACCOUNT_NOT_VERIFIED", "OAuth 계정 인증에 실패했습니다."),
     GOOGLE_OAUTH_EXCHANGE_FAILED(HttpStatus.UNAUTHORIZED, "AUTH_GOOGLE_OAUTH_EXCHANGE_FAILED", "Google 인증 정보를 확인할 수 없습니다."),
     GOOGLE_OAUTH_CONFIGURATION_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "AUTH_GOOGLE_OAUTH_CONFIGURATION_INVALID", "인증 서비스 설정이 올바르지 않습니다."),

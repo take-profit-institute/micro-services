@@ -30,14 +30,14 @@ public class GoogleOAuthClient implements OAuthClient {
     }
 
     @Override
-    public OAuthProfile fetch(String authorizationCode, String state) {
-        validateConfiguration();
+    public OAuthProfile fetch(String authorizationCode, String state, String redirectUri) {
+        validateConfiguration(redirectUri);
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("code", authorizationCode);
             form.add("client_id", properties.google().clientId());
             form.add("client_secret", properties.google().clientSecret());
-            form.add("redirect_uri", properties.google().redirectUri());
+            form.add("redirect_uri", redirectUri);
             form.add("grant_type", "authorization_code");
 
             Map<?, ?> token = restClient.post().uri(TOKEN_URI)
@@ -61,9 +61,9 @@ public class GoogleOAuthClient implements OAuthClient {
         }
     }
 
-    private void validateConfiguration() {
+    private void validateConfiguration(String redirectUri) {
         if (properties.google().clientId().isBlank() || properties.google().clientSecret().isBlank()
-                || properties.google().redirectUri().isBlank()) {
+                || redirectUri == null || redirectUri.isBlank()) {
             throw new AuthException(AuthErrorCode.GOOGLE_OAUTH_CONFIGURATION_INVALID);
         }
     }

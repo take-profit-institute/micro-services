@@ -36,7 +36,7 @@ class GoogleOAuthClientTest {
     void fetch_blankClientId_throwsConfigurationInvalid() {
         when(google.clientId()).thenReturn("");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state", "https://app.candle.io/auth/callback"));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.GOOGLE_OAUTH_CONFIGURATION_INVALID);
     }
 
@@ -45,7 +45,7 @@ class GoogleOAuthClientTest {
         when(google.clientId()).thenReturn("client-id");
         when(google.clientSecret()).thenReturn("  ");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state", "https://app.candle.io/auth/callback"));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.GOOGLE_OAUTH_CONFIGURATION_INVALID);
     }
 
@@ -53,9 +53,8 @@ class GoogleOAuthClientTest {
     void fetch_blankRedirectUri_throwsConfigurationInvalid() {
         when(google.clientId()).thenReturn("client-id");
         when(google.clientSecret()).thenReturn("secret");
-        when(google.redirectUri()).thenReturn("");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state", ""));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.GOOGLE_OAUTH_CONFIGURATION_INVALID);
     }
 }

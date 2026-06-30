@@ -30,8 +30,8 @@ public class NaverOAuthClient implements OAuthClient {
     }
 
     @Override
-    public OAuthProfile fetch(String authorizationCode, String state) {
-        validateConfiguration();
+    public OAuthProfile fetch(String authorizationCode, String state, String redirectUri) {
+        validateConfiguration(redirectUri);
         // naver는 토큰 교환에 state가 필수다. 누락/공백이면 외부 호출 전에 fail-fast 한다.
         if (state == null || state.isBlank()) {
             throw new AuthException(AuthErrorCode.INVALID_OAUTH_REQUEST);
@@ -41,7 +41,7 @@ public class NaverOAuthClient implements OAuthClient {
             form.add("code", authorizationCode);
             form.add("client_id", properties.naver().clientId());
             form.add("client_secret", properties.naver().clientSecret());
-            form.add("redirect_uri", properties.naver().redirectUri());
+            form.add("redirect_uri", redirectUri);
             form.add("grant_type", "authorization_code");
             // naver는 토큰 교환 시 authorize에 사용한 state를 함께 요구한다.
             form.add("state", state);
@@ -71,9 +71,9 @@ public class NaverOAuthClient implements OAuthClient {
         }
     }
 
-    private void validateConfiguration() {
+    private void validateConfiguration(String redirectUri) {
         if (properties.naver().clientId().isBlank() || properties.naver().clientSecret().isBlank()
-                || properties.naver().redirectUri().isBlank()) {
+                || redirectUri == null || redirectUri.isBlank()) {
             throw new AuthException(AuthErrorCode.NAVER_OAUTH_CONFIGURATION_INVALID);
         }
     }

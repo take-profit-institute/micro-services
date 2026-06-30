@@ -86,7 +86,7 @@ class AuthControllerTest {
 
     @Test
     void login_validCode_returns200WithTokenInBody() throws Exception {
-        when(oAuthLoginService.login("google", "valid-code", null)).thenReturn(
+        when(oAuthLoginService.login("google", "valid-code", null, null)).thenReturn(
                 new LoginResult(STUB_TOKENS, false));
 
         mockMvc.perform(post("/api/v1/auth/oauth/google")
@@ -98,7 +98,7 @@ class AuthControllerTest {
 
     @Test
     void login_newUser_isNewUserTrueInResponse() throws Exception {
-        when(oAuthLoginService.login("google", "code", null)).thenReturn(
+        when(oAuthLoginService.login("google", "code", null, null)).thenReturn(
                 new LoginResult(STUB_TOKENS, true));
 
         mockMvc.perform(post("/api/v1/auth/oauth/google")
@@ -110,7 +110,7 @@ class AuthControllerTest {
 
     @Test
     void login_setsAccessAndRefreshCookies() throws Exception {
-        when(oAuthLoginService.login("google", "code", null)).thenReturn(
+        when(oAuthLoginService.login("google", "code", null, null)).thenReturn(
                 new LoginResult(STUB_TOKENS, false));
 
         mockMvc.perform(post("/api/v1/auth/oauth/google")

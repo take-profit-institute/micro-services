@@ -31,14 +31,14 @@ public class KakaoOAuthClient implements OAuthClient {
     }
 
     @Override
-    public OAuthProfile fetch(String authorizationCode, String state) {
-        validateConfiguration();
+    public OAuthProfile fetch(String authorizationCode, String state, String redirectUri) {
+        validateConfiguration(redirectUri);
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("code", authorizationCode);
             form.add("client_id", properties.kakao().clientId());
             form.add("client_secret", properties.kakao().clientSecret());
-            form.add("redirect_uri", properties.kakao().redirectUri());
+            form.add("redirect_uri", redirectUri);
             form.add("grant_type", "authorization_code");
 
             Map<?, ?> token = restClient.post().uri(TOKEN_URI)
@@ -62,9 +62,9 @@ public class KakaoOAuthClient implements OAuthClient {
         }
     }
 
-    private void validateConfiguration() {
+    private void validateConfiguration(String redirectUri) {
         if (properties.kakao().clientId().isBlank() || properties.kakao().clientSecret().isBlank()
-                || properties.kakao().redirectUri().isBlank()) {
+                || redirectUri == null || redirectUri.isBlank()) {
             throw new AuthException(AuthErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID);
         }
     }

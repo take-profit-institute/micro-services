@@ -17,6 +17,7 @@ import org.profit.candle.auth.identity.repository.OAuthAccountRepository;
 import org.profit.candle.auth.oauth.OAuthClient;
 import org.profit.candle.auth.oauth.OAuthClientRegistry;
 import org.profit.candle.auth.oauth.OAuthProfile;
+import org.profit.candle.auth.oauth.OAuthRedirectUriResolver;
 import org.profit.candle.auth.token.service.AuthTokenIssuer;
 import org.profit.candle.auth.token.service.IssuedTokens;
 
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.when;
 class DefaultOAuthLoginServiceTest {
 
     @Mock OAuthClientRegistry registry;
+    @Mock OAuthRedirectUriResolver redirectUriResolver;
     @Mock OAuthAccountRepository accountRepository;
     @Mock AuthTokenIssuer tokenIssuer;
     @Mock OutboxWriter outboxWriter;
@@ -40,23 +42,25 @@ class DefaultOAuthLoginServiceTest {
 
     OAuthClient oAuthClient;
     static final IssuedTokens STUB_TOKENS = new IssuedTokens("access", "refresh", 3600);
+    static final String REDIRECT = "https://app.candle.io/auth/callback";
 
     @BeforeEach
     void setUp() {
         oAuthClient = mock(OAuthClient.class);
         lenient().when(registry.resolve("google")).thenReturn(oAuthClient);
+        lenient().when(redirectUriResolver.resolve(any(), any())).thenReturn(REDIRECT);
     }
 
     @Test
     void login_newUser_createsAccountAndPublishesEvent() {
         UUID userId = UUID.randomUUID();
         OAuthAccount saved = account(userId, "google", "sub123", "user@example.com");
-        when(oAuthClient.fetch("code", "state")).thenReturn(verifiedProfile("sub123", "user@example.com"));
+        when(oAuthClient.fetch("code", "state", REDIRECT)).thenReturn(verifiedProfile("sub123", "user@example.com"));
         when(accountRepository.findByProviderAndProviderSubject("google", "sub123")).thenReturn(Optional.empty());
         when(accountRepository.save(any())).thenReturn(saved);
         when(tokenIssuer.issue(userId, "user@example.com")).thenReturn(STUB_TOKENS);
 
-        LoginResult result = service.login("google", "code", "state");
+        LoginResult result = service.login("google", "code", "state", null);
 
         assertThat(result.isNewUser()).isTrue();
         assertThat(result.tokens()).isEqualTo(STUB_TOKENS);
@@ -68,11 +72,11 @@ class DefaultOAuthLoginServiceTest {
     void login_existingUser_skipsCreationAndEvent() {
         UUID userId = UUID.randomUUID();
         OAuthAccount existing = account(userId, "google", "sub123", "user@example.com");
-        when(oAuthClient.fetch("code", "state")).thenReturn(verifiedProfile("sub123", "user@example.com"));
+        when(oAuthClient.fetch("code", "state", REDIRECT)).thenReturn(verifiedProfile("sub123", "user@example.com"));
         when(accountRepository.findByProviderAndProviderSubject("google", "sub123")).thenReturn(Optional.of(existing));
         when(tokenIssuer.issue(userId, "user@example.com")).thenReturn(STUB_TOKENS);
 
-        LoginResult result = service.login("google", "code", "state");
+        LoginResult result = service.login("google", "code", "state", null);
 
         assertThat(result.isNewUser()).isFalse();
         verify(accountRepository, never()).save(any());
@@ -81,17 +85,17 @@ class DefaultOAuthLoginServiceTest {
 
     @Test
     void login_unverifiedEmail_throwsAccountNotVerified() {
-        when(oAuthClient.fetch("code", "state")).thenReturn(new OAuthProfile("sub123", "user@example.com", false));
+        when(oAuthClient.fetch("code", "state", REDIRECT)).thenReturn(new OAuthProfile("sub123", "user@example.com", false));
 
-        AuthException ex = assertThrows(AuthException.class, () -> service.login("google", "code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> service.login("google", "code", "state", null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.OAUTH_ACCOUNT_NOT_VERIFIED);
     }
 
     @Test
     void login_blankSubject_throwsAccountNotVerified() {
-        when(oAuthClient.fetch("code", "state")).thenReturn(new OAuthProfile("", "user@example.com", true));
+        when(oAuthClient.fetch("code", "state", REDIRECT)).thenReturn(new OAuthProfile("", "user@example.com", true));
 
-        AuthException ex = assertThrows(AuthException.class, () -> service.login("google", "code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> service.login("google", "code", "state", null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.OAUTH_ACCOUNT_NOT_VERIFIED);
     }
 
@@ -101,12 +105,12 @@ class DefaultOAuthLoginServiceTest {
         when(registry.resolve("kakao")).thenReturn(kakao);
         UUID userId = UUID.randomUUID();
         OAuthAccount saved = account(userId, "kakao", "sub-kakao", "user@example.com");
-        when(kakao.fetch("code", "state")).thenReturn(verifiedProfile("sub-kakao", "user@example.com"));
+        when(kakao.fetch("code", "state", REDIRECT)).thenReturn(verifiedProfile("sub-kakao", "user@example.com"));
         when(accountRepository.findByProviderAndProviderSubject("kakao", "sub-kakao")).thenReturn(Optional.empty());
         when(accountRepository.save(any())).thenReturn(saved);
         when(tokenIssuer.issue(userId, "user@example.com")).thenReturn(STUB_TOKENS);
 
-        LoginResult result = service.login("kakao", "code", "state");
+        LoginResult result = service.login("kakao", "code", "state", null);
 
         assertThat(result.isNewUser()).isTrue();
         verify(registry).resolve("kakao");
