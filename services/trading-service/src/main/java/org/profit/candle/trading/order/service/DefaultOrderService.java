@@ -1,20 +1,25 @@
 package org.profit.candle.trading.order.service;
 
-import io.grpc.Status;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.profit.candle.trading.account.entity.AccountEntity;
 import org.profit.candle.trading.account.service.AccountService;
 import org.profit.candle.trading.order.dto.CancelResult;
 import org.profit.candle.trading.order.dto.PlaceOrderCommand;
 import org.profit.candle.trading.order.entity.OrderEntity;
+import org.profit.candle.trading.order.entity.OrderKindValue;
 import org.profit.candle.trading.order.entity.OrderSideValue;
 import org.profit.candle.trading.order.entity.OrderStatusValue;
 import org.profit.candle.trading.order.event.OrderCancelledPayload;
 import org.profit.candle.trading.order.event.OrderOutboxOperations;
 import org.profit.candle.trading.order.event.OrderPlacedPayload;
+import org.profit.candle.trading.order.exception.OrderErrorCode;
+import org.profit.candle.trading.order.exception.OrderException;
 import org.profit.candle.trading.order.repository.OrderRepository;
 import org.profit.candle.trading.support.event.OutboxWriter;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 /**
  * Order 도메인 업무 서비스. 메서드는 IdempotencyExecutor의 트랜잭션 안에서 호출되어
@@ -35,51 +40,62 @@ public class DefaultOrderService implements OrderService {
     private final OrderOutboxOperations outboxOperations;
 
     @Override
-    public OrderEntity placeOrder(String actorId, PlaceOrderCommand command) {
+    @Transactional
+    public OrderEntity placeOrder(UUID userId, PlaceOrderCommand command) {
         if (command.quantity() <= 0 || command.price() <= 0) {
-            throw Status.INVALID_ARGUMENT.withDescription("quantity와 price는 양수여야 합니다").asRuntimeException();
+            throw new OrderException(OrderErrorCode.INVALID_QUANTITY);
         }
+
+        // account_id는 order_svc가 자체 보유하지 않는 값이라 매 호출 조회한다.
+        // (크로스 스키마 FK 금지 — orders.account_id는 이 시점에 받아온 값을 그대로 저장)
+        AccountEntity account = accountService.getAccount(userId);
+
         // ORD-009: 동일 종목 PENDING 주문 중복 방지
-        if (orderRepository.existsByUserIdAndSymbolAndStatus(actorId, command.symbol(), OrderStatusValue.PENDING)) {
-            throw Status.FAILED_PRECONDITION.withDescription("해당 종목에 이미 대기 중인 주문이 있습니다").asRuntimeException();
+        if (orderRepository.existsByAccountIdAndSymbolAndStatus(account.getId(), command.symbol(), OrderStatusValue.PENDING)) {
+            throw new OrderException(OrderErrorCode.DUPLICATE_PENDING_ORDER);
         }
 
         long amount = command.price() * command.quantity();
         long fee = Math.round(amount * FEE_RATE);
-        long reserved = 0;
+        long reservedAmountKrw = 0;
 
         if (command.side() == OrderSideValue.BUY) {
-            reserved = amount + fee;
-            accountService.reserveBalance(actorId, reserved);
+            reservedAmountKrw = amount + fee;
+            accountService.lockBalance(userId, reservedAmountKrw);
         }
 
-        OrderEntity order = new OrderEntity(
-                UUID.randomUUID().toString(), actorId, command.symbol(), command.side(), command.kind(),
-                command.quantity(), command.price(), OrderStatusValue.PENDING, null, reserved);
+        Long priceKrw = command.kind() == OrderKindValue.LIMIT ? command.price() : null;
+
+        OrderEntity order = OrderEntity.place(
+                userId, account.getId(), command.symbol(), command.side(), command.kind(),
+                command.quantity(), priceKrw, reservedAmountKrw, command.idempotencyKey());
         orderRepository.save(order);
 
-        outboxWriter.record(outboxOperations, "OrderPlaced", order.id(), new OrderPlacedPayload(
-                order.id(), actorId, order.symbol(), order.side().name(), order.quantity(), order.price(), reserved));
+        outboxWriter.record(outboxOperations, "OrderPlaced", order.getId().toString(), new OrderPlacedPayload(
+                order.getId().toString(), userId.toString(), order.getSymbol(), order.getSide().name(), order.getQuantity(), order.getPriceKrw() == null ? 0 : order.getPriceKrw(), reservedAmountKrw));
         return order;
     }
 
     @Override
-    public CancelResult cancelOrder(String actorId, String orderId) {
-        OrderEntity order = orderRepository.findByIdAndUserId(orderId, actorId)
-                .orElseThrow(() -> Status.NOT_FOUND.withDescription("주문을 찾을 수 없습니다").asRuntimeException());
-        if (order.status() != OrderStatusValue.PENDING) {
-            throw Status.FAILED_PRECONDITION.withDescription("대기 중인 주문만 취소할 수 있습니다").asRuntimeException();
+    @Transactional
+    public CancelResult cancelOrder(UUID userId, UUID orderId) {
+        OrderEntity order = orderRepository.findByIdAndUserId(orderId, userId)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        long releasedAmount = order.getReservedAmountKrw();
+
+        // markCancelled()가 PENDING/LIMIT 여부를 자체 검증한다 (CAN-001/002/003).
+        order.markCancelled();
+
+        // CAN-004: 취소 시 reserved_amount만큼 즉시 반환. SELL은 잔고를 잠그지 않으므로 반환 불필요.
+        if (releasedAmount > 0 && order.getSide() == OrderSideValue.BUY) {
+            accountService.releaseBalance(userId, releasedAmount);
         }
 
-        long released = order.reservedAmount();
-        if (released > 0 && order.side() == OrderSideValue.BUY) {
-            accountService.releaseBalance(actorId, released);
-        }
-        order.markCancelled();
         orderRepository.save(order);
 
-        outboxWriter.record(outboxOperations, "OrderCancelled", order.id(),
-                new OrderCancelledPayload(order.id(), actorId, released));
-        return new CancelResult(order, released);
+        outboxWriter.record(outboxOperations, "OrderCancelled", order.getId().toString(),
+                new OrderCancelledPayload(order.getId().toString(), userId.toString(), releasedAmount));
+        return new CancelResult(order, releasedAmount);
     }
 }
