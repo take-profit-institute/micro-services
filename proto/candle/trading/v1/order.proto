@@ -21,6 +21,11 @@ message Order {
   string parent_order_id = 9;
   int64 reserved_amount = 10;
   google.protobuf.Timestamp created_at = 11;
+  int64 executed_price = 12;       // 신규 — 체결가. 미체결(PENDING) 상태면 0
+  int64 fee = 13;                  // 신규 — 수수료. 미체결 상태면 0
+  int64 tax = 14;                  // 신규 — 거래세(매도만, 매수/미체결은 0)
+  int64 net_amount = 15;           // 신규 — 정산금액. 미체결 상태면 0
+  google.protobuf.Timestamp executed_at = 16;  // 신규 — 체결시각. 미체결 상태면 미설정
 }
 
 message ListOrdersRequest {

@@ -10,13 +10,11 @@ import org.profit.candle.trading.account.exception.AccountErrorCode;
 import org.profit.candle.trading.account.exception.AccountException;
 import org.profit.candle.trading.order.dto.CancelResult;
 import org.profit.candle.trading.order.dto.PlaceOrderCommand;
-import org.profit.candle.trading.order.entity.OrderEntity;
-import org.profit.candle.trading.order.entity.OrderKindValue;
-import org.profit.candle.trading.order.entity.OrderSideValue;
-import org.profit.candle.trading.order.entity.OrderStatusValue;
+import org.profit.candle.trading.order.entity.*;
 import org.profit.candle.trading.order.event.OrderIdempotencyOperations;
 import org.profit.candle.trading.order.exception.OrderErrorCode;
 import org.profit.candle.trading.order.exception.OrderException;
+import org.profit.candle.trading.order.repository.ExecutionRepository;
 import org.profit.candle.trading.order.repository.OrderRepository;
 import org.profit.candle.trading.order.service.OrderService;
 import org.profit.candle.trading.support.idempotency.IdempotencyContext;
@@ -24,7 +22,11 @@ import org.profit.candle.trading.support.idempotency.IdempotencyExecutor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * OrderService gRPC 엔드포인트.
@@ -46,6 +48,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
 
     private final OrderService orderService;
     private final OrderRepository orderRepository;
+    private final ExecutionRepository executionRepository;
     private final IdempotencyExecutor idempotencyExecutor;
     private final OrderIdempotencyOperations idempotencyOperations;
 
@@ -57,7 +60,14 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         var orders = request.getStatus() == OrderStatus.ORDER_STATUS_UNSPECIFIED
                 ? orderRepository.findByUserIdOrderByCreatedAtDesc(actor)
                 : orderRepository.findByUserIdAndStatusOrderByCreatedAtDesc(actor, toStatus(request.getStatus()));
-        orders.forEach(order -> response.addOrders(toProto(order)));
+
+        // 체결 정보를 N+1 없이 한 번에 조회 — FILLED 주문에만 ExecutionEntity가 존재한다.
+        List<UUID> orderIds = orders.stream().map(OrderEntity::getId).toList();
+        Map<UUID, ExecutionEntity> executionsByOrderId = executionRepository.findByOrderIdIn(orderIds).stream()
+                .collect(Collectors.toMap(ExecutionEntity::getOrderId, Function.identity()));
+
+        orders.forEach(order -> response.addOrders(
+                toProto(order, executionsByOrderId.get(order.getId()))));
         observer.onNext(response.build());
         observer.onCompleted();
     }
@@ -76,9 +86,16 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     request,
                     PlaceOrderResponse.parser(),
                     idempotencyOperations,
-                    () -> PlaceOrderResponse.newBuilder()
-                            .setOrder(toProto(orderService.placeOrder(actor, command)))
-                            .build());
+                    () -> {
+                        OrderEntity order = orderService.placeOrder(actor, command);
+                        // 시장가는 placeOrder 내부에서 이미 체결까지 끝났으므로(EXE-001),
+                        // 같은 트랜잭션 안에서 방금 만들어진 ExecutionEntity를 바로 조회해도 안전하다.
+                        ExecutionEntity execution = executionRepository.findByOrderId(order.getId())
+                                .orElse(null);
+                        return PlaceOrderResponse.newBuilder()
+                                .setOrder(toProto(order, execution))
+                                .build();
+                    });
 
             observer.onNext(response);
             observer.onCompleted();
@@ -100,8 +117,10 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     idempotencyOperations,
                     () -> {
                         CancelResult result = orderService.cancelOrder(actor, UUID.fromString(request.getOrderId()));
+                        // 취소된 주문은 체결된 적이 없으므로(취소는 PENDING 상태에서만 가능)
+                        // execution은 항상 없다 — 조회하지 않고 null로 toProto에 넘긴다.
                         return CancelOrderResponse.newBuilder()
-                                .setOrder(toProto(result.order()))
+                                .setOrder(toProto(result.order(), null))
                                 .setReleasedAmount(result.releasedAmount())
                                 .build();
                     });
@@ -113,6 +132,24 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         } catch (AccountException e) {
             observer.onError(toGrpcException((AccountErrorCode) e.errorCode()));
         }
+    }
+
+    // ── 시스템 호출 (배치 전용, actor/idempotency 검증 없음) ────────────
+    /**
+     * batch-service가 정규장 마감 후 호출. requireActor()/IdempotencyExecutor를
+     * 거치지 않는다 — portfolio-service의 PortfolioSnapshotService.recordDailySnapshot
+     * 패턴과 동일하게, 시스템 간 배치 호출은 사용자 actor 기반 검증 대상이 아니다.
+     * 멱등성은 OrderService.expirePendingOrders 내부에서 주문 상태 전이 자체로
+     * 보장된다(같은 날 재호출돼도 이미 CANCELLED인 건은 자연스럽게 스킵).
+     */
+    @Override
+    public void expirePendingOrders(ExpirePendingOrdersRequest request,
+                                    StreamObserver<ExpirePendingOrdersResponse> observer) {
+        int cancelledCount = orderService.expirePendingOrders();
+        observer.onNext(ExpirePendingOrdersResponse.newBuilder()
+                .setCancelledCount(cancelledCount)
+                .build());
+        observer.onCompleted();
     }
 
     // ── 예외 매핑 (임시 — support/ 공통 계층 도입 시 제거) ──────────────
@@ -170,7 +207,13 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     }
 
     // ── 매핑 ──────────────────────────────────────────────────────────
-    private Order toProto(OrderEntity order) {
+    /**
+     * execution이 null이면(PENDING/CANCELLED/REJECTED 주문) 체결 관련 필드는
+     * proto 기본값(0, 미설정 Timestamp)으로 남는다 — FILLED 상태일 때만
+     * executionRepository에 실제로 row가 존재한다(ExecutionEntity가 order_id
+     * UNIQUE라 체결 전엔 row 자체가 없다).
+     */
+    private Order toProto(OrderEntity order, ExecutionEntity execution) {
         Order.Builder builder = Order.newBuilder()
                 .setId(order.getId().toString())
                 .setUserId(order.getUserId().toString())
@@ -186,6 +229,15 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
         Instant createdAt = order.getCreatedAt() != null ? order.getCreatedAt() : Instant.now();
         builder.setCreatedAt(toTimestamp(createdAt));
+
+        if (execution != null) {
+            builder.setExecutedPrice(execution.getExecutedPriceKrw())
+                    .setFee(execution.getFeeKrw())
+                    .setTax(execution.getTaxKrw())
+                    .setNetAmount(execution.getNetAmountKrw())
+                    .setExecutedAt(toTimestamp(execution.getExecutedAt()));
+        }
+
         return builder.build();
     }
 
@@ -239,15 +291,5 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             case CANCELLED -> OrderStatus.ORDER_STATUS_CANCELLED;
             case REJECTED -> OrderStatus.ORDER_STATUS_REJECTED;
         };
-    }
-
-    @Override
-    public void expirePendingOrders(ExpirePendingOrdersRequest request,
-                                    StreamObserver<ExpirePendingOrdersResponse> observer) {
-        int cancelledCount = orderService.expirePendingOrders();
-        observer.onNext(ExpirePendingOrdersResponse.newBuilder()
-                .setCancelledCount(cancelledCount)
-                .build());
-        observer.onCompleted();
     }
 }

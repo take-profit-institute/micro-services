@@ -84,7 +84,7 @@ public class DefaultOrderExecutionService implements OrderExecutionService {
 
         outboxWriter.record(outboxOperations, "OrderFilled", order.getId().toString(),
                 new OrderFilledPayload(order.getId().toString(), order.getUserId().toString(),
-                        order.getSymbol(), currentPriceKrw, order.getQuantity(), feeKrw, taxKrw, netAmountKrw));
+                        order.getSymbol(), order.getSide().name(), currentPriceKrw, order.getQuantity(), feeKrw, taxKrw, netAmountKrw));
 
         return order;
     }
