@@ -36,7 +36,7 @@ public class RedisRoomRegistry implements RoomAssigner, RoomCounter {
                             .map(current -> RoomAssignment.of(new RoomKey(symbol, room), current)))
                     .filter(assignment -> assignment.count() < properties.room().capacity())
                     .next()
-                    .switchIfEmpty(allocateNewRoom(symbol));
+                    .switchIfEmpty(Mono.defer(() -> allocateNewRoom(symbol)));
         });
     }
 
