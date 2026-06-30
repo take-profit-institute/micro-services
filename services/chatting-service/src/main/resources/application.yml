@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: chatting-service
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+
+server:
+  port: ${CHAT_SERVER_PORT:8090}
+
+chat:
+  jwt:
+    # 게이트웨이와 동일한 HMAC 시크릿을 공유(핸드셰이크 자체 검증)
+    hmac-secret: ${AUTH_JWT_HMAC_SECRET:change-me-in-production-change-me-in-production}
+  room:
+    capacity: ${CHAT_ROOM_CAPACITY:500}
+    # 카운터 누수 안전망 TTL(heartbeat 도입 전까지). ISO-8601 Duration.
+    counter-ttl: ${CHAT_COUNTER_TTL:PT2H}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

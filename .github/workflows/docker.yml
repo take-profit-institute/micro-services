@@ -113,6 +113,14 @@ jobs:
               - '.dockerignore'
               - 'build.gradle'
               - 'settings.gradle'
+            chatting-service:
+              # 채팅 WS 게이트웨이 — proto/gRPC 미사용이라 proto/** 제외
+              - 'services/chatting-service/**'
+              - 'common/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
             gateway:
               - 'gateway/**'
               - 'build.gradle'
@@ -131,9 +139,10 @@ jobs:
           F_MISSION:       ${{ steps.filter.outputs.mission-service }}
           F_LEARNING:      ${{ steps.filter.outputs.learning-service }}
           F_NOTIFICATION:  ${{ steps.filter.outputs.notification-service }}
+          F_CHATTING:      ${{ steps.filter.outputs.chatting-service }}
           F_GATEWAY:       ${{ steps.filter.outputs.gateway }}
         run: |
-          ALL_SERVICES='["auth-service","user-service","market-service","trading-service","portfolio-service","ranking-service","mission-service","learning-service","notification-service"]'
+          ALL_SERVICES='["auth-service","user-service","market-service","trading-service","portfolio-service","ranking-service","mission-service","learning-service","notification-service","chatting-service"]'
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ -z "$DISPATCH_INPUT" ]; then
@@ -173,6 +182,7 @@ jobs:
           [ "$F_MISSION"      = "true" ] && SERVICES+=(mission-service)
           [ "$F_LEARNING"     = "true" ] && SERVICES+=(learning-service)
           [ "$F_NOTIFICATION" = "true" ] && SERVICES+=(notification-service)
+          [ "$F_CHATTING"     = "true" ] && SERVICES+=(chatting-service)
 
           if [ ${#SERVICES[@]} -eq 0 ]; then
             echo "matrix=[]"    >> "$GITHUB_OUTPUT"

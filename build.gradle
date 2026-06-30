@@ -79,6 +79,9 @@ configure(bootProjects) {
 
         if (project.path == ':batch') {
             implementation 'org.springframework.boot:spring-boot-starter-batch'
+        } else if (project.path == ':services:chatting-service') {
+            // 채팅 WS 게이트웨이는 리액티브(WebFlux)로 동작 — servlet starter-web 미적용
+            implementation 'org.springframework.boot:spring-boot-starter-webflux'
         } else {
             implementation 'org.springframework.boot:spring-boot-starter-web'
         }
