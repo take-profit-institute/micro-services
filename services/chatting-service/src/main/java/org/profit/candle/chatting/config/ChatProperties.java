@@ -14,7 +14,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "chat")
 public record ChatProperties(Jwt jwt, Room room, Cors cors) {
 
-    public record Jwt(String hmacSecret) {
+    /**
+     * @param hmacSecret auth-service 서명 시크릿과 동일(HS256)
+     * @param issuer     기대 issuer(auth-service의 {@code AUTH_JWT_ISSUER}와 동일). 비우면 issuer 검증 생략.
+     */
+    public record Jwt(String hmacSecret, String issuer) {
     }
 
     public record Room(int capacity, Duration counterTtl) {

@@ -74,13 +74,17 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                         .flatMap(payload -> broker.publish(channel, payload)))
                 .then();
 
-        // enter(INCR) → 어느 한쪽(수신 종료=클라 끊김, 또는 송신 종료)이 끝나면 전체 정리 → leave(DECR)
-        return roomCounter.enter(key)
-                .doOnSubscribe(s -> log.debug("WS enter account={} room={}", accountId, roomId))
-                .then(Mono.firstWithSignal(session.send(outbound), inbound))
-                .doFinally(signal -> roomCounter.leave(key)
+        // enter(INCR)로 입장 카운트 → 어느 한쪽(수신 종료=클라 끊김, 또는 송신 종료)이 끝나면 정리.
+        // usingWhen: enter(자원 획득)가 성공했을 때만 leave(자원 해제)를 호출한다.
+        // → enter 실패/조기 취소 시 불필요한 DECR로 카운터가 음수로 내려가는 비대칭을 막는다
+        //   (정리는 완료·에러·취소 모든 종료 신호에서 동일하게 1회 실행).
+        return Mono.usingWhen(
+                roomCounter.enter(key)
+                        .doOnNext(c -> log.debug("WS enter account={} room={} count={}", accountId, roomId, c)),
+                enteredCount -> Mono.firstWithSignal(session.send(outbound), inbound),
+                enteredCount -> roomCounter.leave(key)
                         .doOnError(e -> log.warn("카운터 DECR 실패 room={}: {}", roomId, e.getMessage()))
-                        .subscribe());
+                        .onErrorComplete());
     }
 
     private String serialize(String accountId, String text) throws Exception {

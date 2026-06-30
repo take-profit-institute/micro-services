@@ -48,7 +48,14 @@ public class RedisRoomRegistry implements RoomAssigner, RoomCounter {
 
     @Override
     public Mono<Long> leave(RoomKey key) {
-        return redis.opsForValue().decrement(key.countKey());
+        // 카운터를 0 미만으로 내리지 않는다. enter/leave 비대칭(조기 취소)이나
+        // TTL 만료 후 DECR로 키가 -1로 생성되는 경우, 음수 값이 배정 로직(count < capacity)을
+        // 왜곡하므로 0으로 바닥을 친다. 낙관적 설계에 맞춰 원자적 보장까지는 두지 않는다.
+        String countKey = key.countKey();
+        return redis.opsForValue().decrement(countKey)
+                .flatMap(value -> value < 0
+                        ? redis.opsForValue().set(countKey, "0").thenReturn(0L)
+                        : Mono.just(value));
     }
 
     private Mono<RoomAssignment> allocateNewRoom(String symbol) {
