@@ -39,6 +39,10 @@ public enum OrderErrorCode implements ErrorCode {
     OUTSIDE_TRADING_HOURS(
             "ORDER_OUTSIDE_TRADING_HOURS",
                     "정규장 시간(09:00~15:30) 외에는 즉시 주문을 접수할 수 없습니다. 예약 주문을 이용해주세요."
+    ),
+    MARKET_PRICE_UNAVAILABLE(
+            "ORDER_MARKET_PRICE_UNAVAILABLE",
+            "현재가를 조회할 수 없습니다. 잠시 후 다시 시도해주세요."
     );
 
     private final String code;
