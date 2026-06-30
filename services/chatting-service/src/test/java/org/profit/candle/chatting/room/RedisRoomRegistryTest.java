@@ -1,6 +1,7 @@
 package org.profit.candle.chatting.room;
 
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.profit.candle.chatting.config.ChatProperties;
@@ -26,8 +27,9 @@ class RedisRoomRegistryTest {
         when(redis.opsForValue()).thenReturn(values);
 
         registry = new RedisRoomRegistry(redis, new ChatProperties(
-                new ChatProperties.Jwt("12345678901234567890123456789012"),
-                new ChatProperties.Room(2, Duration.ofHours(2))));
+                new ChatProperties.Jwt("12345678901234567890123456789012", "candle-auth-test"),
+                new ChatProperties.Room(2, Duration.ofHours(2)),
+                new ChatProperties.Cors(List.of())));
     }
 
     @Test
@@ -84,5 +86,19 @@ class RedisRoomRegistryTest {
         StepVerifier.create(registry.leave(key))
                 .expectNext(1L)
                 .verifyComplete();
+    }
+
+    @Test
+    void leave_belowZero_floorsToZero() {
+        // enter/leave 비대칭이나 TTL 만료로 카운터가 음수로 내려가면 0으로 바닥을 친다
+        RoomKey key = new RoomKey("005930", 1);
+        when(values.decrement("005930_1_count")).thenReturn(Mono.just(-1L));
+        when(values.set("005930_1_count", "0")).thenReturn(Mono.just(true));
+
+        StepVerifier.create(registry.leave(key))
+                .expectNext(0L)
+                .verifyComplete();
+
+        verify(values).set("005930_1_count", "0");
     }
 }
