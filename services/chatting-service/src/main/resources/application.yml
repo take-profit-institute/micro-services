@@ -16,6 +16,9 @@ chat:
     capacity: ${CHAT_ROOM_CAPACITY:500}
     # 카운터 누수 안전망 TTL(heartbeat 도입 전까지). ISO-8601 Duration.
     counter-ttl: ${CHAT_COUNTER_TTL:PT2H}
+  cors:
+    # 웹앱 origin(dev Next 3000 / 게이트웨이 8000 / vercel 프리뷰 / Capacitor 셸).
+    allowed-origin-patterns: ${CHAT_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8000,https://webapp-webapp.vercel.app,https://webapp-webapp-*.vercel.app,capacitor://localhost}
 
 management:
   endpoints:
