@@ -38,10 +38,14 @@ public class DefaultOrderService implements OrderService {
     private final AccountService accountService;
     private final OutboxWriter outboxWriter;
     private final OrderOutboxOperations outboxOperations;
+    private final TradingHoursValidator tradingHoursValidator;
 
     @Override
     @Transactional
     public OrderEntity placeOrder(UUID userId, PlaceOrderCommand command) {
+        // TIM-001/002: 정규장 외 시간에는 즉시 주문 자체를 거부한다.
+        tradingHoursValidator.requireMarketOpen();
+
         if (command.quantity() <= 0 || command.price() <= 0) {
             throw new OrderException(OrderErrorCode.INVALID_QUANTITY);
         }
@@ -79,8 +83,27 @@ public class DefaultOrderService implements OrderService {
     @Override
     @Transactional
     public CancelResult cancelOrder(UUID userId, UUID orderId) {
-        OrderEntity order = orderRepository.findByIdAndUserId(orderId, userId)
+
+        // 사용자의 취소와 배치의 15:30 자동취소가 같은 주문을 동시에 노릴 수 있어
+        // 비관적 락으로 조회한다 (findByIdAndUserId가 아니라 ...ForUpdate).
+        OrderEntity order = orderRepository.findByIdAndUserIdForUpdate(orderId, userId)
                 .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        return doCancel(order, userId);
+    }
+
+    @Override
+    @Transactional
+    public CancelResult cancelExpiredPendingOrder(UUID orderId) {
+        // 배치(스케줄러) 전용 — userId 소유권 검증 없이 시스템 권한으로 처리한다.
+        // RSV-014 일반화: 정규장 마감(15:30)까지 미체결인 모든 즉시 지정가 PENDING 주문 대상.
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        return doCancel(order, order.getUserId());
+    }
+
+    private CancelResult doCancel(OrderEntity order, UUID userId) {
 
         long releasedAmount = order.getReservedAmountKrw();
 

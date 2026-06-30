@@ -35,6 +35,10 @@ public enum OrderErrorCode implements ErrorCode {
     ORDER_NOT_FOUND(
             "ORDER_NOT_FOUND",
             "주문을 찾을 수 없습니다."
+    ),
+    OUTSIDE_TRADING_HOURS(
+            "ORDER_OUTSIDE_TRADING_HOURS",
+                    "정규장 시간(09:00~15:30) 외에는 즉시 주문을 접수할 수 없습니다. 예약 주문을 이용해주세요."
     );
 
     private final String code;
