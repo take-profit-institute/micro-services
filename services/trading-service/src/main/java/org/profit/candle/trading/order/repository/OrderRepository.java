@@ -42,4 +42,16 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from OrderEntity o where o.id = :id")
     Optional<OrderEntity> findByIdForUpdate(UUID id);
+
+    /**
+     * 배치가 15:30 자동취소 대상을 찾을 때 쓰는 후보 목록 조회. 락 없이
+     * id만 가볍게 가져온다 — 실제 취소는 배치가 각 id로
+     * {@code OrderService.cancelExpiredPendingOrder(id)}를 호출하면, 그 안에서
+     * findByIdForUpdate로 다시 락을 걸고 처리한다(이중 조회지만, 대량 후보를
+     * 한 번에 락 걸고 들고 있는 것보다 안전하다 — 락 보유 시간을 최소화한다).
+     */
+    @Query("select o.id from OrderEntity o where o.status = :status and o.orderKind = "
+            + "org.profit.candle.trading.order.entity.OrderKindValue.LIMIT")
+    List<UUID> findIdsByStatus(OrderStatusValue status);
 }
+

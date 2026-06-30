@@ -19,6 +19,7 @@ import org.profit.candle.trading.support.event.OutboxWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -26,7 +27,9 @@ import java.util.UUID;
  * 상태 변경 + outbox 기록이 멱등성 record와 한 트랜잭션으로 commit된다.
  *
  * 레퍼런스 범위: BUY는 가용 잔고를 예약(reserve)하고 PENDING 주문 생성, CancelOrder는 예약 해제.
- * 체결/보유종목(holdings) 갱신은 도메인 후속 작업으로 남긴다.
+ * 시장가는 접수 직후 같은 트랜잭션 안에서 OrderExecutionService.fillMarketOrder를 호출해
+ * 즉시 체결까지 끝낸다 (EXE-001). 지정가 조건 체결(EXE-002)은 별도 트리거(시세 변화 감시)로
+ * 처리하며, 이 서비스는 PENDING 생성까지만 책임진다.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,6 +42,7 @@ public class DefaultOrderService implements OrderService {
     private final OutboxWriter outboxWriter;
     private final OrderOutboxOperations outboxOperations;
     private final TradingHoursValidator tradingHoursValidator;
+    private final OrderExecutionService orderExecutionService;
 
     @Override
     @Transactional
@@ -77,6 +81,14 @@ public class DefaultOrderService implements OrderService {
 
         outboxWriter.record(outboxOperations, "OrderPlaced", order.getId().toString(), new OrderPlacedPayload(
                 order.getId().toString(), userId.toString(), order.getSymbol(), order.getSide().name(), order.getQuantity(), order.getPriceKrw() == null ? 0 : order.getPriceKrw(), reservedAmountKrw));
+
+        // EXE-001: 시장가는 접수 즉시 체결. 같은 트랜잭션 안에서 처리해
+        // "PENDING으로 잠깐 보였다가 FILLED로 바뀌는" 어중간한 상태가 외부에
+        // 노출되지 않는다 (트랜잭션 commit 전까지는 외부에서 안 보임).
+        if (command.kind() == OrderKindValue.MARKET) {
+            return orderExecutionService.fillMarketOrder(order.getId());
+        }
+
         return order;
     }
 
@@ -103,11 +115,18 @@ public class DefaultOrderService implements OrderService {
         return doCancel(order, order.getUserId());
     }
 
+    /**
+     * 취소 공통 처리. 호출 측이 이미 알맞은 락(findByIdAndUserIdForUpdate 또는
+     * findByIdForUpdate)으로 order를 가져온 뒤 위임해야 한다 — 이 메서드 자체는
+     * 추가 조회를 하지 않는다.
+     */
     private CancelResult doCancel(OrderEntity order, UUID userId) {
 
         long releasedAmount = order.getReservedAmountKrw();
 
         // markCancelled()가 PENDING/LIMIT 여부를 자체 검증한다 (CAN-001/002/003).
+        // 사용자 취소와 배치 자동취소가 동시에 들어와도, 먼저 커밋된 트랜잭션이
+        // 끝난 뒤 락을 잡은 두 번째 호출은 여기서 ORDER_NOT_PENDING으로 막힌다.
         order.markCancelled();
 
         // CAN-004: 취소 시 reserved_amount만큼 즉시 반환. SELL은 잔고를 잠그지 않으므로 반환 불필요.
@@ -120,5 +139,20 @@ public class DefaultOrderService implements OrderService {
         outboxWriter.record(outboxOperations, "OrderCancelled", order.getId().toString(),
                 new OrderCancelledPayload(order.getId().toString(), userId.toString(), releasedAmount));
         return new CancelResult(order, releasedAmount);
+    }
+
+    @Override
+    public int expirePendingOrders() {
+        List<UUID> targets = orderRepository.findIdsByStatus(OrderStatusValue.PENDING);
+        int cancelledCount = 0;
+        for (UUID orderId : targets) {
+            try {
+                cancelExpiredPendingOrder(orderId);
+                cancelledCount++;
+            } catch (OrderException e) {
+                // 이미 처리됨, 정상 스킵
+            }
+        }
+        return cancelledCount;
     }
 }
