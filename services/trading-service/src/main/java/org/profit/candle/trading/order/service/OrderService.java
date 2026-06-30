@@ -11,4 +11,6 @@ public interface OrderService {
     OrderEntity placeOrder(UUID userId, PlaceOrderCommand command);
 
     CancelResult cancelOrder(UUID userId, UUID orderId);
+
+    CancelResult cancelExpiredPendingOrder(UUID orderId);
 }

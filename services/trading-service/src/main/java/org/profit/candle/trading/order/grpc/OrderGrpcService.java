@@ -127,7 +127,8 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     Status.INVALID_ARGUMENT;
             case ORDER_NOT_FOUND ->
                     Status.NOT_FOUND;
-            case DUPLICATE_PENDING_ORDER, ORDER_NOT_PENDING, MARKET_ORDER_CANNOT_BE_CANCELLED ->
+            case DUPLICATE_PENDING_ORDER, ORDER_NOT_PENDING, MARKET_ORDER_CANNOT_BE_CANCELLED,
+                 OUTSIDE_TRADING_HOURS ->
                     Status.FAILED_PRECONDITION;
         };
         return status.withDescription(errorCode.message()).asRuntimeException();
