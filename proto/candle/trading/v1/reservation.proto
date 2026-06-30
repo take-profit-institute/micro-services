@@ -21,8 +21,11 @@ message Reservation {
   string scheduled_date = 9;
   int64 reserved_amount = 10;
   ReservationStatus status = 11;
-  string parent_order_id = 12;
-  google.protobuf.Timestamp created_at = 13;
+  string parent_reservation_id = 12;  // 정정 시 원래 예약 ID (CAN-006/007/008). order_svc의 parent_order_id와는
+  // 별개 개념 — reservation 도메인 내부에서 자기 자신을 참조한다.
+  string converted_order_id = 13;     // 시가+지정가 케이스(6종 중 1개)가 order_svc로 전환 완료됐을 때만 값 존재.
+  // ReservationDue/ReservationConverted Kafka 흐름의 결과.
+  google.protobuf.Timestamp created_at = 14;
 }
 
 message ListReservationsRequest {
@@ -58,7 +61,7 @@ message CancelReservationResponse {
   int64 released_amount = 2;
 }
 
-// 정정 = 원예약 취소 후 parent_order_id를 가진 새 예약 생성(CAN-006~008).
+// 정정 = 원예약 취소 후 parent_reservation_id를 가진 새 예약 생성(CAN-006~008).
 message AmendReservationRequest {
   string user_id = 1;
   string reservation_id = 2;
