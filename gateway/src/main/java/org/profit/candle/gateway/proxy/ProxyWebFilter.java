@@ -31,13 +31,16 @@ public class ProxyWebFilter implements WebFilter, Ordered {
     private final WebClient webClient;
     private final String authServiceUri;
     private final String bffUri;
+    private final String chatUri;
 
     public ProxyWebFilter(
             @Value("${gateway.route.auth-uri:http://localhost:8081}") String authServiceUri,
-            @Value("${gateway.route.bff-uri:http://localhost:8080}") String bffUri) {
+            @Value("${gateway.route.bff-uri:http://localhost:8080}") String bffUri,
+            @Value("${gateway.route.chat-uri:http://localhost:8090}") String chatUri) {
         this.webClient = WebClient.create();
         this.authServiceUri = authServiceUri;
         this.bffUri = bffUri;
+        this.chatUri = chatUri;
     }
 
     @Override
@@ -56,6 +59,13 @@ public class ProxyWebFilter implements WebFilter, Ordered {
             // /api/auth/{providers|oauth/**|token/refresh|logout} → auth-service, /api/v1/auth/** 재작성
             targetBase = authServiceUri;
             targetPath = "/api/v1" + path.substring("/api".length());
+        } else if (path.startsWith("/chat/rooms")) {
+            // /chat/rooms/** (REST 방 배정) → chatting-service, 경로 유지.
+            // ⚠️ /chat/ws (WebSocket Upgrade)는 이 WebClient 프록시로 처리 불가.
+            //    개발: 클라이언트가 chatting-service(:8090)로 직접 WS 연결.
+            //    운영: AWS ALB가 /chat/ws Upgrade를 chatting-service로 passthrough(idle timeout 길게).
+            targetBase = chatUri;
+            targetPath = path;
         } else {
             // /api/auth/me 등 BFF 전용 경로
             targetBase = bffUri;
