@@ -35,7 +35,7 @@ public class TradingHoursValidator {
     /** 정규장 시간이 아니면 {@code OrderException(OUTSIDE_TRADING_HOURS)}를 던진다. */
     public void requireMarketOpen() {
         LocalTime now = LocalTime.now(clock.withZone(KST));
-        if (now.isBefore(MARKET_OPEN) || now.isAfter(MARKET_CLOSE)) {
+        if (now.isBefore(MARKET_OPEN) || !now.isBefore(MARKET_CLOSE)) {
             throw new OrderException(OrderErrorCode.OUTSIDE_TRADING_HOURS);
         }
     }
