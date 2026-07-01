@@ -7,6 +7,7 @@ import org.profit.candle.stock.catalog.repository.StockReader;
 import org.profit.candle.stock.catalog.repository.StockWriter;
 import org.profit.candle.stock.client.KiwoomStockClient;
 import org.profit.candle.stock.client.KiwoomStockData;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -43,6 +44,17 @@ public class DefaultStockIngestionService implements StockIngestionService {
                 .orElseGet(() -> new StockEntity(data.code(), data.name(), market));
         entity.applyReferenceData(data.name(), data.marketType(), data.sector(), data.marketCap(),
                 data.sharesOutstanding(), data.listedAt(), data.listingStatus(), "KIWOOM");
-        return stockWriter.save(entity);
+        return saveResilient(entity, data);
+    }
+
+    private StockEntity saveResilient(StockEntity entity, KiwoomStockData data) {
+        try {
+            return stockWriter.save(entity);
+        } catch (DataIntegrityViolationException e) {
+            StockEntity existing = stockReader.findByStockCode(data.code()).orElseThrow(() -> e);
+            existing.applyReferenceData(data.name(), data.marketType(), data.sector(), data.marketCap(),
+                    data.sharesOutstanding(), data.listedAt(), data.listingStatus(), "KIWOOM");
+            return stockWriter.save(existing);
+        }
     }
 }

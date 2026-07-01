@@ -31,10 +31,13 @@ public class StockFinancialsEntity {
     @Column(name = "net_income")
     private Long netIncome;
 
+    @Column(precision = 10, scale = 2)
     private BigDecimal per;
 
+    @Column(precision = 10, scale = 2)
     private BigDecimal pbr;
 
+    @Column(precision = 6, scale = 2)
     private BigDecimal roe;
 
     @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)

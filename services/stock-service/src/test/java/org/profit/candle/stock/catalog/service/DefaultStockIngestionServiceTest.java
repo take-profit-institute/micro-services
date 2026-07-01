@@ -11,6 +11,7 @@ import org.profit.candle.stock.catalog.repository.StockReader;
 import org.profit.candle.stock.catalog.repository.StockWriter;
 import org.profit.candle.stock.client.KiwoomStockClient;
 import org.profit.candle.stock.client.KiwoomStockData;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -71,6 +72,25 @@ class DefaultStockIngestionServiceTest {
         assertThat(result).isPresent();
         assertThat(existing.stockName()).isEqualTo("삼성전자보통주");
         verify(stockWriter).save(existing);
+    }
+
+    @Test
+    void fetchAndSave_recoversFromConcurrentInsertConflict() {
+        KiwoomStockData data = data("005930", "삼성전자", "KOSPI");
+        StockEntity existing = new StockEntity("005930", "기존명", "KOSPI");
+        when(kiwoomStockClient.findStock("005930")).thenReturn(Optional.of(data));
+        when(stockReader.findByStockCode("005930"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existing));
+        when(stockWriter.save(any(StockEntity.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate stock_code"))
+                .thenReturn(existing);
+
+        var result = service.fetchAndSave("005930");
+
+        assertThat(result).isPresent();
+        assertThat(existing.stockName()).isEqualTo("삼성전자");
+        verify(stockWriter, times(2)).save(any(StockEntity.class));
     }
 
     @Test
