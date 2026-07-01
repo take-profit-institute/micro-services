@@ -19,7 +19,9 @@ public record KiwoomProperties(
         String tokenPath,
         String stockInfoPath,
         String stockListPath,
-        String chartPath) {
+        String chartPath,
+        Duration connectTimeout,
+        Duration readTimeout) {
 
     public KiwoomProperties {
         if (baseUrl == null || baseUrl.isBlank()) baseUrl = "https://api.kiwoom.com";
@@ -28,6 +30,9 @@ public record KiwoomProperties(
         if (stockInfoPath == null || stockInfoPath.isBlank()) stockInfoPath = "/api/dostk/stkinfo";
         if (stockListPath == null || stockListPath.isBlank()) stockListPath = "/api/dostk/stkinfo";
         if (chartPath == null || chartPath.isBlank()) chartPath = "/api/dostk/chart";
+        // 차트 첫 페이지는 수백 개 캔들을 한 번에 내려줘 5s 로는 read timeout 이 발생한다(§11).
+        if (connectTimeout == null) connectTimeout = Duration.ofSeconds(3);
+        if (readTimeout == null) readTimeout = Duration.ofSeconds(15);
     }
 
     public boolean enabled() {

@@ -35,7 +35,7 @@ class DefaultStockCatalogServiceTest {
     @Mock StockIngestionService ingestionService;
 
     private final KiwoomProperties kiwoomProperties =
-            new KiwoomProperties(null, null, null, Duration.ofDays(7), null, null, null, null);
+            new KiwoomProperties(null, null, null, Duration.ofDays(7), null, null, null, null, null, null);
 
     @Test
     void search_delegatesCriteriaAndMapsResults() {

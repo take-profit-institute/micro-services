@@ -6,8 +6,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
-
 @Configuration
 @EnableConfigurationProperties(KiwoomProperties.class)
 public class StockConfiguration {
@@ -16,8 +14,8 @@ public class StockConfiguration {
     @Bean
     RestClient kiwoomRestClient(KiwoomProperties properties) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(3));
-        factory.setReadTimeout(Duration.ofSeconds(5));
+        factory.setConnectTimeout(properties.connectTimeout());
+        factory.setReadTimeout(properties.readTimeout());
         return RestClient.builder()
                 .baseUrl(properties.baseUrl())
                 .requestFactory(factory)

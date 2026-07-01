@@ -44,7 +44,8 @@ public class RestKiwoomChartClient implements KiwoomChartClient {
         try {
             return fetchPages(code, interval, count, to);
         } catch (RuntimeException e) {
-            log.warn("키움 차트 조회 실패 code={} interval={}: {}", code, interval, e.toString());
+            // 원인 예외(예: Jackson 파싱 실패)를 함께 남긴다 — 최상위 메시지만으론 원인 파악이 안 된다.
+            log.warn("키움 차트 조회 실패 code={} interval={}", code, interval, e);
             return List.of();
         }
     }
