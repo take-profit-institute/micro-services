@@ -13,6 +13,8 @@ import org.profit.candle.user.profile.entity.UserProfileEntity;
 import org.profit.candle.user.profile.event.entity.ConsumedEvent;
 import org.profit.candle.user.profile.event.repository.ConsumedEventRepository;
 import org.profit.candle.user.profile.repository.UserProfileWriter;
+import org.profit.candle.user.profile.service.DefaultProfile;
+import org.profit.candle.user.profile.service.DefaultProfileGenerator;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
@@ -29,6 +31,7 @@ class UserCreatedEventConsumerTest {
 
     @Mock ConsumedEventRepository consumedEventRepository;
     @Mock UserProfileWriter userProfileWriter;
+    @Mock DefaultProfileGenerator defaultProfileGenerator;
 
     UserCreatedEventConsumer consumer;
     ObjectMapper objectMapper;
@@ -38,7 +41,7 @@ class UserCreatedEventConsumerTest {
         objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        consumer = new UserCreatedEventConsumer(consumedEventRepository, userProfileWriter, objectMapper);
+        consumer = new UserCreatedEventConsumer(consumedEventRepository, userProfileWriter, defaultProfileGenerator, objectMapper);
     }
 
     private String payload(UUID eventId, UUID userId) throws Exception {
@@ -52,7 +55,8 @@ class UserCreatedEventConsumerTest {
         UUID eventId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         when(consumedEventRepository.existsById(eventId)).thenReturn(false);
-        UserProfileEntity saved = new UserProfileEntity(userId.toString(), "a@b.com", null, null);
+        when(defaultProfileGenerator.generate(userId)).thenReturn(new DefaultProfile("차분한캔들1234", "🐯"));
+        UserProfileEntity saved = new UserProfileEntity(userId.toString(), "a@b.com", "차분한캔들1234", "🐯");
         when(userProfileWriter.save(any())).thenReturn(saved);
 
         consumer.onUserCreated(payload(eventId, userId));
@@ -61,6 +65,8 @@ class UserCreatedEventConsumerTest {
         verify(userProfileWriter).save(profileCaptor.capture());
         assertThat(profileCaptor.getValue().userId()).isEqualTo(userId.toString());
         assertThat(profileCaptor.getValue().email()).isEqualTo("a@b.com");
+        assertThat(profileCaptor.getValue().nickname()).isEqualTo("차분한캔들1234");
+        assertThat(profileCaptor.getValue().profileImageUrl()).isEqualTo("🐯");
 
         ArgumentCaptor<ConsumedEvent> eventCaptor = ArgumentCaptor.forClass(ConsumedEvent.class);
         verify(consumedEventRepository).save(eventCaptor.capture());
@@ -91,6 +97,7 @@ class UserCreatedEventConsumerTest {
         UUID eventId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         when(consumedEventRepository.existsById(eventId)).thenReturn(false);
+        when(defaultProfileGenerator.generate(userId)).thenReturn(new DefaultProfile("차분한캔들1234", "🐯"));
         when(userProfileWriter.save(any())).thenThrow(new DataIntegrityViolationException("dup"));
 
         consumer.onUserCreated(payload(eventId, userId));
