@@ -25,3 +25,4 @@ kiwoom:
   app-secret: ${KIWOOM_APP_SECRET:}
   # 상세 조회 시 DB 데이터가 이 기간보다 오래되면 키움에서 재조회한다.
   staleness: ${KIWOOM_STALENESS:P7D}
+  chart-path: ${KIWOOM_CHART_PATH:/api/dostk/chart}

@@ -76,6 +76,8 @@ public class StockGrpcService extends StockServiceGrpc.StockServiceImplBase {
             observer.onCompleted();
         } catch (CandleException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (RuntimeException e) {
+            observer.onError(toInternalStatus().asRuntimeException());
         }
     }
 
@@ -90,25 +92,39 @@ public class StockGrpcService extends StockServiceGrpc.StockServiceImplBase {
             observer.onCompleted();
         } catch (CandleException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (RuntimeException e) {
+            observer.onError(toInternalStatus().asRuntimeException());
         }
     }
 
     @Override
     public void batchGetStocks(BatchGetStocksRequest request, StreamObserver<BatchGetStocksResponse> observer) {
-        BatchGetStocksResponse.Builder builder = BatchGetStocksResponse.newBuilder();
-        catalogService.batchGet(request.getCodesList()).forEach(s -> builder.addStocks(toProtoStock(s)));
-        observer.onNext(builder.build());
-        observer.onCompleted();
+        try {
+            BatchGetStocksResponse.Builder builder = BatchGetStocksResponse.newBuilder();
+            catalogService.batchGet(request.getCodesList()).forEach(s -> builder.addStocks(toProtoStock(s)));
+            observer.onNext(builder.build());
+            observer.onCompleted();
+        } catch (CandleException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (RuntimeException e) {
+            observer.onError(toInternalStatus().asRuntimeException());
+        }
     }
 
     @Override
     public void syncStocks(SyncStocksRequest request, StreamObserver<SyncStocksResponse> observer) {
-        int upserted = ingestionService.syncMarket(marketToString(request.getMarket()));
-        observer.onNext(SyncStocksResponse.newBuilder()
-                .setUpserted(upserted)
-                .setTotal(upserted)
-                .build());
-        observer.onCompleted();
+        try {
+            int upserted = ingestionService.syncMarket(marketToString(request.getMarket()));
+            observer.onNext(SyncStocksResponse.newBuilder()
+                    .setUpserted(upserted)
+                    .setTotal(upserted)
+                    .build());
+            observer.onCompleted();
+        } catch (CandleException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (RuntimeException e) {
+            observer.onError(toInternalStatus().asRuntimeException());
+        }
     }
 
     // ── 매핑 ──────────────────────────────────────────────────────────
@@ -220,5 +236,9 @@ public class StockGrpcService extends StockServiceGrpc.StockServiceImplBase {
             };
         }
         return Status.INTERNAL.withDescription(e.getMessage());
+    }
+
+    private Status toInternalStatus() {
+        return Status.INTERNAL.withDescription("INTERNAL");
     }
 }

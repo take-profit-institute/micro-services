@@ -122,6 +122,19 @@ class StockGrpcServiceTest {
     }
 
     @Test
+    void batchGetStocks_runtimeException_returnsInternalError() {
+        when(catalogService.batchGet(List.of("005930"))).thenThrow(new IllegalStateException("db down"));
+        StockGrpcService service = new StockGrpcService(catalogService, ingestionService);
+        CapturingObserver<BatchGetStocksResponse> observer = new CapturingObserver<>();
+
+        service.batchGetStocks(BatchGetStocksRequest.newBuilder().addCodes("005930").build(), observer);
+
+        StatusRuntimeException error = (StatusRuntimeException) observer.error;
+        assertThat(error.getStatus().getCode()).isEqualTo(Status.Code.INTERNAL);
+        assertThat(error.getStatus().getDescription()).isEqualTo("INTERNAL");
+    }
+
+    @Test
     void syncStocks_returnsUpsertedCount() {
         when(ingestionService.syncMarket("KOSDAQ")).thenReturn(7);
         StockGrpcService service = new StockGrpcService(catalogService, ingestionService);
@@ -132,6 +145,19 @@ class StockGrpcServiceTest {
         assertThat(observer.value.getUpserted()).isEqualTo(7);
         assertThat(observer.value.getTotal()).isEqualTo(7);
         assertThat(observer.completed).isTrue();
+    }
+
+    @Test
+    void syncStocks_runtimeException_returnsInternalError() {
+        when(ingestionService.syncMarket("KOSDAQ")).thenThrow(new IllegalStateException("kiwoom down"));
+        StockGrpcService service = new StockGrpcService(catalogService, ingestionService);
+        CapturingObserver<SyncStocksResponse> observer = new CapturingObserver<>();
+
+        service.syncStocks(SyncStocksRequest.newBuilder().setMarket(MarketType.KOSDAQ).build(), observer);
+
+        StatusRuntimeException error = (StatusRuntimeException) observer.error;
+        assertThat(error.getStatus().getCode()).isEqualTo(Status.Code.INTERNAL);
+        assertThat(error.getStatus().getDescription()).isEqualTo("INTERNAL");
     }
 
     private StockResult stock(String code, String name, String marketType) {
