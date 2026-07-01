@@ -13,6 +13,8 @@ gateway:
   route:
     auth-uri: ${GATEWAY_AUTH_URI:http://localhost:8081}
     bff-uri: ${GATEWAY_BFF_URI:http://localhost:8080}
+    # /chat/rooms/** REST 방 배정. /chat/ws(WebSocket)는 운영 시 ALB가 직접 passthrough.
+    chat-uri: ${GATEWAY_CHAT_URI:http://localhost:8090}
   cors:
     # 프로덕션 + vercel 프리뷰 도메인(webapp-webapp-<hash>-<scope>.vercel.app) 매칭
     allowed-origin-patterns: http://localhost:3000,https://webapp-webapp.vercel.app,https://webapp-webapp-*.vercel.app

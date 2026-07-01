@@ -1,0 +1,15 @@
+description = 'Stock realtime chat WS gateway — stateless, Redis Pub/Sub fanout (no message persistence)'
+
+dependencies {
+    // 리액티브 Redis: Pub/Sub 팬아웃 + 방 인원 카운터(INCR/DECR)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
+
+    // 핸드셰이크 시점 JWT(HS256) 자체 검증 — 게이트웨이 헤더 주입에 비의존(ALB 호환).
+    // 버전은 BOM 관리 밖이라 게이트웨이가 transitive로 끌어오는 버전(10.9)에 맞춰 고정.
+    implementation 'com.nimbusds:nimbus-jose-jwt:10.9'
+
+    // @ConfigurationProperties 메타데이터 생성(IDE 자동완성)
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    testImplementation 'io.projectreactor:reactor-test'
+}

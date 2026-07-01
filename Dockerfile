@@ -24,6 +24,7 @@ COPY services/ranking-service/build.gradle    services/ranking-service/build.gra
 COPY services/mission-service/build.gradle    services/mission-service/build.gradle
 COPY services/learning-service/build.gradle   services/learning-service/build.gradle
 COPY services/notification-service/build.gradle services/notification-service/build.gradle
+COPY services/chatting-service/build.gradle    services/chatting-service/build.gradle
 COPY gateway/build.gradle gateway/build.gradle
 
 # 의존성 다운로드만 먼저 (소스 변경 시 이 레이어 재사용)

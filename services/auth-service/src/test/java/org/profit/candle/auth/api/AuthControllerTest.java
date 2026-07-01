@@ -137,6 +137,53 @@ class AuthControllerTest {
     }
 
     @Test
+    void refresh_withBodyToken_returns200() throws Exception {
+        when(refreshTokenService.rotate("body-refresh-token")).thenReturn(STUB_TOKENS);
+
+        mockMvc.perform(post("/api/v1/auth/token/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\": \"body-refresh-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access-token"));
+    }
+
+    @Test
+    void refresh_bodyTokenTakesPrecedenceOverCookie() throws Exception {
+        when(refreshTokenService.rotate("body-refresh-token")).thenReturn(STUB_TOKENS);
+
+        mockMvc.perform(post("/api/v1/auth/token/refresh")
+                .cookie(new Cookie("refresh_token", "cookie-refresh-token"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\": \"body-refresh-token\"}"))
+                .andExpect(status().isOk());
+
+        verify(refreshTokenService).rotate("body-refresh-token");
+    }
+
+    @Test
+    void refresh_blankBodyToken_fallsBackToCookie() throws Exception {
+        when(refreshTokenService.rotate("cookie-refresh-token")).thenReturn(STUB_TOKENS);
+
+        mockMvc.perform(post("/api/v1/auth/token/refresh")
+                .cookie(new Cookie("refresh_token", "cookie-refresh-token"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\": \"\"}"))
+                .andExpect(status().isOk());
+
+        verify(refreshTokenService).rotate("cookie-refresh-token");
+    }
+
+    @Test
+    void logout_withBodyToken_revokesTokenAndReturns204() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\": \"body-refresh-token\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(refreshTokenService).revoke("body-refresh-token");
+    }
+
+    @Test
     void logout_withCookie_revokesTokenAndReturns204() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout")
                 .cookie(new Cookie("refresh_token", "old-refresh-token")))
