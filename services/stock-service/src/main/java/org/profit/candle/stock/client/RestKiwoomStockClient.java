@@ -3,11 +3,14 @@ package org.profit.candle.stock.client;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.stock.config.KiwoomProperties;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,6 +29,10 @@ public class RestKiwoomStockClient implements KiwoomStockClient {
 
     // 종목정보 조회 TR (키움 REST). 계정 스펙에 맞게 조정 가능.
     private static final String STOCK_INFO_TR = "ka10100";
+    // 종목정보 리스트 TR (시장별 전체 종목). 스펙 확인 후 조정.
+    private static final String STOCK_LIST_TR = "ka10099";
+    // 연속조회 무한루프 방지 상한.
+    private static final int MAX_PAGES = 200;
 
     private final KiwoomProperties properties;
     private final RestClient kiwoomRestClient;
@@ -60,9 +67,102 @@ public class RestKiwoomStockClient implements KiwoomStockClient {
         if (!properties.enabled()) {
             return List.of();
         }
-        // 벌크 종목목록 TR(예: ka10099)은 배치 도입 시 연결한다. 현재는 미구현.
-        log.info("키움 findAllStocksByMarket 미구현 — 배치 도입 시 연결 예정 (market={})", marketType);
-        return List.of();
+        if (marketType == null || marketType.isBlank()) {
+            List<KiwoomStockData> all = new ArrayList<>();
+            all.addAll(fetchMarket("KOSPI"));
+            all.addAll(fetchMarket("KOSDAQ"));
+            return all;
+        }
+        return fetchMarket(marketType);
+    }
+
+    /**
+     * 시장별 전체 종목을 키움 연속조회로 모두 가져온다.
+     * 키움 REST 페이징: 응답 헤더 cont-yn=Y + next-key 를 다음 요청 헤더로 되던져 cont-yn=N 까지 반복한다.
+     */
+    private List<KiwoomStockData> fetchMarket(String marketType) {
+        String mrktTp = toKiwoomMarketCode(marketType);
+        String token = accessToken();
+        List<KiwoomStockData> result = new ArrayList<>();
+
+        String contYn = "N";   // 최초 호출
+        String nextKey = "";
+        int pages = 0;
+
+        do {
+            ResponseEntity<Map<String, Object>> response = kiwoomRestClient.post()
+                    .uri(properties.stockListPath())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("authorization", "Bearer " + token)
+                    .header("api-id", STOCK_LIST_TR)
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .body(Map.of("mrkt_tp", mrktTp))
+                    .retrieve()
+                    .toEntity(MAP_TYPE);
+
+            extractRows(response.getBody(), marketType, result);
+
+            HttpHeaders headers = response.getHeaders();
+            contYn = header(headers, "cont-yn");
+            nextKey = header(headers, "next-key");
+        } while ("Y".equalsIgnoreCase(contYn) && !nextKey.isBlank() && ++pages < MAX_PAGES);
+
+        log.info("키움 종목목록 조회 완료 market={} count={} pages={}", marketType, result.size(), pages + 1);
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void extractRows(Map<String, Object> body, String marketType, List<KiwoomStockData> out) {
+        if (body == null) {
+            return;
+        }
+        // 응답의 목록 배열: TR 스펙에 따라 키가 다를 수 있어(list/stk_list/output 등) 첫 List 값을 사용한다.
+        List<Object> rows = null;
+        Object named = body.get("list");
+        if (named instanceof List<?> l) {
+            rows = (List<Object>) l;
+        } else {
+            for (Object v : body.values()) {
+                if (v instanceof List<?> l) {
+                    rows = (List<Object>) l;
+                    break;
+                }
+            }
+        }
+        if (rows == null) {
+            return;
+        }
+        for (Object row : rows) {
+            if (!(row instanceof Map<?, ?> m)) {
+                continue;
+            }
+            Map<String, Object> r = (Map<String, Object>) m;
+            String code = firstNonNull(str(r, "code"), str(r, "stk_cd"));
+            String name = firstNonNull(str(r, "name"), str(r, "stk_nm"));
+            if (code == null || code.isBlank() || name == null || name.isBlank()) {
+                continue;
+            }
+            out.add(new KiwoomStockData(
+                    code,
+                    name,
+                    marketType,
+                    str(r, "sector"),
+                    lng(r, "mac"),        // 시가총액
+                    lng(r, "lst_stk"),    // 상장주식수
+                    null,                 // 상장일: 스펙 확인 후 파싱
+                    "LISTED"));
+        }
+    }
+
+    /** KOSPI/KOSDAQ → 키움 시장구분 코드. 스펙 확인 후 조정. */
+    private static String toKiwoomMarketCode(String marketType) {
+        return "KOSDAQ".equalsIgnoreCase(marketType) ? "10" : "0";
+    }
+
+    private static String header(HttpHeaders headers, String name) {
+        String v = headers.getFirst(name);
+        return v == null ? "" : v.trim();
     }
 
     private Optional<KiwoomStockData> toStockData(String code, Map<String, Object> body) {

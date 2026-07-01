@@ -17,13 +17,15 @@ public record KiwoomProperties(
         String appSecret,
         Duration staleness,
         String tokenPath,
-        String stockInfoPath) {
+        String stockInfoPath,
+        String stockListPath) {
 
     public KiwoomProperties {
         if (baseUrl == null || baseUrl.isBlank()) baseUrl = "https://api.kiwoom.com";
         if (staleness == null) staleness = Duration.ofDays(7);
         if (tokenPath == null || tokenPath.isBlank()) tokenPath = "/oauth2/token";
         if (stockInfoPath == null || stockInfoPath.isBlank()) stockInfoPath = "/api/dostk/stkinfo";
+        if (stockListPath == null || stockListPath.isBlank()) stockListPath = "/api/dostk/stkinfo";
     }
 
     public boolean enabled() {
