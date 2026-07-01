@@ -1,13 +1,13 @@
 package org.profit.candle.auth.api;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.api.dto.OAuthLoginRequest;
 import org.profit.candle.auth.api.dto.OAuthLoginResponse;
 import org.profit.candle.auth.api.dto.ProvidersResponse;
+import org.profit.candle.auth.api.dto.RefreshTokenRequest;
 import org.profit.candle.auth.identity.service.OAuthLoginService;
 import org.profit.candle.auth.identity.service.LoginResult;
 import org.profit.candle.auth.identity.service.OAuthProvidersService;
@@ -29,7 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-@Slf4j
 public class AuthController {
     private final AuthProperties properties;
     private final OAuthLoginService oAuthLoginService;
@@ -51,20 +50,25 @@ public class AuthController {
         return tokenResponse(result.tokens(), result.isNewUser());
     }
 
+    // refresh token은 웹(httpOnly 쿠키)과 모바일/네이티브 앱(요청 body) 양쪽에서 받는다.
+    // 쿠키를 쓸 수 없는 Capacitor/WebView 앱은 보안 저장소의 토큰을 body로 전달한다.
     @PostMapping("/token/refresh")
     public ResponseEntity<OAuthLoginResponse> refresh(
-            @CookieValue(name = "refresh_token", required = false) String refreshToken) {
+            @CookieValue(name = "refresh_token", required = false) String cookieToken,
+            @RequestBody(required = false) RefreshTokenRequest body) {
+        String refreshToken = resolveRefreshToken(cookieToken, body);
         if (refreshToken == null || refreshToken.isBlank()) {
-            log.info("refresh token is null");
             throw new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
-        log.info("refresh token is {}", refreshToken);
         return tokenResponse(refreshTokenService.rotate(refreshToken), false);
     }
 
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public ResponseEntity<Void> logout(@CookieValue(name = "refresh_token", required = false) String refreshToken) {
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = "refresh_token", required = false) String cookieToken,
+            @RequestBody(required = false) RefreshTokenRequest body) {
+        String refreshToken = resolveRefreshToken(cookieToken, body);
         if (refreshToken != null && !refreshToken.isBlank()) {
             refreshTokenService.revoke(refreshToken);
         }
@@ -72,6 +76,14 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, expiredCookie("access_token", "/").toString())
                 .header(HttpHeaders.SET_COOKIE, expiredCookie("refresh_token", "/api/v1/auth").toString())
                 .build();
+    }
+
+    // body의 토큰을 우선하고, 없으면 쿠키로 폴백한다.
+    private String resolveRefreshToken(String cookieToken, RefreshTokenRequest body) {
+        if (body != null && body.refreshToken() != null && !body.refreshToken().isBlank()) {
+            return body.refreshToken();
+        }
+        return cookieToken;
     }
 
     private ResponseEntity<OAuthLoginResponse> tokenResponse(IssuedTokens tokens, boolean isNewUser) {
