@@ -11,6 +11,8 @@ import org.profit.candle.portfolio.holding.entity.HoldingEntity;
 import org.profit.candle.portfolio.holding.exception.HoldingErrorCode;
 import org.profit.candle.portfolio.holding.repository.HoldingReader;
 import org.profit.candle.portfolio.holding.repository.HoldingWriter;
+import org.profit.candle.portfolio.holding.trade.entity.RealizedTradeEntity;
+import org.profit.candle.portfolio.holding.trade.repository.RealizedTradeWriter;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +29,7 @@ class DefaultHoldingServiceTest {
 
     @Mock HoldingReader holdingReader;
     @Mock HoldingWriter holdingWriter;
+    @Mock RealizedTradeWriter realizedTradeWriter;
     @InjectMocks DefaultHoldingService service;
 
     private static final String USER_ID = "user-1";
@@ -147,6 +150,7 @@ class DefaultHoldingServiceTest {
         assertThat(existing.quantity()).isEqualTo(5);
         assertThat(existing.realizedProfit()).isEqualTo(25_000);
         verify(holdingWriter).save(existing);
+        verify(realizedTradeWriter).save(any(RealizedTradeEntity.class));
     }
 
     @Test

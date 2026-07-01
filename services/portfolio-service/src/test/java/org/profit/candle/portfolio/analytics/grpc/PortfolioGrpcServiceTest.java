@@ -9,14 +9,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.profit.candle.portfolio.analytics.dto.PortfolioHistoryResult;
 import org.profit.candle.portfolio.analytics.dto.PortfolioSnapshotResult;
 import org.profit.candle.portfolio.analytics.dto.PortfolioSummaryResult;
+import org.profit.candle.portfolio.analytics.dto.MonthlyReturnResult;
 import org.profit.candle.portfolio.analytics.dto.SectorBreakdownResult;
+import org.profit.candle.portfolio.analytics.dto.TradingStatsResult;
 import org.profit.candle.portfolio.analytics.service.PortfolioAnalyticsService;
+import org.profit.candle.portfolio.analytics.service.PortfolioSnapshotService;
+import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsRequest;
+import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsResponse;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioHistoryRequest;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioHistoryResponse;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioSummaryRequest;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioSummaryResponse;
 import org.profit.candle.proto.portfolio.v1.GetSectorBreakdownRequest;
 import org.profit.candle.proto.portfolio.v1.GetSectorBreakdownResponse;
+import org.profit.candle.proto.portfolio.v1.GetTradingStatsRequest;
+import org.profit.candle.proto.portfolio.v1.GetTradingStatsResponse;
+import org.profit.candle.proto.portfolio.v1.RecordDailySnapshotRequest;
+import org.profit.candle.proto.portfolio.v1.RecordDailySnapshotResponse;
 
 import java.util.List;
 
@@ -27,13 +36,14 @@ import static org.mockito.Mockito.when;
 class PortfolioGrpcServiceTest {
 
     @Mock PortfolioAnalyticsService analyticsService;
+    @Mock PortfolioSnapshotService snapshotService;
     PortfolioGrpcService service;
 
     private static final String USER_ID = "user-1";
 
     @BeforeEach
     void setUp() {
-        service = new PortfolioGrpcService(analyticsService);
+        service = new PortfolioGrpcService(analyticsService, snapshotService);
     }
 
     // ─── getPortfolioSummary ─────────────────────────────────────────────────
@@ -140,6 +150,79 @@ class PortfolioGrpcServiceTest {
 
         assertThat(observer.value.getSectorsList()).isEmpty();
         assertThat(observer.completed).isTrue();
+    }
+
+    // ─── getTradingStats ─────────────────────────────────────────────────────
+
+    @Test
+    void getTradingStats_happyPath_mapsAllFields() {
+        when(analyticsService.getTradingStats(USER_ID)).thenReturn(
+                new TradingStatsResult(USER_ID, 10, 7, 3, "70.00", "5.30",
+                        "005930", 50_000, "000660", -30_000));
+        CapturingObserver<GetTradingStatsResponse> observer = new CapturingObserver<>();
+
+        service.getTradingStats(
+                GetTradingStatsRequest.newBuilder().setUserId(USER_ID).build(), observer);
+
+        assertThat(observer.completed).isTrue();
+        var stats = observer.value.getStats();
+        assertThat(stats.getTradeCount()).isEqualTo(10);
+        assertThat(stats.getWinCount()).isEqualTo(7);
+        assertThat(stats.getWinRate()).isEqualTo("70.00");
+        assertThat(stats.getAvgHoldingDays()).isEqualTo("5.30");
+        assertThat(stats.getBestSymbol()).isEqualTo("005930");
+        assertThat(stats.getWorstProfit()).isEqualTo(-30_000);
+    }
+
+    // ─── getMonthlyReturns ───────────────────────────────────────────────────
+
+    @Test
+    void getMonthlyReturns_happyPath_mapsReturnsInOrder() {
+        when(analyticsService.getMonthlyReturns(USER_ID, 6)).thenReturn(List.of(
+                new MonthlyReturnResult("2026-05", "10.00", 100_000),
+                new MonthlyReturnResult("2026-06", "0.00", 0)));
+        CapturingObserver<GetMonthlyReturnsResponse> observer = new CapturingObserver<>();
+
+        service.getMonthlyReturns(
+                GetMonthlyReturnsRequest.newBuilder().setUserId(USER_ID).setMonths(6).build(), observer);
+
+        assertThat(observer.completed).isTrue();
+        assertThat(observer.value.getReturnsList()).hasSize(2);
+        assertThat(observer.value.getReturns(0).getMonth()).isEqualTo("2026-05");
+        assertThat(observer.value.getReturns(0).getReturnRate()).isEqualTo("10.00");
+        assertThat(observer.value.getReturns(0).getProfit()).isEqualTo(100_000);
+    }
+
+    // ─── recordDailySnapshot ─────────────────────────────────────────────────
+
+    @Test
+    void recordDailySnapshot_happyPath_parsesDateAndMapsResult() {
+        when(snapshotService.recordDailySnapshot(org.mockito.ArgumentMatchers.any())).thenReturn(
+                new PortfolioSnapshotResult("2026-06-29", 1_100_000, 850_000, 50_000, "10.00"));
+        CapturingObserver<RecordDailySnapshotResponse> observer = new CapturingObserver<>();
+
+        service.recordDailySnapshot(RecordDailySnapshotRequest.newBuilder()
+                .setUserId(USER_ID).setSnapshotDate("2026-06-29")
+                .setTotalAsset(1_100_000).setStockValue(850_000)
+                .setSeedCapital(1_000_000).setIdempotencyKey("idem-1").build(), observer);
+
+        assertThat(observer.completed).isTrue();
+        assertThat(observer.error).isNull();
+        var snapshot = observer.value.getSnapshot();
+        assertThat(snapshot.getDate()).isEqualTo("2026-06-29");
+        assertThat(snapshot.getDailyProfit()).isEqualTo(50_000);
+        assertThat(snapshot.getCumulativeReturnRate()).isEqualTo("10.00");
+    }
+
+    @Test
+    void recordDailySnapshot_invalidDate_emitsError() {
+        CapturingObserver<RecordDailySnapshotResponse> observer = new CapturingObserver<>();
+
+        service.recordDailySnapshot(RecordDailySnapshotRequest.newBuilder()
+                .setUserId(USER_ID).setSnapshotDate("not-a-date").build(), observer);
+
+        assertThat(observer.error).isNotNull();
+        assertThat(observer.completed).isFalse();
     }
 
     // ─── Helper ─────────────────────────────────────────────────────────────
