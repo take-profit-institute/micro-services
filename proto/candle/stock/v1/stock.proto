@@ -70,6 +70,11 @@ message StockDetail {
 
 // ── 조회 (BFF가 호출) ─────────────────────────────────────────────
 // 목록/검색: 페이지번호 + total (DB 전용 — 배치/스캐너가 선적재).
+//
+// CONVENTIONS §13 예외: 공통 page_token 커서 대신 page/size(offset)을 쓴다.
+//   사유 — 종목 카탈로그는 ~4천건·저빈도 변경이라 §13 자체 기준("대량·고빈도만 커서")에서
+//   offset 이 허용되며, 프론트 종목표는 페이지번호+total UX 가 필요하다.
+//   size 는 서버에서 최대 100 으로 강제하고, 정렬은 stock_code 보조키로 안정화한다.
 message SearchStocksRequest {
   string query = 1;             // 코드/이름 부분검색 (선택)
   MarketType market = 2;        // 필터 (선택)
