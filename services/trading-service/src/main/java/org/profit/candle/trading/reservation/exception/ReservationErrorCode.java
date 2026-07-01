@@ -4,7 +4,6 @@ import org.profit.candle.common.error.ErrorCode;
 
 public enum ReservationErrorCode implements ErrorCode {
 
-
     INVALID_QUANTITY(
             "RESERVATION_INVALID_QUANTITY",
             "예약 수량은 1주 단위 양수여야 합니다."
@@ -52,6 +51,34 @@ public enum ReservationErrorCode implements ErrorCode {
     RESERVATION_NOT_FOUND(
             "RESERVATION_NOT_FOUND",
             "예약을 찾을 수 없습니다."
+    ),
+    INVALID_ID_FORMAT(
+            "RESERVATION_INVALID_ID_FORMAT",
+            "ID 형식이 올바르지 않습니다."
+    ),
+    MISSING_SCHEDULED_DATE(
+            "RESERVATION_MISSING_SCHEDULED_DATE",
+            "scheduled_date는 필수입니다. (YYYY-MM-DD)"
+    ),
+    INVALID_SCHEDULED_DATE_FORMAT(
+            "RESERVATION_INVALID_SCHEDULED_DATE_FORMAT",
+            "scheduled_date 형식이 올바르지 않습니다. (YYYY-MM-DD)"
+    ),
+    INVALID_SIDE(
+            "RESERVATION_INVALID_SIDE",
+            "side가 필요합니다."
+    ),
+    INVALID_TIMING(
+            "RESERVATION_INVALID_TIMING",
+            "timing이 필요합니다."
+    ),
+    INVALID_KIND(
+            "RESERVATION_INVALID_KIND",
+            "kind가 필요합니다."
+    ),
+    INVALID_STATUS(
+            "RESERVATION_INVALID_STATUS",
+            "알 수 없는 status입니다."
     );
 
     private final String code;

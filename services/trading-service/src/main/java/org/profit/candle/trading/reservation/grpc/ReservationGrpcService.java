@@ -1,6 +1,5 @@
 package org.profit.candle.trading.reservation.grpc;
 
-
 import com.google.protobuf.Timestamp;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -17,13 +16,16 @@ import org.profit.candle.trading.reservation.event.ReservationIdempotencyOperati
 import org.profit.candle.trading.reservation.exception.ReservationErrorCode;
 import org.profit.candle.trading.reservation.exception.ReservationException;
 import org.profit.candle.trading.reservation.repository.ReservationRepository;
+import org.profit.candle.trading.reservation.service.ReservationBatchService;
 import org.profit.candle.trading.reservation.service.ReservationService;
 import org.profit.candle.trading.support.idempotency.IdempotencyContext;
 import org.profit.candle.trading.support.idempotency.IdempotencyExecutor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.UUID;
 
 /**
@@ -46,12 +48,17 @@ import java.util.UUID;
  * 도메인 enum의 CONVERTING/FAILED/EXPIRED는 toProtoStatus()에서 별도 처리가 필요하다.
  * 우선 CONVERTING은 RESERVED로, FAILED/EXPIRED는 CANCELLED로 잠정 매핑했다 — proto에
  * 해당 값을 추가하는 게 맞는 방향이며, 이는 후속 확인이 필요하다.</p>
+ *
+ * <p>배치 전용 RPC(ProcessOpenLimitReservations/MarkReservationConverted)는 requireActor()를
+ * 호출하지 않는다 — 배치 서비스는 시스템 권한으로 호출하며, order의 ExpirePendingOrders와
+ * 동일한 컨벤션을 따른다. 네트워크 경계(내부망)로 보호한다.</p>
  */
 @Component
 @RequiredArgsConstructor
 public class ReservationGrpcService extends ReservationServiceGrpc.ReservationServiceImplBase {
 
     private final ReservationService reservationService;
+    private final ReservationBatchService reservationBatchService;
     private final ReservationRepository reservationRepository;
     private final IdempotencyExecutor idempotencyExecutor;
     private final ReservationIdempotencyOperations idempotencyOperations;
@@ -78,9 +85,11 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             UUID actor = requireActor(request.getUserId());
             String idempotencyKey = currentIdempotencyKey();
             Long price = request.getPrice() == 0 ? null : request.getPrice();
-            LocalDate scheduledDate = request.getScheduledDate().isBlank()
-                    ? null
-                    : LocalDate.parse(request.getScheduledDate());
+            LocalDate scheduledDate = null;
+            if (!request.getScheduledDate().isBlank()) {
+                scheduledDate = parseScheduledDate(request.getScheduledDate(), observer);
+                if (scheduledDate == null) return;
+            }
 
             var command = new PlaceReservationCommand(
                     request.getSymbol(), toSide(request.getSide()), toTiming(request.getTiming()),
@@ -100,6 +109,8 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
         } catch (AccountException e) {
             observer.onError(toGrpcException((AccountErrorCode) e.errorCode()));
+        } catch (DataIntegrityViolationException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.DUPLICATE_PENDING_RESERVATION));
         }
     }
 
@@ -128,6 +139,8 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
         } catch (AccountException e) {
             observer.onError(toGrpcException((AccountErrorCode) e.errorCode()));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
         }
     }
 
@@ -144,8 +157,11 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
                     ? null : toKind(request.getKind());
             Long quantity = request.getQuantity() == 0 ? null : request.getQuantity();
             Long price = request.getPrice() == 0 ? null : request.getPrice();
-            LocalDate scheduledDate = request.getScheduledDate().isBlank()
-                    ? null : LocalDate.parse(request.getScheduledDate());
+            LocalDate scheduledDate = null;
+            if (!request.getScheduledDate().isBlank()) {
+                scheduledDate = parseScheduledDate(request.getScheduledDate(), observer);
+                if (scheduledDate == null) return;
+            }
 
             var command = new AmendReservationCommand(
                     UUID.fromString(request.getReservationId()), timing, kind, quantity, price,
@@ -165,6 +181,52 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
         } catch (AccountException e) {
             observer.onError(toGrpcException((AccountErrorCode) e.errorCode()));
+        } catch (DataIntegrityViolationException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.DUPLICATE_PENDING_RESERVATION));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
+        }
+    }
+
+    // ── 배치 전용 RPC ─────────────────────────────────────────────────
+    @Override
+    public void processOpenLimitReservations(ProcessOpenLimitReservationsRequest request,
+                                             StreamObserver<ProcessOpenLimitReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            int count = reservationBatchService.processOpenLimitReservations(targetDate);
+            observer.onNext(ProcessOpenLimitReservationsResponse.newBuilder()
+                    .setProcessedCount(count)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void markReservationConverted(MarkReservationConvertedRequest request,
+                                         StreamObserver<MarkReservationConvertedResponse> observer) {
+        try {
+            reservationBatchService.markConverted(
+                    UUID.fromString(request.getReservationId()),
+                    UUID.fromString(request.getConvertedOrderId()));
+            var reservation = reservationRepository.findById(UUID.fromString(request.getReservationId()))
+                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+            observer.onNext(MarkReservationConvertedResponse.newBuilder()
+                    .setReservation(toProto(reservation))
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
         }
     }
 
@@ -173,7 +235,8 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
         Status status = switch (errorCode) {
             case INVALID_QUANTITY, INVALID_PRICE, LIMIT_RESERVATION_REQUIRES_PRICE,
                  NON_LIMIT_RESERVATION_MUST_NOT_HAVE_PRICE, TIMING_ORDER_KIND_MISMATCH,
-                 INVALID_SCHEDULED_DATE ->
+                 INVALID_SCHEDULED_DATE, INVALID_SCHEDULED_DATE_FORMAT, MISSING_SCHEDULED_DATE,
+                 INVALID_ID_FORMAT, INVALID_SIDE, INVALID_TIMING, INVALID_KIND, INVALID_STATUS ->
                     Status.INVALID_ARGUMENT;
             case RESERVATION_NOT_FOUND ->
                     Status.NOT_FOUND;
@@ -195,6 +258,17 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
                     Status.FAILED_PRECONDITION;
         };
         return status.withDescription(errorCode.message()).asRuntimeException();
+    }
+
+    // ── 날짜 파싱 (DateTimeParseException → INVALID_ARGUMENT) ──────────
+    private <T> LocalDate parseScheduledDate(String raw, StreamObserver<T> observer) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return LocalDate.parse(raw);
+        } catch (DateTimeParseException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_SCHEDULED_DATE_FORMAT));
+            return null;
+        }
     }
 
     // ── actor / idempotency 컨텍스트 ────────────────────────────────────
@@ -250,7 +324,7 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
         return switch (side) {
             case ORDER_SIDE_BUY -> ReservationSideValue.BUY;
             case ORDER_SIDE_SELL -> ReservationSideValue.SELL;
-            default -> throw Status.INVALID_ARGUMENT.withDescription("side가 필요합니다").asRuntimeException();
+            default -> throw toGrpcException(ReservationErrorCode.INVALID_SIDE);
         };
     }
 
@@ -259,7 +333,7 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             case RESERVATION_TIMING_OPEN -> ReservationTimingValue.OPEN;
             case RESERVATION_TIMING_TODAY_CLOSE -> ReservationTimingValue.TODAY_CLOSE;
             case RESERVATION_TIMING_PREV_CLOSE -> ReservationTimingValue.PREV_CLOSE;
-            default -> throw Status.INVALID_ARGUMENT.withDescription("timing이 필요합니다").asRuntimeException();
+            default -> throw toGrpcException(ReservationErrorCode.INVALID_TIMING);
         };
     }
 
@@ -268,7 +342,7 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             case ORDER_KIND_MARKET -> ReservationOrderKindValue.MARKET;
             case ORDER_KIND_LIMIT -> ReservationOrderKindValue.LIMIT;
             case ORDER_KIND_AFTER_HOURS_CLOSE -> ReservationOrderKindValue.AFTER_HOURS_CLOSE;
-            default -> throw Status.INVALID_ARGUMENT.withDescription("kind가 필요합니다").asRuntimeException();
+            default -> throw toGrpcException(ReservationErrorCode.INVALID_KIND);
         };
     }
 
@@ -277,7 +351,7 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             case RESERVATION_STATUS_RESERVED -> ReservationStatusValue.RESERVED;
             case RESERVATION_STATUS_EXECUTED -> ReservationStatusValue.EXECUTED;
             case RESERVATION_STATUS_CANCELLED -> ReservationStatusValue.CANCELLED;
-            default -> throw Status.INVALID_ARGUMENT.withDescription("알 수 없는 status").asRuntimeException();
+            default -> throw toGrpcException(ReservationErrorCode.INVALID_STATUS);
         };
     }
 
@@ -301,8 +375,6 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
         };
     }
 
-    // 도메인 6종 상태 → proto 3종 상태. CONVERTING/FAILED/EXPIRED는 proto에 값이 없어 잠정 매핑한다.
-    // proto에 해당 값을 추가하는 게 맞는 방향 — 후속 확인 필요.
     private ReservationStatus toProtoStatus(ReservationStatusValue status) {
         return switch (status) {
             case RESERVED, CONVERTING -> ReservationStatus.RESERVATION_STATUS_RESERVED;
