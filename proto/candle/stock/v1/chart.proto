@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package candle.stock.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.stock.v1";
+
+import "google/protobuf/timestamp.proto";
+
+enum CandleInterval {
+  CANDLE_INTERVAL_UNSPECIFIED = 0;
+  MIN_1 = 1;
+  MIN_5 = 2;
+  DAY_1 = 3;
+  WEEK_1 = 4;
+  MONTH_1 = 5;
+}
+
+message Candle {
+  string code = 1;
+  CandleInterval interval = 2;
+  google.protobuf.Timestamp open_time = 3;
+  int64 open = 4;
+  int64 high = 5;
+  int64 low = 6;
+  int64 close = 7;
+  int64 volume = 8;
+  bool closed = 9;
+}
+
+message GetCandlesRequest {
+  string code = 1;
+  CandleInterval interval = 2;
+  int32 limit = 3;
+  google.protobuf.Timestamp to = 4;
+}
+
+message GetCandlesResponse {
+  repeated Candle candles = 1;
+}
+
+message BackfillCandlesRequest {
+  string code = 1;
+  CandleInterval interval = 2;
+  int32 count = 3;
+}
+
+message BackfillCandlesResponse {
+  int32 upserted = 1;
+}
+
+service ChartService {
+  rpc GetCandles(GetCandlesRequest) returns (GetCandlesResponse);
+  rpc BackfillCandles(BackfillCandlesRequest) returns (BackfillCandlesResponse);
+}
