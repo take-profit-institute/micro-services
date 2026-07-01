@@ -1,15 +1,9 @@
 # 로컬 개발용 백킹 서비스 (AWS 없이 전 서비스 로컬 실행)
-# 기본: postgres / timescaledb / redis / redpanda(kafka) / mailhog
-# 옵션 profile: ui(redpanda console) · services(Spring 컨테이너) · bff · gateway
+# 기본: timescaledb / redis / bff / gateway
 #
-#   docker compose up -d                                        # 백킹 서비스만
-#   docker compose --profile ui up -d                          # + redpanda console
-#   docker compose --profile services up -d                    # + Spring 서비스 컨테이너
-#   docker compose --profile bff up -d                         # + bff 컨테이너
-#   docker compose --profile gateway up -d                     # + 개발용 API Gateway (:8000)
-#   docker compose --profile gateway --profile bff up -d       # gateway + bff 함께
+#   docker compose -f docker-compose-lean.yml up -d             # lean backing + bff + gateway
 # Spring을 호스트에서 실행: ./gradlew :services:user-service:bootRun
-name: candle-local
+name: candle-local-v2-lean
 
 services:
   # market 전용 시계열 DB (운영의 TimescaleDB StatefulSet 대용)
@@ -31,7 +25,6 @@ services:
   # webapp repo에서 빌드/푸시한 이미지를 가져다 씀. 안 쓰면 webapp repo에서 직접 실행.
   bff:
     image: ${BFF_IMAGE:-yyubin/candle-bff:dev}
-    profiles: ["bff"]
     environment:
       PORT: "8080" # bff는 PORT 사용(기본 4000)
       HOST: "0.0.0.0"
@@ -49,29 +42,27 @@ services:
       GRPC_LEARN_ADDR:        host.docker.internal:50059
     ports: ["8080:8080"]
     extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      redis:
+        condition: service_started
 
-  # ── 옵션: 개발용 API Gateway ──────────────────────────────────────────────
+  # ── 개발용 API Gateway ──────────────────────────────────────────────
   # JWT 검증 → X-Account-Id 헤더 주입 → 라우팅 (프로덕션 API Gateway 역할 대체)
   #
-  # 사용 예:
-  #   docker compose --profile gateway --profile bff up -d   # gateway + bff 함께
-  #   docker compose --profile gateway up -d                 # gateway만 (BFF는 호스트 실행)
-  #
-  # BFF를 호스트에서 실행 중이면 GATEWAY_BFF_URI를 .env에서 설정 불필요 (기본값 host.docker.internal 사용)
-  # BFF를 'bff' 프로파일로 실행 중이면: GATEWAY_BFF_URI=http://bff:8080
   gateway:
     image: ${GATEWAY_IMAGE:-yyubin/candle-gateway:dev}
-    profiles: ["gateway"]
     environment:
       GATEWAY_PORT: "8000"
-      AUTH_JWT_HMAC_SECRET: ${AUTH_JWT_HMAC_SECRET:?AUTH_JWT_HMAC_SECRET must be set in .env}
+      AUTH_JWT_HMAC_SECRET: ${AUTH_JWT_HMAC_SECRET:-local-dev-secret-change-me}
       # auth-service 주소: 'services' 프로파일 사용 시 http://auth-service:8081
       GATEWAY_AUTH_URI: ${GATEWAY_AUTH_URI:-http://host.docker.internal:8081}
-      # BFF 주소: 'bff' 프로파일 사용 시 http://bff:8080
-      GATEWAY_BFF_URI: ${GATEWAY_BFF_URI:-http://host.docker.internal:8080}
+      GATEWAY_BFF_URI: ${GATEWAY_BFF_URI:-http://bff:8080}
       GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
     ports: ["8000:8000"]
     extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      bff:
+        condition: service_started
 
 volumes:
   pgdata:
