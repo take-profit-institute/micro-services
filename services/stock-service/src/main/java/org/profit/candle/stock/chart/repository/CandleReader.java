@@ -7,4 +7,7 @@ import java.util.List;
 
 public interface CandleReader {
     List<CandleEntity> findLatest(String stockCode, String interval, Instant to, int limit);
+
+    /** 여러 종목의 최근 {@code points} 개 종가를 한 번에 조회한다(오래된 -> 최신 정렬). */
+    List<SparklinePoint> findRecentCloses(List<String> codes, String interval, int points);
 }

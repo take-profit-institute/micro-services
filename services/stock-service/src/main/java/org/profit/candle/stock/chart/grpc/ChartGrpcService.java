@@ -11,7 +11,13 @@ import org.profit.candle.proto.stock.v1.Candle;
 import org.profit.candle.proto.stock.v1.ChartServiceGrpc;
 import org.profit.candle.proto.stock.v1.GetCandlesRequest;
 import org.profit.candle.proto.stock.v1.GetCandlesResponse;
+import org.profit.candle.proto.stock.v1.GetPreviousCloseRequest;
+import org.profit.candle.proto.stock.v1.GetPreviousCloseResponse;
+import org.profit.candle.proto.stock.v1.GetSparklinesRequest;
+import org.profit.candle.proto.stock.v1.GetSparklinesResponse;
+import org.profit.candle.proto.stock.v1.Sparkline;
 import org.profit.candle.stock.chart.dto.CandleResult;
+import org.profit.candle.stock.chart.dto.SparklineResult;
 import org.profit.candle.stock.chart.exception.ChartErrorCode;
 import org.profit.candle.stock.chart.service.CandleBackfillService;
 import org.profit.candle.stock.chart.service.ChartService;
@@ -39,6 +45,44 @@ public class ChartGrpcService extends ChartServiceGrpc.ChartServiceImplBase {
             chartService.getCandles(request.getCode(), interval, limit, to)
                     .forEach(candle -> builder.addCandles(toProto(candle)));
             observer.onNext(builder.build());
+            observer.onCompleted();
+        } catch (CandleException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (IllegalArgumentException e) {
+            observer.onError(Status.INVALID_ARGUMENT.withDescription(ChartErrorCode.INVALID_CANDLE_REQUEST.code())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void getSparklines(GetSparklinesRequest request, StreamObserver<GetSparklinesResponse> observer) {
+        try {
+            org.profit.candle.stock.chart.dto.CandleInterval interval = intervalOrDefault(request.getInterval());
+            GetSparklinesResponse.Builder builder = GetSparklinesResponse.newBuilder();
+            chartService.getSparklines(request.getCodesList(), interval, request.getPoints())
+                    .forEach(sparkline -> builder.addSparklines(toProto(sparkline)));
+            observer.onNext(builder.build());
+            observer.onCompleted();
+        } catch (CandleException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (IllegalArgumentException e) {
+            observer.onError(Status.INVALID_ARGUMENT.withDescription(ChartErrorCode.INVALID_CANDLE_REQUEST.code())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void getPreviousClose(GetPreviousCloseRequest request, StreamObserver<GetPreviousCloseResponse> observer) {
+        try {
+            if (!request.hasDate()) {
+                throw new IllegalArgumentException("date is required");
+            }
+            CandleResult prev = chartService.getPreviousClose(request.getCode(), toInstant(request.getDate()));
+            observer.onNext(GetPreviousCloseResponse.newBuilder()
+                    .setCode(prev.code())
+                    .setPrevClose(prev.close())
+                    .setPrevOpenTime(toTimestamp(prev.openTime()))
+                    .build());
             observer.onCompleted();
         } catch (CandleException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
@@ -78,6 +122,14 @@ public class ChartGrpcService extends ChartServiceGrpc.ChartServiceImplBase {
                 .build();
     }
 
+    private static Sparkline toProto(SparklineResult result) {
+        return Sparkline.newBuilder()
+                .setCode(result.code())
+                .addAllCloses(result.closes())
+                .setLastOpenTime(toTimestamp(result.lastOpenTime()))
+                .build();
+    }
+
     private static org.profit.candle.stock.chart.dto.CandleInterval intervalOf(
             org.profit.candle.proto.stock.v1.CandleInterval interval) {
         return switch (interval) {
@@ -86,6 +138,15 @@ public class ChartGrpcService extends ChartServiceGrpc.ChartServiceImplBase {
             case MONTH_1 -> org.profit.candle.stock.chart.dto.CandleInterval.MONTH_1;
             default -> throw new IllegalArgumentException("unsupported candle interval");
         };
+    }
+
+    /** sparkline 은 주기 미지정 시 DAY_1 로 본다. */
+    private static org.profit.candle.stock.chart.dto.CandleInterval intervalOrDefault(
+            org.profit.candle.proto.stock.v1.CandleInterval interval) {
+        if (interval == org.profit.candle.proto.stock.v1.CandleInterval.CANDLE_INTERVAL_UNSPECIFIED) {
+            return org.profit.candle.stock.chart.dto.CandleInterval.DAY_1;
+        }
+        return intervalOf(interval);
     }
 
     private static org.profit.candle.proto.stock.v1.CandleInterval toProtoInterval(

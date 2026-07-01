@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ public class RestKiwoomChartClient implements KiwoomChartClient {
     private static final String WEEKLY_CHART_TR = "ka10082";
     private static final String MONTHLY_CHART_TR = "ka10083";
     private static final int MAX_PAGES = 100;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final KiwoomProperties properties;
     private final RestClient kiwoomRestClient;
@@ -89,11 +91,13 @@ public class RestKiwoomChartClient implements KiwoomChartClient {
     }
 
     private static Map<String, Object> requestBody(String code, Instant to) {
+        // ka10081/82/83 공통 필수 파라미터: stk_cd, base_dt(기준일자, 이 날짜부터 과거로 조회), upd_stkpc_tp(수정주가구분).
+        // to 가 없으면(초기 조회) 오늘(KST) 기준으로 최신 캔들을 받는다.
+        Instant baseInstant = to != null ? to : Instant.now();
         Map<String, Object> body = new HashMap<>();
         body.put("stk_cd", code);
-        if (to != null) {
-            body.put("base_dt", DateTimeFormatter.BASIC_ISO_DATE.format(to.atZone(ZoneOffset.UTC).toLocalDate()));
-        }
+        body.put("base_dt", DateTimeFormatter.BASIC_ISO_DATE.format(baseInstant.atZone(KST).toLocalDate()));
+        body.put("upd_stkpc_tp", "1");
         return body;
     }
 

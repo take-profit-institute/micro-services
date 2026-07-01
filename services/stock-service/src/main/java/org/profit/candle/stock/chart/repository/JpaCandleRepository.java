@@ -43,4 +43,21 @@ public interface JpaCandleRepository extends JpaRepository<CandleEntity, CandleI
                                       @Param("interval") String interval,
                                       @Param("to") Instant to,
                                       org.springframework.data.domain.Pageable pageable);
+
+    // 종목별 top-N 종가. JPQL 로는 group 별 상위 N 을 표현하기 어려워 윈도우 함수 native 쿼리를 쓴다.
+    @Override
+    @Query(value = """
+            SELECT stock_code AS "stockCode", open_time AS "openTime", close AS "close"
+            FROM (
+                SELECT stock_code, open_time, close,
+                       ROW_NUMBER() OVER (PARTITION BY stock_code ORDER BY open_time DESC) AS rn
+                FROM candles
+                WHERE stock_code IN (:codes) AND interval = :interval
+            ) ranked
+            WHERE rn <= :points
+            ORDER BY stock_code ASC, open_time ASC
+            """, nativeQuery = true)
+    List<SparklinePoint> findRecentCloses(@Param("codes") List<String> codes,
+                                          @Param("interval") String interval,
+                                          @Param("points") int points);
 }

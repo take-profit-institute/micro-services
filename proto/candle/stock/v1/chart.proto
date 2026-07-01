@@ -49,7 +49,39 @@ message BackfillCandlesResponse {
   int32 upserted = 1;
 }
 
+// 리스트 화면(관심종목/랭킹)의 미니 차트용 경량 조회. GetCandles 를 종목마다 부르는 대신
+// 여러 종목의 최근 종가 시퀀스만 한 번에 받는다. DB 에 있는 데이터만 반환하며 백필하지 않는다.
+message GetSparklinesRequest {
+  repeated string codes = 1;
+  CandleInterval interval = 2;  // 기본 DAY_1
+  int32 points = 3;             // 기본 10 (약 2주 영업일)
+}
+
+message Sparkline {
+  string code = 1;
+  repeated int64 closes = 2;                    // 오래된 -> 최신 종가
+  google.protobuf.Timestamp last_open_time = 3; // 마지막(최신) 캔들 시각
+}
+
+message GetSparklinesResponse {
+  repeated Sparkline sparklines = 1;
+}
+
+// 종목 + 기준일자 -> 그 일자 직전(exclusive)의 마지막 일봉 종가(= 전 거래일 종가).
+message GetPreviousCloseRequest {
+  string code = 1;
+  google.protobuf.Timestamp date = 2;  // 이 시각보다 앞선 가장 최근 일봉을 찾는다
+}
+
+message GetPreviousCloseResponse {
+  string code = 1;
+  int64 prev_close = 2;
+  google.protobuf.Timestamp prev_open_time = 3;  // 종가가 속한 캔들 시각(= 전 거래일)
+}
+
 service ChartService {
   rpc GetCandles(GetCandlesRequest) returns (GetCandlesResponse);
+  rpc GetSparklines(GetSparklinesRequest) returns (GetSparklinesResponse);
+  rpc GetPreviousClose(GetPreviousCloseRequest) returns (GetPreviousCloseResponse);
   rpc BackfillCandles(BackfillCandlesRequest) returns (BackfillCandlesResponse);
 }
