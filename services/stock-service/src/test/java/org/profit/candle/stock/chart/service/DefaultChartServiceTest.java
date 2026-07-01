@@ -48,7 +48,7 @@ class DefaultChartServiceTest {
 
         List<CandleResult> result = service.getCandles("005930", CandleInterval.DAY_1, 2, null);
 
-        verify(backfillService).backfill("005930", CandleInterval.DAY_1, 2);
+        verify(backfillService).backfill("005930", CandleInterval.DAY_1, 2, null);
         assertThat(result).hasSize(1);
     }
 

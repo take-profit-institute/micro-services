@@ -34,7 +34,7 @@ public class DefaultChartService implements ChartService {
         List<CandleEntity> candles = readLatest(code, interval, limit, to);
 
         if (candles.size() < limit) {
-            backfillService.backfill(code, interval, limit);
+            backfillService.backfill(code, interval, limit, to);
             candles = readLatest(code, interval, limit, to);
         }
 

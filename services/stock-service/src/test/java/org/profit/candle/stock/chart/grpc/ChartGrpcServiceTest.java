@@ -69,7 +69,7 @@ class ChartGrpcServiceTest {
 
     @Test
     void backfillCandles_returnsUpsertedCount() {
-        when(backfillService.backfill("005930", CandleInterval.WEEK_1, 30)).thenReturn(7);
+        when(backfillService.backfill("005930", CandleInterval.WEEK_1, 30, null)).thenReturn(7);
         ChartGrpcService service = new ChartGrpcService(chartService, backfillService);
         CapturingObserver<BackfillCandlesResponse> observer = new CapturingObserver<>();
 

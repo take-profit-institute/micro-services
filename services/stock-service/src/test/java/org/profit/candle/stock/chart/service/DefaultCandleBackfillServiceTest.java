@@ -6,9 +6,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.profit.candle.stock.chart.dto.CandleInterval;
-import org.profit.candle.stock.chart.entity.CandleEntity;
-import org.profit.candle.stock.chart.repository.CandleReader;
-import org.profit.candle.stock.chart.repository.CandleWriter;
 import org.profit.candle.stock.client.KiwoomCandleData;
 import org.profit.candle.stock.client.KiwoomChartClient;
 
@@ -16,8 +13,6 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,35 +20,30 @@ import static org.mockito.Mockito.when;
 class DefaultCandleBackfillServiceTest {
 
     @Mock KiwoomChartClient chartClient;
-    @Mock CandleReader candleReader;
-    @Mock CandleWriter candleWriter;
+    @Mock CandleBackfillPersistence persistence;
 
     @Test
     void backfill_returnsZeroWhenClientHasNoData() {
-        when(chartClient.fetchCandles("005930", CandleInterval.DAY_1, 100)).thenReturn(List.of());
-        DefaultCandleBackfillService service = new DefaultCandleBackfillService(chartClient, candleReader, candleWriter);
+        when(chartClient.fetchCandles("005930", CandleInterval.DAY_1, 100, null)).thenReturn(List.of());
+        DefaultCandleBackfillService service = new DefaultCandleBackfillService(chartClient, persistence);
 
-        assertThat(service.backfill("005930", CandleInterval.DAY_1, 100)).isZero();
-
-        verify(candleWriter, never()).saveAll(any());
+        assertThat(service.backfill("005930", CandleInterval.DAY_1, 100, null)).isZero();
+        verify(persistence).upsertFetched(List.of());
     }
 
     @Test
-    void backfill_upsertsFetchedCandles() {
+    void backfill_fetchesOutsidePersistenceAndDelegatesUpsert() {
         Instant openTime = Instant.parse("2026-06-30T00:00:00Z");
-        when(chartClient.fetchCandles("005930", CandleInterval.DAY_1, 100))
-                .thenReturn(List.of(new KiwoomCandleData("005930", CandleInterval.DAY_1,
-                        openTime, 70000, 71000, 69000, 70500, 1000)));
-        when(candleReader.findLatest("005930", "1d", null, 100)).thenReturn(List.of());
-        DefaultCandleBackfillService service = new DefaultCandleBackfillService(chartClient, candleReader, candleWriter);
+        List<KiwoomCandleData> fetched = List.of(new KiwoomCandleData("005930", CandleInterval.DAY_1,
+                openTime, 70000, 71000, 69000, 70500, 1000));
+        Instant to = Instant.parse("2026-07-01T00:00:00Z");
+        when(chartClient.fetchCandles("005930", CandleInterval.DAY_1, 100, to)).thenReturn(fetched);
+        when(persistence.upsertFetched(fetched)).thenReturn(1);
+        DefaultCandleBackfillService service = new DefaultCandleBackfillService(chartClient, persistence);
 
-        int upserted = service.backfill("005930", CandleInterval.DAY_1, 100);
+        int upserted = service.backfill("005930", CandleInterval.DAY_1, 100, to);
 
         assertThat(upserted).isEqualTo(1);
-        ArgumentCaptor<Iterable<CandleEntity>> captor = ArgumentCaptor.forClass(Iterable.class);
-        verify(candleWriter).saveAll(captor.capture());
-        CandleEntity saved = captor.getValue().iterator().next();
-        assertThat(saved.id().stockCode()).isEqualTo("005930");
-        assertThat(saved.close()).isEqualTo(70500);
+        verify(persistence).upsertFetched(fetched);
     }
 }

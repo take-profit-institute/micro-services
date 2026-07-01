@@ -53,7 +53,7 @@ public class ChartGrpcService extends ChartServiceGrpc.ChartServiceImplBase {
         try {
             org.profit.candle.stock.chart.dto.CandleInterval interval = intervalOf(request.getInterval());
             int count = normalizeLimit(request.getCount());
-            int upserted = backfillService.backfill(request.getCode(), interval, count);
+            int upserted = backfillService.backfill(request.getCode(), interval, count, null);
             observer.onNext(BackfillCandlesResponse.newBuilder().setUpserted(upserted).build());
             observer.onCompleted();
         } catch (CandleException e) {

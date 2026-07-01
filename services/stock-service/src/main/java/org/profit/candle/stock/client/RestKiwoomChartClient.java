@@ -16,6 +16,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,19 +37,19 @@ public class RestKiwoomChartClient implements KiwoomChartClient {
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
 
     @Override
-    public List<KiwoomCandleData> fetchCandles(String code, CandleInterval interval, int count) {
+    public List<KiwoomCandleData> fetchCandles(String code, CandleInterval interval, int count, Instant to) {
         if (!properties.enabled()) {
             return List.of();
         }
         try {
-            return fetchPages(code, interval, count);
+            return fetchPages(code, interval, count, to);
         } catch (RuntimeException e) {
             log.warn("키움 차트 조회 실패 code={} interval={}: {}", code, interval, e.toString());
             return List.of();
         }
     }
 
-    private List<KiwoomCandleData> fetchPages(String code, CandleInterval interval, int count) {
+    private List<KiwoomCandleData> fetchPages(String code, CandleInterval interval, int count, Instant to) {
         String token = accessToken();
         List<KiwoomCandleData> result = new ArrayList<>();
         String contYn = "N";
@@ -63,7 +64,7 @@ public class RestKiwoomChartClient implements KiwoomChartClient {
                     .header("api-id", apiId(interval))
                     .header("cont-yn", contYn)
                     .header("next-key", nextKey)
-                    .body(Map.of("stk_cd", code))
+                    .body(requestBody(code, to))
                     .retrieve()
                     .toEntity(MAP_TYPE);
 
@@ -77,10 +78,22 @@ public class RestKiwoomChartClient implements KiwoomChartClient {
                 && !nextKey.isBlank()
                 && ++pages < MAX_PAGES);
 
-        return result.stream()
+        List<KiwoomCandleData> filtered = result.stream()
+                .filter(candle -> to == null || candle.openTime().isBefore(to))
                 .sorted(Comparator.comparing(KiwoomCandleData::openTime))
-                .skip(Math.max(0, result.size() - count))
                 .toList();
+        return filtered.stream()
+                .skip(Math.max(0, filtered.size() - count))
+                .toList();
+    }
+
+    private static Map<String, Object> requestBody(String code, Instant to) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("stk_cd", code);
+        if (to != null) {
+            body.put("base_dt", DateTimeFormatter.BASIC_ISO_DATE.format(to.atZone(ZoneOffset.UTC).toLocalDate()));
+        }
+        return body;
     }
 
     @SuppressWarnings("unchecked")

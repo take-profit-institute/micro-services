@@ -5,6 +5,7 @@ import org.profit.candle.stock.chart.dto.CandleInterval;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -19,8 +20,8 @@ public class SingleFlightCandleBackfillService implements CandleBackfillService 
     private final ConcurrentMap<String, CompletableFuture<Integer>> inFlight = new ConcurrentHashMap<>();
 
     @Override
-    public int backfill(String code, CandleInterval interval, int count) {
-        String key = code + ":" + interval.storageValue();
+    public int backfill(String code, CandleInterval interval, int count, Instant to) {
+        String key = code + ":" + interval.storageValue() + ":" + (to == null ? "latest" : to.toString());
         CompletableFuture<Integer> created = new CompletableFuture<>();
         CompletableFuture<Integer> current = inFlight.putIfAbsent(key, created);
         if (current != null) {
@@ -28,7 +29,7 @@ public class SingleFlightCandleBackfillService implements CandleBackfillService 
         }
 
         try {
-            int result = delegate.backfill(code, interval, count);
+            int result = delegate.backfill(code, interval, count, to);
             created.complete(result);
             return result;
         } catch (RuntimeException e) {
