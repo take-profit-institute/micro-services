@@ -85,6 +85,22 @@ services:
         condition: service_started
     restart: on-failure
 
+  # ── 옵션: 종목 실시간 채팅 WS 게이트웨이 (stateless, Redis Pub/Sub 팬아웃) ──
+  # WS는 /chat/ws(8090), 방 배정 REST는 /chat/rooms. 상태는 전부 redis에 위임.
+  chatting-service:
+    image: ${CHATTING_SERVICE_IMAGE:-yyubin/candle-chatting-service:dev}
+    profiles: ["services"]
+    environment:
+      REDIS_URL: redis://redis:6379
+      AUTH_JWT_HMAC_SECRET: ${AUTH_JWT_HMAC_SECRET:?AUTH_JWT_HMAC_SECRET must be set in .env}
+      CHAT_SERVER_PORT: "8090"
+    ports:
+      - "8090:8090"
+    depends_on:
+      redis:
+        condition: service_started
+    restart: on-failure
+
   # ── 옵션: redpanda console (Kafka UI) ──
   redpanda-console:
     image: redpandadata/console:v2.7.2
@@ -102,10 +118,18 @@ services:
     environment:
       PORT: "8080" # bff는 PORT 사용(기본 4000)
       HOST: "0.0.0.0"
+      NODE_OPTIONS: "--dns-result-order=ipv4first"
       REDIS_URL: redis://redis:6379
-      # bff는 호스트에서 실행 중인 gRPC 서비스에 붙음(기본 50051~)
-      GRPC_AUTH_ADDR: host.docker.internal:50051
-      GRPC_MARKET_ADDR: host.docker.internal:50053
+      # gRPC 서비스는 호스트에서 로컬 실행 (50051~50059)
+      GRPC_AUTH_ADDR:         host.docker.internal:50051
+      GRPC_USER_ADDR:         host.docker.internal:50052
+      GRPC_MARKET_ADDR:       host.docker.internal:50053
+      GRPC_ACCOUNT_ADDR:      host.docker.internal:50054
+      GRPC_PORTFOLIO_ADDR:    host.docker.internal:50055
+      GRPC_RANKING_ADDR:      host.docker.internal:50056
+      GRPC_NOTIFICATION_ADDR: host.docker.internal:50057
+      GRPC_MISSION_ADDR:      host.docker.internal:50058
+      GRPC_LEARN_ADDR:        host.docker.internal:50059
     ports: ["8080:8080"]
     extra_hosts: ["host.docker.internal:host-gateway"]
 
@@ -128,6 +152,9 @@ services:
       GATEWAY_AUTH_URI: ${GATEWAY_AUTH_URI:-http://host.docker.internal:8081}
       # BFF 주소: 'bff' 프로파일 사용 시 http://bff:8080
       GATEWAY_BFF_URI: ${GATEWAY_BFF_URI:-http://host.docker.internal:8080}
+      # 채팅 방 배정 REST(/chat/rooms) 주소: 'services' 프로파일 사용 시 http://chatting-service:8090
+      # (/chat/ws WebSocket은 운영 시 ALB가 직접 passthrough — 이 게이트웨이는 REST만 프록시)
+      GATEWAY_CHAT_URI: ${GATEWAY_CHAT_URI:-http://host.docker.internal:8090}
       GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
     ports: ["8000:8000"]
     extra_hosts: ["host.docker.internal:host-gateway"]

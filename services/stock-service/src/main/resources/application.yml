@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: stock-service
+  grpc:
+    server:
+      port: ${STOCK_GRPC_PORT:50055}
+  datasource:
+    url: ${STOCK_DB_URL:jdbc:postgresql://localhost:5432/candle_stock}
+    username: ${STOCK_DB_USERNAME:candle}
+    password: ${STOCK_DB_PASSWORD:candle}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    locations: classpath:migration
+
+server:
+  port: ${STOCK_SERVER_PORT:8091}
+
+# 키움 OpenAPI (종목 기준정보 fallback/동기화). 키가 없으면 fallback은 비활성(NOT_FOUND 반환).
+kiwoom:
+  base-url: ${KIWOOM_BASE_URL:https://api.kiwoom.com}
+  app-key: ${KIWOOM_APP_KEY:}
+  app-secret: ${KIWOOM_APP_SECRET:}
+  # 상세 조회 시 DB 데이터가 이 기간보다 오래되면 키움에서 재조회한다.
+  staleness: ${KIWOOM_STALENESS:P7D}

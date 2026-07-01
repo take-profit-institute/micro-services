@@ -1,0 +1,58 @@
+package org.profit.candle.portfolio.holding.event;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.profit.candle.portfolio.holding.event.dto.OrderFilledPayload;
+import org.profit.candle.portfolio.holding.event.entity.ConsumedEvent;
+import org.profit.candle.portfolio.holding.event.repository.ConsumedEventRepository;
+import org.profit.candle.portfolio.holding.service.HoldingService;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class TradingEventConsumer {
+
+    private final HoldingService holdingService;
+    private final ConsumedEventRepository consumedEventRepository;
+    private final ObjectMapper objectMapper;
+
+    @KafkaListener(topics = ConsumedTopics.TRADING_ORDER_FILLED)
+    @Transactional
+    public void onOrderFilled(String rawPayload) {
+        OrderFilledPayload payload;
+        try {
+            payload = objectMapper.readValue(rawPayload, OrderFilledPayload.class);
+        } catch (Exception e) {
+            log.error("OrderFilled 이벤트 역직렬화 실패. payload={}", rawPayload, e);
+            return;
+        }
+
+        if (consumedEventRepository.existsById(payload.eventId())) {
+            log.info("이미 처리된 이벤트 skip. eventId={}", payload.eventId());
+            return;
+        }
+
+        try {
+            switch (payload.side().toUpperCase()) {
+                case "BUY" -> holdingService.applyBuyFill(
+                        payload.userId(), payload.symbol(), payload.quantity(), payload.executedPrice());
+                case "SELL" -> holdingService.applySellFill(
+                        payload.userId(), payload.symbol(), payload.quantity(), payload.executedPrice());
+                default -> {
+                    log.warn("알 수 없는 주문 방향. side={}, eventId={}", payload.side(), payload.eventId());
+                    return;
+                }
+            }
+            consumedEventRepository.save(new ConsumedEvent(payload.eventId(), payload.eventType()));
+            log.info("보유종목 업데이트 완료. userId={}, symbol={}, side={}",
+                    payload.userId(), payload.symbol(), payload.side());
+        } catch (Exception e) {
+            log.error("보유종목 업데이트 실패. eventId={}", payload.eventId(), e);
+            throw e;
+        }
+    }
+}

@@ -14,5 +14,8 @@ public interface JpaUserProfileRepository
     boolean existsById(String userId);
 
     @Override
+    boolean existsByNickname(String nickname);
+
+    @Override
     UserProfileEntity save(UserProfileEntity profile);
 }

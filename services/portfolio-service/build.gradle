@@ -1,1 +1,46 @@
-description = 'Portfolio aggregation and analysis service'
+description = 'Portfolio aggregation and holdings read model service'
+
+apply plugin: 'com.google.protobuf'
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-grpc-server'
+    implementation 'com.google.protobuf:protobuf-java'
+    implementation 'io.grpc:grpc-stub'
+    implementation 'io.grpc:grpc-protobuf'
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
+    implementation 'org.springframework.kafka:spring-kafka'
+}
+
+sourceSets {
+    main {
+        proto {
+            srcDir "${rootDir}/proto"
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:4.34.2'
+    }
+    plugins {
+        grpc {
+            artifact = 'io.grpc:protoc-gen-grpc-java:1.80.0'
+        }
+    }
+    generateProtoTasks {
+        all().configureEach { task ->
+            task.plugins {
+                grpc {}
+            }
+        }
+    }
+}
