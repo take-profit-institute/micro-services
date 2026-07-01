@@ -1,5 +1,16 @@
 spring:
   application:
     name: stock-service
+  datasource:
+    url: ${STOCK_DB_URL:jdbc:postgresql://localhost:5432/candle_stock}
+    username: ${STOCK_DB_USERNAME:candle}
+    password: ${STOCK_DB_PASSWORD:candle}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    locations: classpath:migration
+
 server:
-  port: ${SERVER_PORT:8091}
+  port: ${STOCK_SERVER_PORT:8091}
