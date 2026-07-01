@@ -65,6 +65,14 @@ jobs:
               - '.dockerignore'
               - 'build.gradle'
               - 'settings.gradle'
+            stock-service:
+              - 'services/stock-service/**'
+              - 'common/**'
+              - 'proto/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'build.gradle'
+              - 'settings.gradle'
             trading-service:
               - 'services/trading-service/**'
               - 'common/**'
@@ -133,6 +141,7 @@ jobs:
           F_AUTH:          ${{ steps.filter.outputs.auth-service }}
           F_USER:          ${{ steps.filter.outputs.user-service }}
           F_MARKET:        ${{ steps.filter.outputs.market-service }}
+          F_STOCK:         ${{ steps.filter.outputs.stock-service }}
           F_TRADING:       ${{ steps.filter.outputs.trading-service }}
           F_PORTFOLIO:     ${{ steps.filter.outputs.portfolio-service }}
           F_RANKING:       ${{ steps.filter.outputs.ranking-service }}
@@ -142,7 +151,7 @@ jobs:
           F_CHATTING:      ${{ steps.filter.outputs.chatting-service }}
           F_GATEWAY:       ${{ steps.filter.outputs.gateway }}
         run: |
-          ALL_SERVICES='["auth-service","user-service","market-service","trading-service","portfolio-service","ranking-service","mission-service","learning-service","notification-service","chatting-service"]'
+          ALL_SERVICES='["auth-service","user-service","market-service","stock-service","trading-service","portfolio-service","ranking-service","mission-service","learning-service","notification-service","chatting-service"]'
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ -z "$DISPATCH_INPUT" ]; then
@@ -176,6 +185,7 @@ jobs:
           [ "$F_AUTH"         = "true" ] && SERVICES+=(auth-service)
           [ "$F_USER"         = "true" ] && SERVICES+=(user-service)
           [ "$F_MARKET"       = "true" ] && SERVICES+=(market-service)
+          [ "$F_STOCK"        = "true" ] && SERVICES+=(stock-service)
           [ "$F_TRADING"      = "true" ] && SERVICES+=(trading-service)
           [ "$F_PORTFOLIO"    = "true" ] && SERVICES+=(portfolio-service)
           [ "$F_RANKING"      = "true" ] && SERVICES+=(ranking-service)

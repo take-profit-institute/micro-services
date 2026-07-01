@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: stock-service
+server:
+  port: ${SERVER_PORT:8091}
