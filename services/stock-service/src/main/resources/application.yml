@@ -36,5 +36,5 @@ kiwoom:
   staleness: ${KIWOOM_STALENESS:P7D}
   chart-path: ${KIWOOM_CHART_PATH:/api/dostk/chart}
   # 외부 호출 timeout. 차트 첫 페이지는 응답이 커서 read timeout 을 넉넉히 잡는다.
-  connect-timeout: ${KIWOOM_CONNECT_TIMEOUT:3s}
-  read-timeout: ${KIWOOM_READ_TIMEOUT:15s}
+  connect-timeout: ${KIWOOM_CONNECT_TIMEOUT:5s}
+  read-timeout: ${KIWOOM_READ_TIMEOUT:40s}
