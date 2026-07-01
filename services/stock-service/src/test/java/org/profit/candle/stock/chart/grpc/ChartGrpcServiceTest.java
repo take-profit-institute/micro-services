@@ -17,6 +17,7 @@ import org.profit.candle.stock.chart.dto.CandleResult;
 import org.profit.candle.stock.chart.exception.ChartErrorCode;
 import org.profit.candle.stock.chart.service.CandleBackfillService;
 import org.profit.candle.stock.chart.service.ChartService;
+import org.profit.candle.stock.chart.service.DailyCloseService;
 
 import java.time.Instant;
 import java.util.List;
@@ -29,13 +30,14 @@ class ChartGrpcServiceTest {
 
     @Mock ChartService chartService;
     @Mock CandleBackfillService backfillService;
+    @Mock DailyCloseService dailyCloseService;
 
     @Test
     void getCandles_returnsProtoCandles() {
         when(chartService.getCandles("005930", CandleInterval.DAY_1, 60, null))
                 .thenReturn(List.of(new CandleResult("005930", CandleInterval.DAY_1,
                         Instant.parse("2026-06-30T00:00:00Z"), 70000, 71000, 69000, 70500, 1000, true)));
-        ChartGrpcService service = new ChartGrpcService(chartService, backfillService);
+        ChartGrpcService service = new ChartGrpcService(chartService, backfillService, dailyCloseService);
         CapturingObserver<GetCandlesResponse> observer = new CapturingObserver<>();
 
         service.getCandles(GetCandlesRequest.newBuilder()
@@ -53,7 +55,7 @@ class ChartGrpcServiceTest {
     void getCandles_mapsUnavailableError() {
         when(chartService.getCandles("005930", CandleInterval.DAY_1, 1, null))
                 .thenThrow(new CandleException(ChartErrorCode.CHART_DATA_UNAVAILABLE));
-        ChartGrpcService service = new ChartGrpcService(chartService, backfillService);
+        ChartGrpcService service = new ChartGrpcService(chartService, backfillService, dailyCloseService);
         CapturingObserver<GetCandlesResponse> observer = new CapturingObserver<>();
 
         service.getCandles(GetCandlesRequest.newBuilder()
@@ -70,7 +72,7 @@ class ChartGrpcServiceTest {
     @Test
     void backfillCandles_returnsUpsertedCount() {
         when(backfillService.backfill("005930", CandleInterval.WEEK_1, 30, null)).thenReturn(7);
-        ChartGrpcService service = new ChartGrpcService(chartService, backfillService);
+        ChartGrpcService service = new ChartGrpcService(chartService, backfillService, dailyCloseService);
         CapturingObserver<BackfillCandlesResponse> observer = new CapturingObserver<>();
 
         service.backfillCandles(BackfillCandlesRequest.newBuilder()

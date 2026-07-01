@@ -51,6 +51,11 @@ public class CandleEntity {
         this.source = "KIWOOM";
     }
 
+    /** EOD 확정: 진행 중이던 캔들을 마감 처리한다. */
+    public void markClosed() {
+        this.closed = true;
+    }
+
     public void applyPrices(long open, long high, long low, long close, long volume, boolean closed, String source) {
         if (open < 0 || high < 0 || low < 0 || close < 0 || volume < 0) {
             throw new IllegalArgumentException("캔들 가격과 거래량은 음수일 수 없습니다");

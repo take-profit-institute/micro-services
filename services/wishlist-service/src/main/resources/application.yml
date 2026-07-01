@@ -14,6 +14,21 @@ spring:
     open-in-view: false
   flyway:
     locations: classpath:migration
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
 
 server:
   port: ${WISHLIST_SERVER_PORT:8092}
+
+wishlist:
+  alert:
+    threshold-basis-points: ${WISHLIST_ALERT_THRESHOLD_BP:500}
+    retry-batch-size: ${WISHLIST_ALERT_RETRY_BATCH_SIZE:100}
+    retry-delay: ${WISHLIST_ALERT_RETRY_DELAY:PT30S}
+  market:
+    quote-channel: ${WISHLIST_QUOTE_CHANNEL:market:quotes}
+    timezone: ${WISHLIST_MARKET_TIMEZONE:Asia/Seoul}
+  notification:
+    grpc-address: ${NOTIFICATION_GRPC_ADDR:localhost:50057}
+    deadline: ${NOTIFICATION_GRPC_DEADLINE:PT3S}

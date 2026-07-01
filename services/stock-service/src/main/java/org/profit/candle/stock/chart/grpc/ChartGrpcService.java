@@ -9,6 +9,8 @@ import org.profit.candle.proto.stock.v1.BackfillCandlesRequest;
 import org.profit.candle.proto.stock.v1.BackfillCandlesResponse;
 import org.profit.candle.proto.stock.v1.Candle;
 import org.profit.candle.proto.stock.v1.ChartServiceGrpc;
+import org.profit.candle.proto.stock.v1.CloseDailyCandlesRequest;
+import org.profit.candle.proto.stock.v1.CloseDailyCandlesResponse;
 import org.profit.candle.proto.stock.v1.GetCandlesRequest;
 import org.profit.candle.proto.stock.v1.GetCandlesResponse;
 import org.profit.candle.proto.stock.v1.GetPreviousCloseRequest;
@@ -21,9 +23,12 @@ import org.profit.candle.stock.chart.dto.SparklineResult;
 import org.profit.candle.stock.chart.exception.ChartErrorCode;
 import org.profit.candle.stock.chart.service.CandleBackfillService;
 import org.profit.candle.stock.chart.service.ChartService;
+import org.profit.candle.stock.chart.service.DailyCloseService;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 @Component
 @RequiredArgsConstructor
@@ -34,6 +39,7 @@ public class ChartGrpcService extends ChartServiceGrpc.ChartServiceImplBase {
 
     private final ChartService chartService;
     private final CandleBackfillService backfillService;
+    private final DailyCloseService dailyCloseService;
 
     @Override
     public void getCandles(GetCandlesRequest request, StreamObserver<GetCandlesResponse> observer) {
@@ -103,6 +109,21 @@ public class ChartGrpcService extends ChartServiceGrpc.ChartServiceImplBase {
         } catch (CandleException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         } catch (IllegalArgumentException e) {
+            observer.onError(Status.INVALID_ARGUMENT.withDescription(ChartErrorCode.INVALID_CANDLE_REQUEST.code())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void closeDailyCandles(CloseDailyCandlesRequest request, StreamObserver<CloseDailyCandlesResponse> observer) {
+        try {
+            LocalDate tradeDate = LocalDate.parse(request.getTradeDate());
+            int closed = dailyCloseService.closeDaily(tradeDate);
+            observer.onNext(CloseDailyCandlesResponse.newBuilder().setClosedCount(closed).build());
+            observer.onCompleted();
+        } catch (CandleException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (DateTimeParseException | IllegalArgumentException e) {
             observer.onError(Status.INVALID_ARGUMENT.withDescription(ChartErrorCode.INVALID_CANDLE_REQUEST.code())
                     .asRuntimeException());
         }

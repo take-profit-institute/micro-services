@@ -14,9 +14,18 @@ spring:
     open-in-view: false
   flyway:
     locations: classpath:migration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 server:
   port: ${STOCK_SERVER_PORT:8091}
+
+stock:
+  outbox:
+    publish-interval-ms: ${STOCK_OUTBOX_PUBLISH_INTERVAL_MS:5000}
 
 # 키움 OpenAPI (종목 기준정보 fallback/동기화). 키가 없으면 fallback은 비활성(NOT_FOUND 반환).
 kiwoom:

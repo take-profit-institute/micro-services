@@ -60,4 +60,13 @@ public interface JpaCandleRepository extends JpaRepository<CandleEntity, CandleI
     List<SparklinePoint> findRecentCloses(@Param("codes") List<String> codes,
                                           @Param("interval") String interval,
                                           @Param("points") int points);
+
+    @Override
+    @Query("""
+            SELECT c FROM CandleEntity c
+            WHERE c.id.interval = :interval
+              AND c.id.openTime = :openTime
+              AND c.closed = false
+            """)
+    List<CandleEntity> findOpenAt(@Param("interval") String interval, @Param("openTime") Instant openTime);
 }

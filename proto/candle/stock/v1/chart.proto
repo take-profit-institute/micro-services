@@ -49,6 +49,17 @@ message BackfillCandlesResponse {
   int32 upserted = 1;
 }
 
+// 장 마감 후 batch(stock.close-daily.v1)가 호출한다. 해당 거래일의 미확정 일봉을 확정(closed=true)하고
+// 종가 이벤트를 발행한다. 이미 확정된 캔들은 건너뛰므로 재실행에 안전하다.
+message CloseDailyCandlesRequest {
+  string trade_date = 1;       // YYYY-MM-DD (KST 거래일)
+  string idempotency_key = 2;  // batch execution_id 등 (재실행 추적)
+}
+
+message CloseDailyCandlesResponse {
+  int32 closed_count = 1;      // 이번 호출에서 새로 확정한 캔들 수
+}
+
 // 리스트 화면(관심종목/랭킹)의 미니 차트용 경량 조회. GetCandles 를 종목마다 부르는 대신
 // 여러 종목의 최근 종가 시퀀스만 한 번에 받는다. DB 에 있는 데이터만 반환하며 백필하지 않는다.
 message GetSparklinesRequest {
@@ -84,4 +95,5 @@ service ChartService {
   rpc GetSparklines(GetSparklinesRequest) returns (GetSparklinesResponse);
   rpc GetPreviousClose(GetPreviousCloseRequest) returns (GetPreviousCloseResponse);
   rpc BackfillCandles(BackfillCandlesRequest) returns (BackfillCandlesResponse);
+  rpc CloseDailyCandles(CloseDailyCandlesRequest) returns (CloseDailyCandlesResponse);
 }

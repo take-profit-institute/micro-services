@@ -7,6 +7,7 @@ import org.profit.candle.stock.client.KiwoomCandleData;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -21,10 +22,13 @@ public class DefaultCandleBackfillPersistence implements CandleBackfillPersisten
         if (fetched.isEmpty()) {
             return 0;
         }
+        Instant now = Instant.now();
         List<CandleEntity> upserts = fetched.stream()
                 .map(data -> {
                     CandleEntity candle = new CandleEntity(data.code(), data.interval().storageValue(), data.openTime());
-                    candle.applyPrices(data.open(), data.high(), data.low(), data.close(), data.volume(), true, "KIWOOM");
+                    // 진행 중인(현재 주기) 캔들은 closed=false. EOD 배치가 확정 종가로 true 전환 + 이벤트 발행한다.
+                    boolean closed = data.interval().isPeriodClosed(data.openTime(), now);
+                    candle.applyPrices(data.open(), data.high(), data.low(), data.close(), data.volume(), closed, "KIWOOM");
                     return candle;
                 })
                 .toList();
