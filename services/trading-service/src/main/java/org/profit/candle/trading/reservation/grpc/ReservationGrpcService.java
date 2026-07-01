@@ -1,6 +1,5 @@
 package org.profit.candle.trading.reservation.grpc;
 
-
 import com.google.protobuf.Timestamp;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -17,6 +16,7 @@ import org.profit.candle.trading.reservation.event.ReservationIdempotencyOperati
 import org.profit.candle.trading.reservation.exception.ReservationErrorCode;
 import org.profit.candle.trading.reservation.exception.ReservationException;
 import org.profit.candle.trading.reservation.repository.ReservationRepository;
+import org.profit.candle.trading.reservation.service.ReservationBatchService;
 import org.profit.candle.trading.reservation.service.ReservationService;
 import org.profit.candle.trading.support.idempotency.IdempotencyContext;
 import org.profit.candle.trading.support.idempotency.IdempotencyExecutor;
@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.UUID;
 
 /**
@@ -52,6 +53,7 @@ import java.util.UUID;
 public class ReservationGrpcService extends ReservationServiceGrpc.ReservationServiceImplBase {
 
     private final ReservationService reservationService;
+    private final ReservationBatchService reservationBatchService;
     private final ReservationRepository reservationRepository;
     private final IdempotencyExecutor idempotencyExecutor;
     private final ReservationIdempotencyOperations idempotencyOperations;
@@ -78,9 +80,8 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             UUID actor = requireActor(request.getUserId());
             String idempotencyKey = currentIdempotencyKey();
             Long price = request.getPrice() == 0 ? null : request.getPrice();
-            LocalDate scheduledDate = request.getScheduledDate().isBlank()
-                    ? null
-                    : LocalDate.parse(request.getScheduledDate());
+            LocalDate scheduledDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (scheduledDate == null && !request.getScheduledDate().isBlank()) return;
 
             var command = new PlaceReservationCommand(
                     request.getSymbol(), toSide(request.getSide()), toTiming(request.getTiming()),
@@ -144,8 +145,8 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
                     ? null : toKind(request.getKind());
             Long quantity = request.getQuantity() == 0 ? null : request.getQuantity();
             Long price = request.getPrice() == 0 ? null : request.getPrice();
-            LocalDate scheduledDate = request.getScheduledDate().isBlank()
-                    ? null : LocalDate.parse(request.getScheduledDate());
+            LocalDate scheduledDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (scheduledDate == null && !request.getScheduledDate().isBlank()) return;
 
             var command = new AmendReservationCommand(
                     UUID.fromString(request.getReservationId()), timing, kind, quantity, price,
@@ -165,6 +166,43 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
         } catch (AccountException e) {
             observer.onError(toGrpcException((AccountErrorCode) e.errorCode()));
+        }
+    }
+
+    // ── 배치 전용 RPC ─────────────────────────────────────────────────
+    @Override
+    public void processOpenLimitReservations(ProcessOpenLimitReservationsRequest request,
+                                             StreamObserver<ProcessOpenLimitReservationsResponse> observer) {
+        try {
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            int count = reservationBatchService.processOpenLimitReservations(targetDate);
+            observer.onNext(ProcessOpenLimitReservationsResponse.newBuilder()
+                    .setProcessedCount(count)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void markReservationConverted(MarkReservationConvertedRequest request,
+                                         StreamObserver<MarkReservationConvertedResponse> observer) {
+        try {
+            reservationBatchService.markConverted(
+                    UUID.fromString(request.getReservationId()),
+                    UUID.fromString(request.getConvertedOrderId()));
+            // markConverted 후 최신 상태 조회해서 반환
+            var reservation = reservationRepository.findById(UUID.fromString(request.getReservationId()))
+                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+            observer.onNext(MarkReservationConvertedResponse.newBuilder()
+                    .setReservation(toProto(reservation))
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
         }
     }
 
@@ -195,6 +233,23 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
                     Status.FAILED_PRECONDITION;
         };
         return status.withDescription(errorCode.message()).asRuntimeException();
+    }
+
+    // ── 날짜 파싱 (DateTimeParseException → INVALID_ARGUMENT) ──────────
+    /**
+     * scheduled_date 파싱. 빈 문자열이면 null 반환(선택 필드 취급).
+     * 형식이 잘못됐으면 observer에 INVALID_ARGUMENT를 내리고 null 반환 — 호출 측에서 return 필요.
+     */
+    private <T> LocalDate parseScheduledDate(String raw, StreamObserver<T> observer) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return LocalDate.parse(raw);
+        } catch (DateTimeParseException e) {
+            observer.onError(Status.INVALID_ARGUMENT
+                    .withDescription("scheduled_date 형식이 올바르지 않습니다. (YYYY-MM-DD)")
+                    .asRuntimeException());
+            return null;
+        }
     }
 
     // ── actor / idempotency 컨텍스트 ────────────────────────────────────
