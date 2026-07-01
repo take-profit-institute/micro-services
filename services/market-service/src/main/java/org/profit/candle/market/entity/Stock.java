@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Table(
         name="stocks",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_stoks_code", columnNames = "code")
+                @UniqueConstraint(name = "uk_stocks_code", columnNames = "code")
         },
         indexes = {
                 @Index(name="idx_stocks_name", columnList = "name"),
