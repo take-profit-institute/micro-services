@@ -3,8 +3,24 @@ spring:
     name: market-service
   config:
     import: optional:file:.env[.properties]
+  datasource:
+    url: ${MARKET_DB_URL:jdbc:postgresql://localhost:5432/candle_market}
+    username: ${MARKET_DB_USERNAME:candle}
+    password: ${MARKET_DB_PASSWORD:candle}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    locations: classpath:migration
 server:
   port: 8083
 kiwoom:
+  base-url: ${KIWOOM_BASE_URL:https://api.kiwoom.com}
   app-key: ${KIWOOM_APP_KEY}
   secret-key: ${KIWOOM_SECRET_KEY}
+  connect-timeout-ms: ${KIWOOM_CONNECT_TIMEOUT_MS:3000}
+  response-timeout-ms: ${KIWOOM_RESPONSE_TIMEOUT_MS:5000}
+  read-timeout-ms: ${KIWOOM_READ_TIMEOUT_MS:5000}
+  write-timeout-ms: ${KIWOOM_WRITE_TIMEOUT_MS:5000}
+  token-cache-ttl: ${KIWOOM_TOKEN_CACHE_TTL:PT50M}
