@@ -8,11 +8,15 @@ import org.profit.candle.stock.catalog.repository.StockWriter;
 import org.profit.candle.stock.client.KiwoomStockClient;
 import org.profit.candle.stock.client.KiwoomStockData;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 키움(외부 HTTP) 조회는 트랜잭션 밖에서 수행한다 — DB 트랜잭션/커넥션을 네트워크 IO 동안
+ * 잡지 않기 위함(장애 시 커넥션 고갈·락 점유 방지). 실제 DB 쓰기는 {@link StockWriter#save}
+ * 호출마다 각자의 트랜잭션으로 커밋된다(idempotent upsert라 부분 성공도 재실행으로 수렴).
+ */
 @Service
 @RequiredArgsConstructor
 public class DefaultStockIngestionService implements StockIngestionService {
@@ -22,13 +26,11 @@ public class DefaultStockIngestionService implements StockIngestionService {
     private final StockWriter stockWriter;
 
     @Override
-    @Transactional
     public Optional<StockResult> fetchAndSave(String code) {
         return kiwoomStockClient.findStock(code).map(this::upsert).map(StockResult::from);
     }
 
     @Override
-    @Transactional
     public int syncMarket(String marketType) {
         List<KiwoomStockData> stocks = kiwoomStockClient.findAllStocksByMarket(marketType);
         stocks.forEach(this::upsert);
