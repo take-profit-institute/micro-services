@@ -16,12 +16,12 @@ public interface JpaStockRepository extends JpaRepository<StockEntity, Long>, St
     @Override
     @Query("""
             SELECT s FROM StockEntity s
-            WHERE (:market IS NULL OR s.marketType = :market)
-              AND (:sector IS NULL OR s.sector = :sector)
-              AND (:status IS NULL OR s.listingStatus = :status)
-              AND (:query IS NULL
-                   OR LOWER(s.stockName) LIKE LOWER(CONCAT('%', :query, '%'))
-                   OR s.stockCode LIKE CONCAT('%', :query, '%'))
+            WHERE (CAST(:market AS string) IS NULL OR s.marketType = :market)
+              AND (CAST(:sector AS string) IS NULL OR s.sector = :sector)
+              AND (CAST(:status AS string) IS NULL OR s.listingStatus = :status)
+              AND (CAST(:query AS string) IS NULL
+                   OR LOWER(s.stockName) LIKE LOWER(CONCAT('%', CAST(:query AS string), '%'))
+                   OR s.stockCode LIKE CONCAT('%', CAST(:query AS string), '%'))
             """)
     Page<StockEntity> search(@Param("query") String query,
                              @Param("market") String market,

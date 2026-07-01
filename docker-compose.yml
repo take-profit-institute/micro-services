@@ -116,7 +116,9 @@ services:
       HOST: "0.0.0.0"
       NODE_OPTIONS: "--dns-result-order=ipv4first"
       REDIS_URL: redis://redis:6379
-      # gRPC 서비스는 호스트에서 로컬 실행 (50051~50059)
+      # 실제 마이크로서비스로 gRPC 라우팅 (mock 아님)
+      DATA_SOURCE: grpc
+      # gRPC 서비스는 호스트에서 로컬 실행 (50051~50060)
       GRPC_AUTH_ADDR:         host.docker.internal:50051
       GRPC_USER_ADDR:         host.docker.internal:50052
       GRPC_MARKET_ADDR:       host.docker.internal:50053
@@ -126,6 +128,7 @@ services:
       GRPC_NOTIFICATION_ADDR: host.docker.internal:50057
       GRPC_MISSION_ADDR:      host.docker.internal:50058
       GRPC_LEARN_ADDR:        host.docker.internal:50059
+      GRPC_STOCK_ADDR:        host.docker.internal:50060
     ports: ["8080:8080"]
     extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
