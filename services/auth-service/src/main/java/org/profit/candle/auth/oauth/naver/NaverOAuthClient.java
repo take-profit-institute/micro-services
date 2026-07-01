@@ -7,6 +7,7 @@ import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.oauth.OAuthClient;
 import org.profit.candle.auth.oauth.OAuthProfile;
+import org.profit.candle.auth.oauth.OAuthRedirectUris;
 import org.profit.candle.auth.oauth.OAuthResponses;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -30,18 +31,20 @@ public class NaverOAuthClient implements OAuthClient {
     }
 
     @Override
-    public OAuthProfile fetch(String authorizationCode, String state) {
+    public OAuthProfile fetch(String authorizationCode, String state, String redirectUri) {
         validateConfiguration();
         // naver는 토큰 교환에 state가 필수다. 누락/공백이면 외부 호출 전에 fail-fast 한다.
         if (state == null || state.isBlank()) {
             throw new AuthException(AuthErrorCode.INVALID_OAUTH_REQUEST);
         }
+        String resolvedRedirectUri = OAuthRedirectUris.resolve(
+                redirectUri, properties.naver().redirectUri(), properties.naver().allowedRedirectUris());
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("code", authorizationCode);
             form.add("client_id", properties.naver().clientId());
             form.add("client_secret", properties.naver().clientSecret());
-            form.add("redirect_uri", properties.naver().redirectUri());
+            form.add("redirect_uri", resolvedRedirectUri);
             form.add("grant_type", "authorization_code");
             // naver는 토큰 교환 시 authorize에 사용한 state를 함께 요구한다.
             form.add("state", state);

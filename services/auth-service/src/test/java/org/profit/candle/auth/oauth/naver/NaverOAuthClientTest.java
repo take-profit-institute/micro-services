@@ -36,7 +36,7 @@ class NaverOAuthClientTest {
     void fetch_blankClientId_throwsConfigurationInvalid() {
         when(naver.clientId()).thenReturn("");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state", null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.NAVER_OAUTH_CONFIGURATION_INVALID);
     }
 
@@ -45,7 +45,7 @@ class NaverOAuthClientTest {
         when(naver.clientId()).thenReturn("client-id");
         when(naver.clientSecret()).thenReturn("  ");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state", null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.NAVER_OAUTH_CONFIGURATION_INVALID);
     }
 
@@ -55,7 +55,7 @@ class NaverOAuthClientTest {
         when(naver.clientSecret()).thenReturn("secret");
         when(naver.redirectUri()).thenReturn("");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state", null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.NAVER_OAUTH_CONFIGURATION_INVALID);
     }
 
@@ -65,7 +65,7 @@ class NaverOAuthClientTest {
         when(naver.clientSecret()).thenReturn("secret");
         when(naver.redirectUri()).thenReturn("https://example.com/callback");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "  "));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "  ", null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.INVALID_OAUTH_REQUEST);
     }
 
@@ -75,7 +75,7 @@ class NaverOAuthClientTest {
         when(naver.clientSecret()).thenReturn("secret");
         when(naver.redirectUri()).thenReturn("https://example.com/callback");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", null));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", null, null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.INVALID_OAUTH_REQUEST);
     }
 }

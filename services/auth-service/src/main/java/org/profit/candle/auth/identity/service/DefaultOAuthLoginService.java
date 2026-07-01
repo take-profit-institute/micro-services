@@ -25,8 +25,8 @@ public class DefaultOAuthLoginService implements OAuthLoginService {
 
     @Override
     @Transactional
-    public LoginResult login(String provider, String authorizationCode, String state) {
-        OAuthProfile profile = oAuthClientRegistry.resolve(provider).fetch(authorizationCode, state);
+    public LoginResult login(String provider, String authorizationCode, String state, String redirectUri) {
+        OAuthProfile profile = oAuthClientRegistry.resolve(provider).fetch(authorizationCode, state, redirectUri);
         if (!profile.emailVerified() || profile.subject().isBlank()) {
             throw new AuthException(AuthErrorCode.OAUTH_ACCOUNT_NOT_VERIFIED);
         }

@@ -36,7 +36,7 @@ class KakaoOAuthClientTest {
     void fetch_blankClientId_throwsConfigurationInvalid() {
         when(kakao.clientId()).thenReturn("");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state", null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID);
     }
 
@@ -45,7 +45,7 @@ class KakaoOAuthClientTest {
         when(kakao.clientId()).thenReturn("client-id");
         when(kakao.clientSecret()).thenReturn("  ");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state", null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID);
     }
 
@@ -55,7 +55,7 @@ class KakaoOAuthClientTest {
         when(kakao.clientSecret()).thenReturn("secret");
         when(kakao.redirectUri()).thenReturn("");
 
-        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state"));
+        AuthException ex = assertThrows(AuthException.class, () -> client.fetch("code", "state", null));
         assertThat(ex.errorCode()).isEqualTo(AuthErrorCode.KAKAO_OAUTH_CONFIGURATION_INVALID);
     }
 }
