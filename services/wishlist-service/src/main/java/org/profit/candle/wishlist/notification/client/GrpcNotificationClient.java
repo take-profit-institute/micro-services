@@ -1,7 +1,6 @@
 package org.profit.candle.wishlist.notification.client;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import jakarta.annotation.PreDestroy;
@@ -96,7 +95,7 @@ public class GrpcNotificationClient implements NotificationClient {
                     "triggerPrice", command.triggerPrice(),
                     "changePercent", percent.toPlainString()
             ));
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             log.warn("Failed to serialize wishlist price alert metadata", e);
             return "{}";
         }
