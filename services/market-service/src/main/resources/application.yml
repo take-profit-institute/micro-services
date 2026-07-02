@@ -4,15 +4,18 @@ spring:
   config:
     import: optional:file:.env[.properties]
   datasource:
+    url: jdbc:postgresql://localhost:5433/market
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
     url: ${MARKET_DB_URL:jdbc:postgresql://localhost:5432/candle_market}
     username: ${MARKET_DB_USERNAME:candle}
     password: ${MARKET_DB_PASSWORD:candle}
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-  flyway:
-    locations: classpath:migration
+
 server:
   port: 8083
 kiwoom:
