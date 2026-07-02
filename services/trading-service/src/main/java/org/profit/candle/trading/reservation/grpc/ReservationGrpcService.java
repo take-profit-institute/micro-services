@@ -44,11 +44,6 @@ import java.util.UUID;
  * 각 GrpcService가 따로 갖는다. support/ 공통 변환 계층(인터셉터/AOP)이 생기면 이 중복은
  * 해소된다 — 관련 제안 이슈 #{이슈번호}.</p>
  *
- * <p>proto {@code ReservationStatus}는 RESERVED/EXECUTED/CANCELLED 3종만 정의되어 있어
- * 도메인 enum의 CONVERTING/FAILED/EXPIRED는 toProtoStatus()에서 별도 처리가 필요하다.
- * 우선 CONVERTING은 RESERVED로, FAILED/EXPIRED는 CANCELLED로 잠정 매핑했다 — proto에
- * 해당 값을 추가하는 게 맞는 방향이며, 이는 후속 확인이 필요하다.</p>
- *
  * <p>배치 전용 RPC(ProcessOpenLimitReservations/MarkReservationConverted)는 requireActor()를
  * 호출하지 않는다 — 배치 서비스는 시스템 권한으로 호출하며, order의 ExpirePendingOrders와
  * 동일한 컨벤션을 따른다. 네트워크 경계(내부망)로 보호한다.</p>
@@ -392,8 +387,11 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
     private ReservationStatusValue toStatus(ReservationStatus status) {
         return switch (status) {
             case RESERVATION_STATUS_RESERVED -> ReservationStatusValue.RESERVED;
+            case RESERVATION_STATUS_CONVERTING -> ReservationStatusValue.CONVERTING;
             case RESERVATION_STATUS_EXECUTED -> ReservationStatusValue.EXECUTED;
             case RESERVATION_STATUS_CANCELLED -> ReservationStatusValue.CANCELLED;
+            case RESERVATION_STATUS_FAILED -> ReservationStatusValue.FAILED;
+            case RESERVATION_STATUS_EXPIRED -> ReservationStatusValue.EXPIRED;
             default -> throw toGrpcException(ReservationErrorCode.INVALID_STATUS);
         };
     }
@@ -420,9 +418,12 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
 
     private ReservationStatus toProtoStatus(ReservationStatusValue status) {
         return switch (status) {
-            case RESERVED, CONVERTING -> ReservationStatus.RESERVATION_STATUS_RESERVED;
+            case RESERVED -> ReservationStatus.RESERVATION_STATUS_RESERVED;
+            case CONVERTING -> ReservationStatus.RESERVATION_STATUS_CONVERTING;
             case EXECUTED -> ReservationStatus.RESERVATION_STATUS_EXECUTED;
-            case CANCELLED, FAILED, EXPIRED -> ReservationStatus.RESERVATION_STATUS_CANCELLED;
+            case CANCELLED -> ReservationStatus.RESERVATION_STATUS_CANCELLED;
+            case FAILED -> ReservationStatus.RESERVATION_STATUS_FAILED;
+            case EXPIRED -> ReservationStatus.RESERVATION_STATUS_EXPIRED;
         };
     }
 }
