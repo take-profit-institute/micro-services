@@ -48,6 +48,18 @@ public enum ReservationErrorCode implements ErrorCode {
             "RESERVATION_BATCH_DEADLINE_PASSED",
             "배치 마감 후에는 취소/정정할 수 없습니다."
     ),
+    PREV_CLOSE_DEADLINE_PASSED(
+            "RESERVATION_PREV_CLOSE_DEADLINE_PASSED",
+            "전일종가 예약 접수가 마감되었습니다. (08:25 이후)"
+    ),
+    OPEN_DEADLINE_PASSED(
+            "RESERVATION_OPEN_DEADLINE_PASSED",
+            "시가 예약 접수가 마감되었습니다. (08:50 이후)"
+    ),
+    TODAY_CLOSE_DEADLINE_PASSED(
+            "RESERVATION_TODAY_CLOSE_DEADLINE_PASSED",
+            "종가 예약 접수가 마감되었습니다. (15:30 이후)"
+    ),
     RESERVATION_NOT_FOUND(
             "RESERVATION_NOT_FOUND",
             "예약을 찾을 수 없습니다."

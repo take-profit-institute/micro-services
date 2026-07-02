@@ -73,6 +73,9 @@ message AmendReservationRequest {
 message AmendReservationResponse { Reservation reservation = 1; }
 
 // ── 배치 전용 (BFF 노출 아님) ────────────────────────────────────────
+
+// 09:00 배치 트리거 — OPEN+LIMIT RESERVED 예약을 CONVERTING으로 전이하고
+// ReservationDue 이벤트를 Outbox에 기록한다.
 message ProcessOpenLimitReservationsRequest {
   string scheduled_date = 1; // YYYY-MM-DD
 }
@@ -80,6 +83,25 @@ message ProcessOpenLimitReservationsResponse {
   int32 processed_count = 1;
 }
 
+// 08:30 배치 트리거 — PREV_CLOSE 예약을 전일 종가로 즉시 체결
+message ProcessPrevCloseReservationsRequest {
+  string scheduled_date = 1; // YYYY-MM-DD (체결 대상 예약의 scheduled_date)
+}
+message ProcessPrevCloseReservationsResponse {
+  int32 processed_count = 1;
+}
+
+// 15:40 배치 트리거 — TODAY_CLOSE 예약을 당일 종가로 즉시 체결
+// 반드시 ChartService.CloseDailyCandles 완료 후 호출해야 한다.
+message ProcessTodayCloseReservationsRequest {
+  string scheduled_date = 1; // YYYY-MM-DD (체결 대상 예약의 scheduled_date)
+}
+message ProcessTodayCloseReservationsResponse {
+  int32 processed_count = 1;
+}
+
+// order_svc가 ReservationDue를 수신해 Order를 생성한 뒤 호출한다.
+// reservation을 CONVERTING → EXECUTED로 전이하고 converted_order_id를 기록한다.
 message MarkReservationConvertedRequest {
   string reservation_id = 1;
   string converted_order_id = 2;
@@ -96,5 +118,7 @@ service ReservationService {
 
   // 배치 전용
   rpc ProcessOpenLimitReservations(ProcessOpenLimitReservationsRequest) returns (ProcessOpenLimitReservationsResponse);
+  rpc ProcessPrevCloseReservations(ProcessPrevCloseReservationsRequest) returns (ProcessPrevCloseReservationsResponse);
+  rpc ProcessTodayCloseReservations(ProcessTodayCloseReservationsRequest) returns (ProcessTodayCloseReservationsResponse);
   rpc MarkReservationConverted(MarkReservationConvertedRequest) returns (MarkReservationConvertedResponse);
 }
