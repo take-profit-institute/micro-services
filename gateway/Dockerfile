@@ -14,6 +14,7 @@ COPY services/auth-service/build.gradle       services/auth-service/build.gradle
 COPY services/user-service/build.gradle       services/user-service/build.gradle
 COPY services/market-service/build.gradle     services/market-service/build.gradle
 COPY services/stock-service/build.gradle      services/stock-service/build.gradle
+COPY services/wishlist-service/build.gradle   services/wishlist-service/build.gradle
 COPY services/trading-service/build.gradle    services/trading-service/build.gradle
 COPY services/portfolio-service/build.gradle  services/portfolio-service/build.gradle
 COPY services/ranking-service/build.gradle    services/ranking-service/build.gradle
