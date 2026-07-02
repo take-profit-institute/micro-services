@@ -38,4 +38,7 @@ enum ReservationStatus {
   RESERVATION_STATUS_RESERVED = 1;
   RESERVATION_STATUS_EXECUTED = 2;
   RESERVATION_STATUS_CANCELLED = 3;
+  RESERVATION_STATUS_CONVERTING = 4;  // 시가+지정가 전환 진행 중 (ReservationDue 발행~ReservationConverted 수신 전)
+  RESERVATION_STATUS_FAILED = 5;      // 잔고 부족 등 처리 실패
+  RESERVATION_STATUS_EXPIRED = 6;     // 접수 마감 후 미처리 등 자동 만료
 }

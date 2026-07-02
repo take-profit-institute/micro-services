@@ -23,6 +23,9 @@ dependencies {
 
     // gRPC 클라이언트
     implementation 'org.springframework.boot:spring-boot-grpc-client'
+
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 }
 
 // 공용 proto 디렉터리(리포 루트 /proto)에서 stub 생성

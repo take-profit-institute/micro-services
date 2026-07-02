@@ -107,6 +107,10 @@ public class DefaultReservationService implements ReservationService {
         ReservationEntity reservation = reservationRepository.findByIdAndUserIdForUpdate(reservationId, userId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
+        // RSV-006~008: 배치 마감 후에는 취소 불가 — 배치가 이미 처리 중일 수 있다.
+        // place/amend와 동일하게 timing 기준으로 마감 시간을 검증한다.
+        deadlineValidator.requireBeforeDeadline(reservation.getTiming());
+
         return doCancel(reservation, userId);
     }
 
