@@ -183,7 +183,15 @@ public class DefaultReservationBatchService implements ReservationBatchService {
                 BigDecimal amount = BigDecimal.valueOf(executedPrice)
                         .multiply(BigDecimal.valueOf(candidate.getQuantity()));
                 BigDecimal fee = amount.multiply(FEE_RATE).setScale(0, RoundingMode.HALF_UP);
-                reservedAmount = amount.add(fee).longValue();
+                BigDecimal total = amount.add(fee);
+                try {
+                    reservedAmount = total.longValueExact(); // 범위 초과 시 ArithmeticException
+                } catch (ArithmeticException e) {
+                    log.error("금액 계산 오버플로 — reservationId={}, amount={}",
+                            candidate.getId(), total, e);
+                    batchExecutor.markFailedUnderLock(candidate.getId());
+                    continue;
+                }
 
                 try {
                     batchExecutor.lockBalanceInNewTransaction(candidate.getUserId(), reservedAmount);
@@ -196,8 +204,10 @@ public class DefaultReservationBatchService implements ReservationBatchService {
             }
 
             // 4단계: 락 재획득 → EXECUTED 전이 → Outbox 기록
-            batchExecutor.executeUnderLock(candidate.getId(), executedPrice, reservedAmount);
-            count++;
+            // executeUnderLock이 false(no-op)이면 내부에서 자동으로 보상(releaseBalance)한다.
+            if (batchExecutor.executeUnderLock(candidate.getId(), executedPrice, reservedAmount)) {
+                count++;
+            }
         }
         return count;
     }
