@@ -1,5 +1,19 @@
 spring:
   application:
     name: ranking-service
+  grpc:
+    server:
+      port: ${RANKING_GRPC_PORT:50056}
+  datasource:
+    url: ${RANKING_DB_URL:jdbc:postgresql://localhost:5432/candle_ranking}
+    username: ${RANKING_DB_USERNAME:candle}
+    password: ${RANKING_DB_PASSWORD:candle}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    locations: classpath:migration
+
 server:
-  port: 8086
+  port: ${RANKING_SERVER_PORT:8086}
