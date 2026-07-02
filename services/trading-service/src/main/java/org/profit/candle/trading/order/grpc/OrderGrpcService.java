@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.proto.trading.v1.*;
 import org.profit.candle.trading.account.exception.AccountErrorCode;
 import org.profit.candle.trading.account.exception.AccountException;
+import org.profit.candle.trading.order.dto.AmendOrderCommand;
 import org.profit.candle.trading.order.dto.CancelResult;
 import org.profit.candle.trading.order.dto.PlaceOrderCommand;
 import org.profit.candle.trading.order.entity.*;
@@ -122,6 +123,35 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                         return CancelOrderResponse.newBuilder()
                                 .setOrder(toProto(result.order(), null))
                                 .setReleasedAmount(result.releasedAmount())
+                                .build();
+                    });
+
+            observer.onNext(response);
+            observer.onCompleted();
+        } catch (OrderException e) {
+            observer.onError(toGrpcException((OrderErrorCode) e.errorCode()));
+        } catch (AccountException e) {
+            observer.onError(toGrpcException((AccountErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void amendOrder(AmendOrderRequest request, StreamObserver<AmendOrderResponse> observer) {
+        try {
+            UUID actor = requireActor(request.getUserId());
+
+            AmendOrderResponse response = idempotencyExecutor.execute(
+                    request,
+                    AmendOrderResponse.parser(),
+                    idempotencyOperations,
+                    () -> {
+                        var command = new AmendOrderCommand(
+                                request.getQuantity(), request.getPrice(), currentIdempotencyKey());
+                        OrderEntity amended = orderService.amendOrder(
+                                actor, UUID.fromString(request.getOrderId()), command);
+                        // 정정으로 만들어진 신규 주문은 PENDING이라 ExecutionEntity가 없다.
+                        return AmendOrderResponse.newBuilder()
+                                .setOrder(toProto(amended, null))
                                 .build();
                     });
 
