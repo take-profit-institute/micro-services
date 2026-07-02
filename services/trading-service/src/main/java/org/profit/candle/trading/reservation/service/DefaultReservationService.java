@@ -34,7 +34,6 @@ import java.util.UUID;
  * 예약 주문은 모든 시간대에 상시 접수 가능하므로 거래시간 검증 대상이 아니다. 대신
  * scheduled_date 범위(RSV-006~008)를 자체 검증한다.</p>
  */
-
 @Service
 @RequiredArgsConstructor
 public class DefaultReservationService implements ReservationService {
@@ -46,6 +45,7 @@ public class DefaultReservationService implements ReservationService {
     private final AccountService accountService;
     private final OutboxWriter outboxWriter;
     private final ReservationOutboxOperations outboxOperations;
+    private final ReservationDeadlineValidator deadlineValidator;
     private final Clock clock;
 
     @Override
@@ -54,6 +54,9 @@ public class DefaultReservationService implements ReservationService {
         if (command.quantity() <= 0) {
             throw new ReservationException(ReservationErrorCode.INVALID_QUANTITY);
         }
+
+        // RSV-006~008: timing별 접수 마감 시간 검증 (KST 기준)
+        deadlineValidator.requireBeforeDeadline(command.timing());
 
         LocalDate scheduledDate = resolveAndValidateScheduledDate(command.timing(), command.scheduledDate());
 
@@ -85,7 +88,6 @@ public class DefaultReservationService implements ReservationService {
         ReservationEntity reservation = ReservationEntity.reserve(
                 userId, account.getId(), command.symbol(), command.side(), command.timing(), command.kind(),
                 command.quantity(), command.price(), scheduledDate, reservedAmountKrw, command.idempotencyKey());
-
         reservationRepository.save(reservation);
 
         outboxWriter.record(outboxOperations, "ReservationReserved", reservation.getId().toString(),
@@ -94,7 +96,6 @@ public class DefaultReservationService implements ReservationService {
                         reservation.getSide().name(), reservation.getTiming().name(),
                         reservation.getOrderKind().name(), reservation.getQuantity(),
                         reservation.getPriceKrw() == null ? 0 : reservation.getPriceKrw(), reservedAmountKrw));
-
         return reservation;
     }
 
@@ -114,7 +115,7 @@ public class DefaultReservationService implements ReservationService {
     public ReservationEntity amendReservation(UUID userId, AmendReservationCommand command) {
         // CAN-006: 배치 마감 전 RESERVED 상태인 예약만 정정 가능.
         ReservationEntity original = reservationRepository.findByIdAndUserIdForUpdate(
-                command.reservationId(), userId)
+                        command.reservationId(), userId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
         // CAN-007: 정정은 원예약 취소 + 신규 예약 생성 방식으로 처리한다.
@@ -125,13 +126,18 @@ public class DefaultReservationService implements ReservationService {
         ReservationOrderKindValue kind = command.kind() != null ? command.kind() : original.getOrderKind();
         long quantity = command.quantity() != null ? command.quantity() : original.getQuantity();
         Long price = command.price() != null ? command.price() : original.getPriceKrw();
+
+        // RSV-006~008: 정정 후 적용될 timing 기준으로 마감 시간 검증.
+        // timing을 바꾸는 경우 새 timing, 그대로면 원래 timing 기준으로 검증한다.
+        deadlineValidator.requireBeforeDeadline(timing);
         LocalDate scheduledDate = resolveAndValidateScheduledDate(
                 timing, command.scheduledDate() != null ? command.scheduledDate() : original.getScheduledDate());
 
         AccountEntity account = accountService.getAccount(userId);
 
         long reservedAmountKrw = 0;
-        if (original.getSide() == ReservationSideValue.BUY && kind == ReservationOrderKindValue.LIMIT && price != null) {
+        if (original.getSide() == ReservationSideValue.BUY && kind == ReservationOrderKindValue.LIMIT
+                && price != null) {
             long amount = price * quantity;
             long fee = Math.round(amount * FEE_RATE);
             reservedAmountKrw = amount + fee;
@@ -169,7 +175,6 @@ public class DefaultReservationService implements ReservationService {
 
         outboxWriter.record(outboxOperations, "ReservationCancelled", reservation.getId().toString(),
                 new ReservationCancelledPayload(reservation.getId().toString(), userId.toString(), releasedAmount));
-
         return new ReservationCancelResult(reservation, releasedAmount);
     }
 

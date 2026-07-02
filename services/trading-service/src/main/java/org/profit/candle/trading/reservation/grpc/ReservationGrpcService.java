@@ -211,6 +211,48 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
     }
 
     @Override
+    public void processPrevCloseReservations(ProcessPrevCloseReservationsRequest request,
+                                             StreamObserver<ProcessPrevCloseReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            int count = reservationBatchService.processPrevCloseReservations(targetDate);
+            observer.onNext(ProcessPrevCloseReservationsResponse.newBuilder()
+                    .setProcessedCount(count)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void processTodayCloseReservations(ProcessTodayCloseReservationsRequest request,
+                                              StreamObserver<ProcessTodayCloseReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            int count = reservationBatchService.processTodayCloseReservations(targetDate);
+            observer.onNext(ProcessTodayCloseReservationsResponse.newBuilder()
+                    .setProcessedCount(count)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
     public void markReservationConverted(MarkReservationConvertedRequest request,
                                          StreamObserver<MarkReservationConvertedResponse> observer) {
         try {
@@ -241,7 +283,8 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
             case RESERVATION_NOT_FOUND ->
                     Status.NOT_FOUND;
             case DUPLICATE_PENDING_RESERVATION, RESERVATION_NOT_RESERVED, RESERVATION_NOT_CONVERTING,
-                 NOT_CONVERTIBLE, BATCH_DEADLINE_PASSED ->
+                 NOT_CONVERTIBLE, BATCH_DEADLINE_PASSED, PREV_CLOSE_DEADLINE_PASSED,
+                 OPEN_DEADLINE_PASSED, TODAY_CLOSE_DEADLINE_PASSED ->
                     Status.FAILED_PRECONDITION;
         };
         return status.withDescription(errorCode.message()).asRuntimeException();

@@ -24,4 +24,21 @@ public interface ReservationBatchService {
      * converted_order_id 기록.
      */
     void markConverted(UUID reservationId, UUID convertedOrderId);
+
+    /**
+     * PREV_CLOSE(전일종가) 예약 체결. 08:30 배치 트리거.
+     * ChartService.GetPreviousClose(baseDate=오늘)로 전일 종가를 조회해 즉시 체결한다.
+     *
+     * @return 처리된 예약 건수
+     */
+    int processPrevCloseReservations(LocalDate targetDate);
+
+    /**
+     * TODAY_CLOSE(당일종가) 예약 체결. 15:40 배치 트리거.
+     * ChartService.CloseDailyCandles로 종가 확정 후 배치가 호출해야 한다.
+     * ChartService.GetPreviousClose(baseDate=내일)로 당일 종가를 조회해 즉시 체결한다.
+     *
+     * @return 처리된 예약 건수
+     */
+    int processTodayCloseReservations(LocalDate targetDate);
 }
