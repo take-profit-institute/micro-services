@@ -1,7 +1,6 @@
 package org.profit.candle.notification.idempotency.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +75,7 @@ public class IdempotencyExecutor {
 
         try {
             return objectMapper.readValue(record.getResponseJson(), responseType);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             throw new NotificationException(NotificationErrorCode.INVALID_REQUEST, e);
         }
     }
@@ -84,7 +83,7 @@ public class IdempotencyExecutor {
     private String toJson(Object response) {
         try {
             return objectMapper.writeValueAsString(response);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             throw new NotificationException(NotificationErrorCode.INVALID_REQUEST, e);
         }
     }

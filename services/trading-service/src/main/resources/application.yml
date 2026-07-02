@@ -4,6 +4,10 @@ spring:
   grpc:
     server:
       port: ${TRADING_GRPC_PORT:50054}
+    client:
+      channels:
+        chart-service:
+          address: ${CHART_SERVICE_GRPC_ADDRESS:static://localhost:50060}
   datasource:
     url: ${TRADING_DB_URL:jdbc:postgresql://localhost:5432/candle_trading}
     username: ${TRADING_DB_USERNAME:candle}

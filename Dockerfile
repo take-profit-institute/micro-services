@@ -1,49 +1,29 @@
+# syntax=docker/dockerfile:1
 # 모노레포 공용 Dockerfile.
 # 빌드: docker build --build-arg SERVICE_MODULE=user-service -t <image> .
+#
+# 서비스 목록을 열거하지 않는다 — settings.gradle 에 서비스가 추가돼도 이 파일은 수정 불필요.
+# 전체 소스를 ephemeral bind mount 로 붙여 빌드하고(레이어에 소스가 남지 않음), 산출 jar 만
+# 런타임 이미지로 복사한다. gradle 의존성은 cache mount 로 빌드 간 재사용한다.
+# (BuildKit 필요 — buildx/최신 docker 기본값)
 ARG SERVICE_MODULE=user-service
 
 # ── 1단계: Gradle 빌드 ────────────────────────────────────────────────
 FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /workspace
-
-# Gradle wrapper 먼저 (레이어 캐시 활용)
-COPY gradlew gradlew.bat ./
-COPY gradle/ gradle/
-RUN chmod +x gradlew
-
-# 루트·모듈 빌드 스크립트 (의존성 해석에 필요)
-COPY build.gradle settings.gradle ./
-COPY common/build.gradle common/build.gradle
-COPY batch/build.gradle batch/build.gradle
-COPY services/auth-service/build.gradle       services/auth-service/build.gradle
-COPY services/user-service/build.gradle       services/user-service/build.gradle
-COPY services/market-service/build.gradle     services/market-service/build.gradle
-COPY services/trading-service/build.gradle    services/trading-service/build.gradle
-COPY services/portfolio-service/build.gradle  services/portfolio-service/build.gradle
-COPY services/ranking-service/build.gradle    services/ranking-service/build.gradle
-COPY services/mission-service/build.gradle    services/mission-service/build.gradle
-COPY services/learning-service/build.gradle   services/learning-service/build.gradle
-COPY services/notification-service/build.gradle services/notification-service/build.gradle
-COPY gateway/build.gradle gateway/build.gradle
-
-# 의존성 다운로드만 먼저 (소스 변경 시 이 레이어 재사용)
 ARG SERVICE_MODULE
-RUN ./gradlew :services:${SERVICE_MODULE}:dependencies --no-daemon -q 2>/dev/null || true
-
-# 소스 복사 (common, proto, 대상 서비스)
-COPY common/src/ common/src/
-COPY proto/ proto/
-COPY services/${SERVICE_MODULE}/src/ services/${SERVICE_MODULE}/src/
-
-# JAR 빌드
-RUN ./gradlew :services:${SERVICE_MODULE}:bootJar --no-daemon -x test
+# bind mount: 빌드 컨텍스트 전체를 읽기/쓰기(ephemeral)로 마운트 → 개별 파일 COPY 열거 불필요.
+# cache mount: ~/.gradle(의존성·wrapper) 를 빌드 간 캐시.
+# 산출 jar 는 마운트 밖 경로(/app.jar)로 복사해야 레이어에 남는다.
+RUN --mount=type=bind,target=/workspace,rw \
+    --mount=type=cache,target=/root/.gradle \
+    sh ./gradlew :services:${SERVICE_MODULE}:bootJar --no-daemon -x test \
+ && cp services/${SERVICE_MODULE}/build/libs/*.jar /app.jar
 
 # ── 2단계: 런타임 이미지 ────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
-
-ARG SERVICE_MODULE
-COPY --from=build /workspace/services/${SERVICE_MODULE}/build/libs/*.jar app.jar
+COPY --from=build /app.jar app.jar
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

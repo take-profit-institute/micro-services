@@ -79,6 +79,9 @@ configure(bootProjects) {
 
         if (project.path == ':batch') {
             implementation 'org.springframework.boot:spring-boot-starter-batch'
+        } else if (project.path == ':services:chatting-service') {
+            // 채팅 WS 게이트웨이는 리액티브(WebFlux)로 동작 — servlet starter-web 미적용
+            implementation 'org.springframework.boot:spring-boot-starter-webflux'
         } else {
             implementation 'org.springframework.boot:spring-boot-starter-web'
         }
@@ -94,9 +97,26 @@ project(':common') {
         }
     }
 
+    tasks.named('test') {
+        useJUnitPlatform()
+    }
+
     dependencies {
         compileOnly "org.projectlombok:lombok:${lombokVersion}"
         annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+        testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+
+        compileOnly 'jakarta.persistence:jakarta.persistence-api:3.2.0'
+        compileOnly 'org.springframework:spring-context:7.0.8'
+
+        testCompileOnly 'jakarta.persistence:jakarta.persistence-api:3.2.0'
+        testCompileOnly 'org.springframework:spring-context:7.0.8'
+        testRuntimeOnly 'jakarta.persistence:jakarta.persistence-api:3.2.0'
+        testRuntimeOnly 'org.springframework:spring-context:7.0.8'
+
+        testImplementation platform('org.junit:junit-bom:6.0.3')
         testImplementation 'org.junit.jupiter:junit-jupiter'
+        testImplementation 'org.assertj:assertj-core:3.25.3'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     }
 }

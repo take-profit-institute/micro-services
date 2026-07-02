@@ -54,5 +54,6 @@ CLAUDE.md
 docker-compose.override.yml
 docker-compose.override.yaml
 
+**/firebase-adminsdk.json
 # misc
 .DS_Store

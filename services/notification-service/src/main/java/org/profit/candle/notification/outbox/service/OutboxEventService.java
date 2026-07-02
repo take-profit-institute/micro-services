@@ -1,7 +1,6 @@
 package org.profit.candle.notification.outbox.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.notification.device.entity.DeviceToken;
@@ -73,10 +72,6 @@ public class OutboxEventService {
     }
 
     private String toJson(Map<String, Object> payload) {
-        try {
-            return objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
-            throw new NotificationException(NotificationErrorCode.INTERNAL_ERROR, e);
-        }
+        return objectMapper.writeValueAsString(payload);
     }
 }

@@ -7,6 +7,7 @@ import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.oauth.OAuthClient;
 import org.profit.candle.auth.oauth.OAuthProfile;
+import org.profit.candle.auth.oauth.OAuthRedirectUris;
 import org.profit.candle.auth.oauth.OAuthResponses;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -31,14 +32,16 @@ public class KakaoOAuthClient implements OAuthClient {
     }
 
     @Override
-    public OAuthProfile fetch(String authorizationCode, String state) {
+    public OAuthProfile fetch(String authorizationCode, String state, String redirectUri) {
         validateConfiguration();
+        String resolvedRedirectUri = OAuthRedirectUris.resolve(
+                redirectUri, properties.kakao().redirectUri(), properties.kakao().allowedRedirectUris());
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("code", authorizationCode);
             form.add("client_id", properties.kakao().clientId());
             form.add("client_secret", properties.kakao().clientSecret());
-            form.add("redirect_uri", properties.kakao().redirectUri());
+            form.add("redirect_uri", resolvedRedirectUri);
             form.add("grant_type", "authorization_code");
 
             Map<?, ?> token = restClient.post().uri(TOKEN_URI)
