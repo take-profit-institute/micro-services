@@ -12,7 +12,9 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Component
@@ -55,7 +57,7 @@ public class ProxyWebFilter implements WebFilter, Ordered {
             targetBase = authServiceUri;
             targetPath = "/api/v1" + path.substring("/api".length());
         } else {
-            // /api/auth/me, /api/auth/token/validate 등 BFF 전용 경로
+            // /api/auth/me 등 BFF 전용 경로
             targetBase = bffUri;
             targetPath = path;
         }
@@ -63,8 +65,8 @@ public class ProxyWebFilter implements WebFilter, Ordered {
 
         HttpHeaders forwardHeaders = new HttpHeaders();
         request.getHeaders().forEach((name, values) -> {
-            if (!EXCLUDED_REQUEST_HEADERS.contains(name.toLowerCase())) {
-                forwardHeaders.put(name, values);
+            if (!EXCLUDED_REQUEST_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+                forwardHeaders.addAll(name, new ArrayList<>(values));
             }
         });
 
@@ -76,13 +78,10 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                     var response = exchange.getResponse();
                     response.setStatusCode(clientResponse.statusCode());
                     final String routedBase = targetBase;
-                    clientResponse.headers().asHttpHeaders().forEach((name, values) -> {
-                        if (EXCLUDED_RESPONSE_HEADERS.contains(name.toLowerCase())) return;
-                        if (name.equalsIgnoreCase(HttpHeaders.SET_COOKIE) && routedBase.equals(authServiceUri)) {
-                            response.getHeaders().put(name, rewriteAuthCookiePaths(values));
-                        } else {
-                            response.getHeaders().put(name, values);
-                        }
+                    HttpHeaders upstreamHeaders = clientResponse.headers().asHttpHeaders();
+                    response.beforeCommit(() -> {
+                        copyResponseHeaders(upstreamHeaders, response.getHeaders(), routedBase, authServiceUri);
+                        return Mono.empty();
                     });
                     Flux<DataBuffer> body = clientResponse.bodyToFlux(DataBuffer.class);
                     return response.writeWith(body);
@@ -96,10 +95,18 @@ public class ProxyWebFilter implements WebFilter, Ordered {
                 .toList();
     }
 
-    /**
-     * auth-service가 실제로 처리하는 경로만 true.
-     * /me, /token/validate 등 BFF 전용 경로는 false → BFF로 라우팅.
-     */
+    static void copyResponseHeaders(HttpHeaders source, HttpHeaders target, String routedBase, String authServiceUri) {
+        source.forEach((name, values) -> {
+            if (EXCLUDED_RESPONSE_HEADERS.contains(name.toLowerCase(Locale.ROOT))) return;
+            List<String> copiedValues = new ArrayList<>(values);
+            if (name.equalsIgnoreCase(HttpHeaders.SET_COOKIE) && routedBase.equals(authServiceUri)) {
+                copiedValues = rewriteAuthCookiePaths(copiedValues);
+            }
+            target.remove(name);
+            target.addAll(name, copiedValues);
+        });
+    }
+
     private static boolean isAuthServicePath(String path) {
         return path.startsWith("/api/auth/oauth/")
                 || path.equals("/api/auth/token/refresh")

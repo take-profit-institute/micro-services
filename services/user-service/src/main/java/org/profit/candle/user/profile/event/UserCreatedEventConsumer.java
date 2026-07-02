@@ -22,7 +22,7 @@ public class UserCreatedEventConsumer {
     private final UserProfileWriter userProfileWriter;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "auth.user-created.v1")
+    @KafkaListener(topics = ConsumedTopics.AUTH_USER_CREATED)
     @Transactional
     public void onUserCreated(String rawPayload) {
         UserCreatedPayload payload;
