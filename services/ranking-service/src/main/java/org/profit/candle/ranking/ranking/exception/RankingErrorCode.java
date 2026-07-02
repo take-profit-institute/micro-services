@@ -8,7 +8,13 @@ public enum RankingErrorCode implements ErrorCode {
             "포트폴리오 스냅샷 서비스를 사용할 수 없습니다."),
     INVALID_PORTFOLIO_SNAPSHOT(
             "RANKING_INVALID_PORTFOLIO_SNAPSHOT",
-            "포트폴리오 스냅샷 데이터가 올바르지 않습니다.");
+            "포트폴리오 스냅샷 데이터가 올바르지 않습니다."),
+    RANKING_NOT_FOUND(
+            "RANKING_NOT_FOUND",
+            "완료된 랭킹 결과를 찾을 수 없습니다."),
+    INVALID_PAGE_TOKEN(
+            "RANKING_INVALID_PAGE_TOKEN",
+            "랭킹 페이지 토큰이 올바르지 않습니다.");
 
     private final String code;
     private final String message;

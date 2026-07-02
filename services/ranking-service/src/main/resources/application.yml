@@ -14,6 +14,10 @@ spring:
     open-in-view: false
   flyway:
     locations: classpath:migration
+  data:
+    redis:
+      host: ${RANKING_REDIS_HOST:localhost}
+      port: ${RANKING_REDIS_PORT:6379}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
