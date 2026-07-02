@@ -3,6 +3,9 @@ spring:
     name: market-service
   config:
     import: optional:file:.env[.properties]
+  grpc:
+    server:
+      port: ${MARKET_GRPC_PORT:50053}
   datasource:
     url: jdbc:postgresql://localhost:5433/market
     username: ${POSTGRES_USER:candle}
