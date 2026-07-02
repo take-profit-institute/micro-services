@@ -1,12 +1,17 @@
 package org.profit.candle.trading.client;
 
 import com.google.protobuf.Timestamp;
+import io.grpc.Deadline;
 import io.grpc.StatusRuntimeException;
+import org.profit.candle.proto.stock.v1.ChartServiceGrpc;
+import org.profit.candle.proto.stock.v1.GetPreviousCloseRequest;
+import org.profit.candle.proto.stock.v1.GetPreviousCloseResponse;
 import org.springframework.grpc.client.GrpcChannelFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.concurrent.TimeUnit;
 
 /**
  * {@link ChartServiceClient} gRPC 구현체.
@@ -15,14 +20,14 @@ import java.time.ZoneId;
  * {@code spring.grpc.client.channels.chart-service.address}로 채널을 생성한다.
  * EKS 배포 시 환경변수 {@code CHART_SERVICE_GRPC_ADDRESS}만 교체하면 된다.</p>
  *
- * <p>{@code baseDate}는 KST 기준 해당 일자 00:00을 UTC Timestamp로 변환해 넘긴다 —
- * ChartService proto 명세: "이 시각보다 앞선 가장 최근 일봉을 찾는다"</p>
+ * <p>배치 체결 흐름에서 호출되므로 per-call deadline을 설정한다 — ChartService가
+ * 느리거나 응답하지 않을 때 배치가 무한 대기하는 것을 방지한다 (Qodo #3).</p>
  */
-
 @Component
 public class DefaultChartServiceClient implements ChartServiceClient {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final int DEADLINE_SECONDS = 5;
 
     private final ChartServiceGrpc.ChartServiceBlockingStub stub;
 
@@ -33,7 +38,6 @@ public class DefaultChartServiceClient implements ChartServiceClient {
 
     @Override
     public long getPreviousClose(String symbol, LocalDate baseDate) {
-        // baseDate 00:00 KST → UTC Timestamp
         var baseDateInstant = baseDate.atStartOfDay(KST).toInstant();
         var timestamp = Timestamp.newBuilder()
                 .setSeconds(baseDateInstant.getEpochSecond())
@@ -46,7 +50,10 @@ public class DefaultChartServiceClient implements ChartServiceClient {
                 .build();
 
         try {
-            GetPreviousCloseResponse response = stub.getPreviousClose(request);
+            // per-call deadline: 5초 초과 시 DEADLINE_EXCEEDED로 실패 처리
+            GetPreviousCloseResponse response = stub
+                    .withDeadline(Deadline.after(DEADLINE_SECONDS, TimeUnit.SECONDS))
+                    .getPreviousClose(request);
             return response.getPrevClose();
         } catch (StatusRuntimeException e) {
             throw new ChartServiceException(symbol, e);

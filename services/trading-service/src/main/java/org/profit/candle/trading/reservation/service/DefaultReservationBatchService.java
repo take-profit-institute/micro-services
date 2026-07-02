@@ -2,7 +2,6 @@ package org.profit.candle.trading.reservation.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.profit.candle.trading.account.service.AccountService;
 import org.profit.candle.trading.client.ChartServiceClient;
 import org.profit.candle.trading.client.ChartServiceException;
 import org.profit.candle.trading.reservation.entity.ReservationEntity;
@@ -11,7 +10,6 @@ import org.profit.candle.trading.reservation.entity.ReservationSideValue;
 import org.profit.candle.trading.reservation.entity.ReservationStatusValue;
 import org.profit.candle.trading.reservation.entity.ReservationTimingValue;
 import org.profit.candle.trading.reservation.event.ReservationDuePayload;
-import org.profit.candle.trading.reservation.event.ReservationExecutedPayload;
 import org.profit.candle.trading.reservation.event.ReservationOutboxOperations;
 import org.profit.candle.trading.reservation.exception.ReservationErrorCode;
 import org.profit.candle.trading.reservation.exception.ReservationException;
@@ -20,6 +18,8 @@ import org.profit.candle.trading.support.event.OutboxWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -36,19 +36,22 @@ import java.util.UUID;
  *       (CloseDailyCandles로 종가 확정 후 배치가 호출해야 함)</li>
  *   <li>OPEN+MARKET: Market 도메인 현재가 스키마 확정 후 추가 예정</li>
  * </ul>
+ *
+ * <p>건별 트랜잭션이 필요한 작업(락 획득/상태 전이/잔고 선점)은 {@link ReservationBatchExecutor}에
+ * 위임한다 — Spring AOP self-invocation 문제를 방지하기 위해 별도 @Service로 분리했다.</p>
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DefaultReservationBatchService implements ReservationBatchService {
 
-    private static final double FEE_RATE = 0.00015;
+    private static final BigDecimal FEE_RATE = new BigDecimal("0.00015");
 
     private final ReservationRepository reservationRepository;
-    private final AccountService accountService;
     private final ChartServiceClient chartServiceClient;
     private final OutboxWriter outboxWriter;
     private final ReservationOutboxOperations outboxOperations;
+    private final ReservationBatchExecutor batchExecutor;
 
     @Override
     @Transactional
@@ -74,12 +77,8 @@ public class DefaultReservationBatchService implements ReservationBatchService {
         //   - 단점: 배치 담당자 협의 필요, RPC 호출 횟수 증가(건수만큼).
         //
         // [방안 B] 건별 트랜잭션을 위한 Helper 클래스 분리
-        //   - DefaultReservationBatchServiceHelper를 별도 @Service로 만들고,
-        //     processSingleOpenLimitReservation(UUID reservationId) @Transactional 메서드를 둠.
-        //   - DefaultReservationBatchService는 candidates 조회 후 Helper를 건별로 호출.
-        //   - Spring AOP 프록시를 통해 호출하므로 @Transactional이 정상 동작.
-        //   - proto/배치 담당자 협의 없이 내부 코드만으로 해결 가능.
-        //   - 단점: 클래스 1개 추가, 스프링 빈 추가.
+        //   → 이미 processCloseReservations에서 ReservationBatchExecutor로 구현됨.
+        //      OPEN+LIMIT도 동일하게 리팩토링 가능.
         // ─────────────────────────────────────────────────────────────────
         List<ReservationEntity> candidates = reservationRepository
                 .findByScheduledDateAndStatusAndTiming(
@@ -89,13 +88,11 @@ public class DefaultReservationBatchService implements ReservationBatchService {
         for (ReservationEntity candidate : candidates) {
             if (candidate.getOrderKind() != ReservationOrderKindValue.LIMIT) continue;
 
-            // 개별 락 획득 — 이미 다른 트랜잭션이 상태를 바꿨으면 RESERVED가 아닐 수 있다.
             ReservationEntity reservation = reservationRepository
                     .findByIdForUpdate(candidate.getId())
                     .orElse(null);
             if (reservation == null || !reservation.reserved()) continue;
 
-            // CONVERTING 전이 + Outbox 기록은 한 트랜잭션 안에서 처리된다 (컨벤션 7장).
             reservation.startConverting();
             reservationRepository.save(reservation);
 
@@ -118,11 +115,9 @@ public class DefaultReservationBatchService implements ReservationBatchService {
     @Override
     @Transactional
     public void markConverted(UUID reservationId, UUID convertedOrderId) {
-        // 배치 시스템이 호출 — userId 소유권 검증 없이 시스템 권한으로 처리한다.
         ReservationEntity reservation = reservationRepository.findByIdForUpdate(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
-        // 멱등 처리: 이미 EXECUTED면 성공으로 간주 — at-least-once 재시도 대응.
         if (reservation.getStatus() == ReservationStatusValue.EXECUTED) {
             return;
         }
@@ -132,14 +127,12 @@ public class DefaultReservationBatchService implements ReservationBatchService {
     }
 
     @Override
-    @Transactional
     public int processPrevCloseReservations(LocalDate targetDate) {
         // PREV_CLOSE: baseDate = targetDate(오늘) → 전일 거래일 종가 조회
         return processCloseReservations(ReservationTimingValue.PREV_CLOSE, targetDate, targetDate);
     }
 
     @Override
-    @Transactional
     public int processTodayCloseReservations(LocalDate targetDate) {
         // TODAY_CLOSE: baseDate = targetDate 다음날 → 당일(targetDate) 종가 조회.
         // GetPreviousClose는 baseDate보다 앞선 마지막 일봉을 반환하므로,
@@ -150,12 +143,16 @@ public class DefaultReservationBatchService implements ReservationBatchService {
     }
 
     /**
-     * 종가 체결 공통 로직.
-     * AFTER_HOURS_CLOSE 예약을 ChartService에서 조회한 종가로 즉시 체결한다.
+     * 종가 체결 공통 로직. 락 보유시간 최소화를 위해 단계별로 처리한다.
      *
-     * @param timing     처리할 예약 timing (PREV_CLOSE / TODAY_CLOSE)
-     * @param targetDate 처리 대상 예약의 scheduled_date
-     * @param baseDate   GetPreviousClose에 넘길 기준일자
+     * <pre>
+     * 1단계: 락 획득 → RESERVED 확인 → 즉시 커밋 (락 해제)
+     * 2단계: 락 없이 종가 조회 (외부 gRPC)
+     * 3단계: BUY면 잔고 선점 (REQUIRES_NEW 트랜잭션 — rollback-only 전파 차단)
+     * 4단계: 락 재획득 → EXECUTED 전이 → Outbox 기록
+     * </pre>
+     *
+     * 각 단계는 {@link ReservationBatchExecutor}에 위임한다 — self-invocation 방지.
      */
     private int processCloseReservations(ReservationTimingValue timing, LocalDate targetDate,
                                          LocalDate baseDate) {
@@ -165,53 +162,41 @@ public class DefaultReservationBatchService implements ReservationBatchService {
 
         int count = 0;
         for (ReservationEntity candidate : candidates) {
-            ReservationEntity reservation = reservationRepository
-                    .findByIdForUpdate(candidate.getId())
-                    .orElse(null);
-            if (reservation == null || !reservation.reserved()) continue;
 
+            // 1단계: 락 획득 → RESERVED 여부 확인 → 즉시 커밋
+            if (!batchExecutor.checkReservedUnderLock(candidate.getId())) continue;
+
+            // 2단계: 락 없이 종가 조회
             long executedPrice;
             try {
-                executedPrice = chartServiceClient.getPreviousClose(reservation.getSymbol(), baseDate);
+                executedPrice = chartServiceClient.getPreviousClose(candidate.getSymbol(), baseDate);
             } catch (ChartServiceException e) {
-                log.error("종가 조회 실패로 예약 체결 실패 — reservationId={}, symbol={}, timing={}",
-                        reservation.getId(), reservation.getSymbol(), timing, e);
-                reservation.markFailed();
-                reservationRepository.save(reservation);
+                log.error("종가 조회 실패 — reservationId={}, symbol={}, timing={}",
+                        candidate.getId(), candidate.getSymbol(), timing, e);
+                batchExecutor.markFailedUnderLock(candidate.getId());
                 continue;
             }
 
-            // BUY: 체결 시점에 잔고 선점 (AFTER_HOURS_CLOSE는 생성 시 미선점이었음)
+            // 3단계: BUY면 잔고 선점 (REQUIRES_NEW — rollback-only 전파 차단)
             long reservedAmount = 0;
-            if (reservation.getSide() == ReservationSideValue.BUY) {
-                long amount = executedPrice * reservation.getQuantity();
-                long fee = Math.round(amount * FEE_RATE);
-                reservedAmount = amount + fee;
+            if (candidate.getSide() == ReservationSideValue.BUY) {
+                BigDecimal amount = BigDecimal.valueOf(executedPrice)
+                        .multiply(BigDecimal.valueOf(candidate.getQuantity()));
+                BigDecimal fee = amount.multiply(FEE_RATE).setScale(0, RoundingMode.HALF_UP);
+                reservedAmount = amount.add(fee).longValue();
+
                 try {
-                    accountService.lockBalance(reservation.getUserId(), reservedAmount);
+                    batchExecutor.lockBalanceInNewTransaction(candidate.getUserId(), reservedAmount);
                 } catch (Exception e) {
-                    log.error("잔고 부족으로 예약 체결 실패 — reservationId={}, userId={}, amount={}",
-                            reservation.getId(), reservation.getUserId(), reservedAmount, e);
-                    reservation.markFailed();
-                    reservationRepository.save(reservation);
+                    log.error("잔고 부족으로 체결 실패 — reservationId={}, userId={}, amount={}",
+                            candidate.getId(), candidate.getUserId(), reservedAmount, e);
+                    batchExecutor.markFailedUnderLock(candidate.getId());
                     continue;
                 }
             }
 
-            reservation.markExecuted();
-            reservationRepository.save(reservation);
-
-            outboxWriter.record(outboxOperations, "ReservationExecuted",
-                    reservation.getId().toString(),
-                    new ReservationExecutedPayload(
-                            reservation.getId().toString(),
-                            reservation.getUserId().toString(),
-                            reservation.getAccountId().toString(),
-                            reservation.getSymbol(),
-                            reservation.getSide().name(),
-                            reservation.getQuantity(),
-                            executedPrice,
-                            reservedAmount));
+            // 4단계: 락 재획득 → EXECUTED 전이 → Outbox 기록
+            batchExecutor.executeUnderLock(candidate.getId(), executedPrice, reservedAmount);
             count++;
         }
         return count;
