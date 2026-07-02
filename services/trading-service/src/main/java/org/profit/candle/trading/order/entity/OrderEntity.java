@@ -119,6 +119,29 @@ public class OrderEntity {
                 now, now);
     }
 
+    /**
+     * 정정 주문 생성. (CAN-008) place()와 동일하지만 parent_order_id를 설정한다.
+     * 정정은 항상 지정가(LIMIT)만 가능하므로 orderKind는 항상 LIMIT이어야 한다.
+     */
+    public static OrderEntity placeWithParent(UUID userId, UUID accountId, String symbol,
+                                              OrderSideValue side, OrderKindValue orderKind,
+                                              long quantity, Long priceKrw, long reservedAmountKrw,
+                                              String idempotencyKey, UUID parentOrderId) {
+        if (quantity <= 0) {
+            throw new OrderException(OrderErrorCode.INVALID_QUANTITY);
+        }
+        if (orderKind == OrderKindValue.LIMIT && priceKrw == null) {
+            throw new OrderException(OrderErrorCode.LIMIT_ORDER_REQUIRES_PRICE);
+        }
+        if (priceKrw != null && priceKrw <= 0) {
+            throw new OrderException(OrderErrorCode.INVALID_PRICE);
+        }
+        Instant now = Instant.now();
+        return new OrderEntity(UUID.randomUUID(), userId, accountId, symbol, side,
+                orderKind, quantity, priceKrw, reservedAmountKrw, OrderStatusValue.PENDING,
+                parentOrderId, idempotencyKey, now, now);
+    }
+
     public boolean pending() {
         return status == OrderStatusValue.PENDING;
     }
