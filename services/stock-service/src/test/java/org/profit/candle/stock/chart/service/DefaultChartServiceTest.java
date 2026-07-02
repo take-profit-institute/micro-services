@@ -7,10 +7,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.profit.candle.common.error.CandleException;
 import org.profit.candle.stock.chart.dto.CandleInterval;
 import org.profit.candle.stock.chart.dto.CandleResult;
+import org.profit.candle.stock.chart.dto.PriceStatsResult;
 import org.profit.candle.stock.chart.dto.SparklineResult;
 import org.profit.candle.stock.chart.entity.CandleEntity;
 import org.profit.candle.stock.chart.exception.ChartErrorCode;
 import org.profit.candle.stock.chart.repository.CandleReader;
+import org.profit.candle.stock.chart.repository.PriceStatsRow;
 import org.profit.candle.stock.chart.repository.SparklinePoint;
 
 import java.time.Instant;
@@ -18,6 +20,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -113,6 +117,48 @@ class DefaultChartServiceTest {
     }
 
     @Test
+    void getPriceStats_returnsWindowHighLowWithLatestCloseAndVolume() {
+        CandleEntity latest = candle("005930", "1d", "2026-06-30T00:00:00Z", 72000);
+        when(candleReader.findLatest("005930", "1d", null, 1)).thenReturn(List.of(latest));
+        when(candleReader.findPriceStats(eq("005930"), eq("1d"), any(Instant.class)))
+                .thenReturn(statsRow(88000L, 55000L));
+        DefaultChartService service = new DefaultChartService(candleReader, backfillService);
+
+        PriceStatsResult result = service.getPriceStats("005930", 0);
+
+        assertThat(result.high()).isEqualTo(88000L);     // 52주 최고
+        assertThat(result.low()).isEqualTo(55000L);      // 52주 최저
+        assertThat(result.latestClose()).isEqualTo(72000L);
+        assertThat(result.latestVolume()).isEqualTo(1000L);
+        assertThat(result.asOf()).isEqualTo(latest.id().openTime());
+    }
+
+    @Test
+    void getPriceStats_returnsEmptyWhenNoCandles() {
+        when(candleReader.findLatest("005930", "1d", null, 1)).thenReturn(List.of());
+        DefaultChartService service = new DefaultChartService(candleReader, backfillService);
+
+        PriceStatsResult result = service.getPriceStats("005930", 0);
+
+        assertThat(result).isEqualTo(PriceStatsResult.empty("005930"));
+    }
+
+    @Test
+    void getPriceStats_fallsBackToLatestWhenWindowAggregateIsNull() {
+        CandleEntity latest = candle("005930", "1d", "2026-06-30T00:00:00Z", 72000);
+        when(candleReader.findLatest("005930", "1d", null, 1)).thenReturn(List.of(latest));
+        when(candleReader.findPriceStats(eq("005930"), eq("1d"), any(Instant.class)))
+                .thenReturn(statsRow(null, null));
+        DefaultChartService service = new DefaultChartService(candleReader, backfillService);
+
+        PriceStatsResult result = service.getPriceStats("005930", 0);
+
+        // window 내 봉이 없으면 최근 봉의 high/low 로 폴백한다(candle 헬퍼: high=close+100, low=close-200).
+        assertThat(result.high()).isEqualTo(72100L);
+        assertThat(result.low()).isEqualTo(71800L);
+    }
+
+    @Test
     void getSparklines_throwsInvalidWhenNoUsableCodes() {
         DefaultChartService service = new DefaultChartService(candleReader, backfillService);
 
@@ -126,6 +172,13 @@ class DefaultChartServiceTest {
         CandleEntity candle = new CandleEntity(code, interval, Instant.parse(openTime));
         candle.applyPrices(close - 100, close + 100, close - 200, close, 1000, true, "KIWOOM");
         return candle;
+    }
+
+    private static PriceStatsRow statsRow(Long high, Long low) {
+        return new PriceStatsRow() {
+            @Override public Long getHigh() { return high; }
+            @Override public Long getLow() { return low; }
+        };
     }
 
     private static SparklinePoint point(String code, String openTime, long close) {

@@ -12,8 +12,11 @@ import org.profit.candle.proto.stock.v1.BackfillCandlesRequest;
 import org.profit.candle.proto.stock.v1.BackfillCandlesResponse;
 import org.profit.candle.proto.stock.v1.GetCandlesRequest;
 import org.profit.candle.proto.stock.v1.GetCandlesResponse;
+import org.profit.candle.proto.stock.v1.GetPriceStatsRequest;
+import org.profit.candle.proto.stock.v1.GetPriceStatsResponse;
 import org.profit.candle.stock.chart.dto.CandleInterval;
 import org.profit.candle.stock.chart.dto.CandleResult;
+import org.profit.candle.stock.chart.dto.PriceStatsResult;
 import org.profit.candle.stock.chart.exception.ChartErrorCode;
 import org.profit.candle.stock.chart.service.CandleBackfillService;
 import org.profit.candle.stock.chart.service.ChartService;
@@ -82,6 +85,37 @@ class ChartGrpcServiceTest {
                 .build(), observer);
 
         assertThat(observer.value.getUpserted()).isEqualTo(7);
+        assertThat(observer.completed).isTrue();
+    }
+
+    @Test
+    void getPriceStats_returnsProtoStats() {
+        Instant asOf = Instant.parse("2026-06-30T00:00:00Z");
+        when(chartService.getPriceStats("005930", 0))
+                .thenReturn(new PriceStatsResult("005930", 88000, 55000, 72000, 1500, asOf));
+        ChartGrpcService service = new ChartGrpcService(chartService, backfillService, dailyCloseService);
+        CapturingObserver<GetPriceStatsResponse> observer = new CapturingObserver<>();
+
+        service.getPriceStats(GetPriceStatsRequest.newBuilder().setCode("005930").build(), observer);
+
+        assertThat(observer.value.getHigh()).isEqualTo(88000);
+        assertThat(observer.value.getLow()).isEqualTo(55000);
+        assertThat(observer.value.getLatestClose()).isEqualTo(72000);
+        assertThat(observer.value.getLatestVolume()).isEqualTo(1500);
+        assertThat(observer.value.getAsOf().getSeconds()).isEqualTo(asOf.getEpochSecond());
+        assertThat(observer.completed).isTrue();
+    }
+
+    @Test
+    void getPriceStats_omitsAsOfWhenEmpty() {
+        when(chartService.getPriceStats("005930", 0)).thenReturn(PriceStatsResult.empty("005930"));
+        ChartGrpcService service = new ChartGrpcService(chartService, backfillService, dailyCloseService);
+        CapturingObserver<GetPriceStatsResponse> observer = new CapturingObserver<>();
+
+        service.getPriceStats(GetPriceStatsRequest.newBuilder().setCode("005930").build(), observer);
+
+        assertThat(observer.value.hasAsOf()).isFalse();
+        assertThat(observer.value.getHigh()).isZero();
         assertThat(observer.completed).isTrue();
     }
 

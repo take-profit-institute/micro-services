@@ -4,14 +4,17 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.common.error.CandleException;
 import org.profit.candle.stock.chart.dto.CandleInterval;
 import org.profit.candle.stock.chart.dto.CandleResult;
+import org.profit.candle.stock.chart.dto.PriceStatsResult;
 import org.profit.candle.stock.chart.dto.SparklineResult;
 import org.profit.candle.stock.chart.entity.CandleEntity;
 import org.profit.candle.stock.chart.exception.ChartErrorCode;
 import org.profit.candle.stock.chart.repository.CandleReader;
+import org.profit.candle.stock.chart.repository.PriceStatsRow;
 import org.profit.candle.stock.chart.repository.SparklinePoint;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,6 +32,8 @@ public class DefaultChartService implements ChartService {
     private static final int DEFAULT_POINTS = 10;
     private static final int MAX_POINTS = 60;
     private static final int MAX_CODES = 100;
+    private static final int DEFAULT_WINDOW_DAYS = 365;   // 약 52주
+    private static final int MAX_WINDOW_DAYS = 366 * 5;   // 상한 5년
 
     private final CandleReader candleReader;
     private final CandleBackfillService backfillService;
@@ -109,8 +114,39 @@ public class DefaultChartService implements ChartService {
         return CandleResult.from(found.get(0));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PriceStatsResult getPriceStats(String code, int windowDays) {
+        if (code == null || code.isBlank()) {
+            throw new CandleException(ChartErrorCode.INVALID_CANDLE_REQUEST);
+        }
+        String interval = CandleInterval.DAY_1.storageValue();
+
+        // 최근 일봉(종가/거래량/시각) — 없으면 이 종목은 캔들 데이터 자체가 없으므로 empty.
+        List<CandleEntity> latest = candleReader.findLatest(code, interval, null, 1);
+        if (latest.isEmpty()) {
+            return PriceStatsResult.empty(code);
+        }
+        CandleEntity last = latest.get(0);
+
+        Instant from = Instant.now().minus(Duration.ofDays(normalizeWindow(windowDays)));
+        PriceStatsRow stats = candleReader.findPriceStats(code, interval, from);
+        // window 안에 봉이 없으면(집계 NULL) 최근 봉 자체로 폴백해 최소한의 값을 채운다.
+        long high = stats != null && stats.getHigh() != null ? stats.getHigh() : last.high();
+        long low = stats != null && stats.getLow() != null ? stats.getLow() : last.low();
+
+        return new PriceStatsResult(code, high, low, last.close(), last.volume(), last.id().openTime());
+    }
+
     protected List<CandleEntity> readLatest(String code, CandleInterval interval, int limit, Instant to) {
         return candleReader.findLatest(code, interval.storageValue(), to, limit);
+    }
+
+    private static int normalizeWindow(int requested) {
+        if (requested <= 0) {
+            return DEFAULT_WINDOW_DAYS;
+        }
+        return Math.min(requested, MAX_WINDOW_DAYS);
     }
 
     private static int normalizePoints(int requested) {

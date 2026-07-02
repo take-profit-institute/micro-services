@@ -90,10 +90,27 @@ message GetPreviousCloseResponse {
   google.protobuf.Timestamp prev_open_time = 3;  // 종가가 속한 캔들 시각(= 전 거래일)
 }
 
+// 종목 통계(52주 고저 등) — 상세 화면 헤더용. candles(일봉)에서 집계한다.
+// DB 에 있는 데이터만 집계하며 백필하지 않는다. 데이터가 없으면 0/미설정으로 응답한다(예외 아님).
+message GetPriceStatsRequest {
+  string code = 1;
+  int32 window_days = 2;  // 기본 365 (약 52주)
+}
+
+message GetPriceStatsResponse {
+  string code = 1;
+  int64 high = 2;                       // window 내 최고가 (= 52주 최고)
+  int64 low = 3;                        // window 내 최저가 (= 52주 최저)
+  int64 latest_close = 4;               // 최근 일봉 종가
+  int64 latest_volume = 5;              // 최근 일봉 거래량
+  google.protobuf.Timestamp as_of = 6;  // 최근 일봉 시각 (데이터 없으면 미설정)
+}
+
 service ChartService {
   rpc GetCandles(GetCandlesRequest) returns (GetCandlesResponse);
   rpc GetSparklines(GetSparklinesRequest) returns (GetSparklinesResponse);
   rpc GetPreviousClose(GetPreviousCloseRequest) returns (GetPreviousCloseResponse);
+  rpc GetPriceStats(GetPriceStatsRequest) returns (GetPriceStatsResponse);
   rpc BackfillCandles(BackfillCandlesRequest) returns (BackfillCandlesResponse);
   rpc CloseDailyCandles(CloseDailyCandlesRequest) returns (CloseDailyCandlesResponse);
 }

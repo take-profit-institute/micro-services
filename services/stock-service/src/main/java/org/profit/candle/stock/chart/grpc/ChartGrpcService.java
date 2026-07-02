@@ -15,10 +15,13 @@ import org.profit.candle.proto.stock.v1.GetCandlesRequest;
 import org.profit.candle.proto.stock.v1.GetCandlesResponse;
 import org.profit.candle.proto.stock.v1.GetPreviousCloseRequest;
 import org.profit.candle.proto.stock.v1.GetPreviousCloseResponse;
+import org.profit.candle.proto.stock.v1.GetPriceStatsRequest;
+import org.profit.candle.proto.stock.v1.GetPriceStatsResponse;
 import org.profit.candle.proto.stock.v1.GetSparklinesRequest;
 import org.profit.candle.proto.stock.v1.GetSparklinesResponse;
 import org.profit.candle.proto.stock.v1.Sparkline;
 import org.profit.candle.stock.chart.dto.CandleResult;
+import org.profit.candle.stock.chart.dto.PriceStatsResult;
 import org.profit.candle.stock.chart.dto.SparklineResult;
 import org.profit.candle.stock.chart.exception.ChartErrorCode;
 import org.profit.candle.stock.chart.service.CandleBackfillService;
@@ -89,6 +92,29 @@ public class ChartGrpcService extends ChartServiceGrpc.ChartServiceImplBase {
                     .setPrevClose(prev.close())
                     .setPrevOpenTime(toTimestamp(prev.openTime()))
                     .build());
+            observer.onCompleted();
+        } catch (CandleException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (IllegalArgumentException e) {
+            observer.onError(Status.INVALID_ARGUMENT.withDescription(ChartErrorCode.INVALID_CANDLE_REQUEST.code())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void getPriceStats(GetPriceStatsRequest request, StreamObserver<GetPriceStatsResponse> observer) {
+        try {
+            PriceStatsResult stats = chartService.getPriceStats(request.getCode(), request.getWindowDays());
+            GetPriceStatsResponse.Builder builder = GetPriceStatsResponse.newBuilder()
+                    .setCode(stats.code())
+                    .setHigh(stats.high())
+                    .setLow(stats.low())
+                    .setLatestClose(stats.latestClose())
+                    .setLatestVolume(stats.latestVolume());
+            if (stats.asOf() != null) {
+                builder.setAsOf(toTimestamp(stats.asOf()));
+            }
+            observer.onNext(builder.build());
             observer.onCompleted();
         } catch (CandleException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());

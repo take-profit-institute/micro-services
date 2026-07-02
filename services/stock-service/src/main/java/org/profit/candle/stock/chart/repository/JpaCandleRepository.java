@@ -69,4 +69,16 @@ public interface JpaCandleRepository extends JpaRepository<CandleEntity, CandleI
               AND c.closed = false
             """)
     List<CandleEntity> findOpenAt(@Param("interval") String interval, @Param("openTime") Instant openTime);
+
+    // 집계는 그룹이 없어 항상 한 행을 돌려준다(데이터 없으면 high/low = NULL). JPQL 도 되지만
+    // 종목별 인덱스(stock_code, interval, open_time)를 그대로 타도록 native 로 둔다.
+    @Override
+    @Query(value = """
+            SELECT MAX(high) AS high, MIN(low) AS low
+            FROM candles
+            WHERE stock_code = :stockCode AND interval = :interval AND open_time >= :from
+            """, nativeQuery = true)
+    PriceStatsRow findPriceStats(@Param("stockCode") String stockCode,
+                                 @Param("interval") String interval,
+                                 @Param("from") Instant from);
 }
