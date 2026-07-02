@@ -8,4 +8,6 @@ public interface UserProfileReader {
     Optional<UserProfileEntity> findById(String userId);
 
     boolean existsById(String userId);
+
+    boolean existsByNickname(String nickname);
 }

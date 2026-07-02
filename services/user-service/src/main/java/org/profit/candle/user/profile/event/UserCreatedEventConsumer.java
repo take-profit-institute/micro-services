@@ -8,6 +8,7 @@ import org.profit.candle.user.profile.event.dto.UserCreatedPayload;
 import org.profit.candle.user.profile.event.entity.ConsumedEvent;
 import org.profit.candle.user.profile.event.repository.ConsumedEventRepository;
 import org.profit.candle.user.profile.repository.UserProfileWriter;
+import org.profit.candle.user.profile.service.DefaultProfileGenerator;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -20,9 +21,10 @@ public class UserCreatedEventConsumer {
 
     private final ConsumedEventRepository consumedEventRepository;
     private final UserProfileWriter userProfileWriter;
+    private final DefaultProfileGenerator defaultProfileGenerator;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "auth.user-created.v1")
+    @KafkaListener(topics = ConsumedTopics.AUTH_USER_CREATED)
     @Transactional
     public void onUserCreated(String rawPayload) {
         UserCreatedPayload payload;
@@ -39,11 +41,12 @@ public class UserCreatedEventConsumer {
         }
 
         try {
+            var defaultProfile = defaultProfileGenerator.generate(payload.userId());
             userProfileWriter.save(new UserProfileEntity(
                     payload.userId().toString(),
                     payload.email(),
-                    null,
-                    null));
+                    defaultProfile.nickname(),
+                    defaultProfile.profileImageUrl()));
             consumedEventRepository.save(new ConsumedEvent(payload.eventId(), payload.eventType()));
             log.info("사용자 프로필 생성 완료. userId={}, email={}", payload.userId(), payload.email());
         } catch (DataIntegrityViolationException e) {

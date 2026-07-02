@@ -3,6 +3,58 @@ spring:
     name: candle-batch
   main:
     web-application-type: none
+
+  datasource:
+    url: ${BATCH_DB_URL:jdbc:postgresql://localhost:5432/candle_batch}
+    username: ${BATCH_DB_USERNAME:candle}
+    password: ${BATCH_DB_PASSWORD:candle}
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    locations: classpath:migration
+
   batch:
     job:
       enabled: false
+    jdbc:
+      initialize-schema: never
+
+  grpc:
+    client:
+      channel:
+        market:
+          target: ${BATCH_MARKET_GRPC_TARGET:static://localhost:50060}
+          ssl:
+            enabled: false
+        trading:
+          target: ${BATCH_TRADING_GRPC_TARGET:static://localhost:50054}
+          ssl:
+            enabled: false
+        portfolio:
+          target: ${BATCH_PORTFOLIO_GRPC_TARGET:static://localhost:50053}
+          ssl:
+            enabled: false
+
+batch:
+  schedule:
+    zone-id: Asia/Seoul
+    smoke:
+      enabled: ${BATCH_SMOKE_ENABLED:true}
+      cron: "${BATCH_SMOKE_CRON:0 */1 * * * *}"
+    portfolio-eod:
+      enabled: ${BATCH_PORTFOLIO_EOD_ENABLED:false}
+      cron: "${BATCH_PORTFOLIO_EOD_CRON:0 0 16 * * MON-FRI}"
+      chunk-size: ${BATCH_PORTFOLIO_EOD_CHUNK_SIZE:100}
+      symbol-batch-size: ${BATCH_PORTFOLIO_EOD_SYMBOL_BATCH_SIZE:500}
+  grpc:
+    market-target: market
+    trading-target: trading
+    portfolio-target: portfolio
+    read-deadline-millis: ${BATCH_GRPC_READ_DEADLINE_MILLIS:300}
+    write-deadline-millis: ${BATCH_GRPC_WRITE_DEADLINE_MILLIS:1000}
+
+logging:
+  level:
+    org.profit.candle.batch: info
+    org.springframework.batch: info

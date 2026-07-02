@@ -27,6 +27,17 @@ auth:
     client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
     client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
     redirect-uri: ${GOOGLE_OAUTH_REDIRECT_URI:}
+    allowed-redirect-uris: ${GOOGLE_OAUTH_ALLOWED_REDIRECT_URIS:}
+  kakao:
+    client-id: ${KAKAO_OAUTH_CLIENT_ID:}
+    client-secret: ${KAKAO_OAUTH_CLIENT_SECRET:}
+    redirect-uri: ${KAKAO_OAUTH_REDIRECT_URI:}
+    allowed-redirect-uris: ${KAKAO_OAUTH_ALLOWED_REDIRECT_URIS:}
+  naver:
+    client-id: ${NAVER_OAUTH_CLIENT_ID:}
+    client-secret: ${NAVER_OAUTH_CLIENT_SECRET:}
+    redirect-uri: ${NAVER_OAUTH_REDIRECT_URI:}
+    allowed-redirect-uris: ${NAVER_OAUTH_ALLOWED_REDIRECT_URIS:}
   jwt:
     issuer: ${AUTH_JWT_ISSUER:candle-auth}
     access-token-ttl: PT15M

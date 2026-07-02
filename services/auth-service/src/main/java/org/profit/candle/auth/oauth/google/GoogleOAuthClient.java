@@ -7,6 +7,8 @@ import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.oauth.OAuthClient;
 import org.profit.candle.auth.oauth.OAuthProfile;
+import org.profit.candle.auth.oauth.OAuthRedirectUris;
+import org.profit.candle.auth.oauth.OAuthResponses;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -29,27 +31,32 @@ public class GoogleOAuthClient implements OAuthClient {
     }
 
     @Override
-    public OAuthProfile fetch(String authorizationCode) {
+    public OAuthProfile fetch(String authorizationCode, String state, String redirectUri) {
         validateConfiguration();
+        String resolvedRedirectUri = OAuthRedirectUris.resolve(
+                redirectUri, properties.google().redirectUri(), properties.google().allowedRedirectUris());
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("code", authorizationCode);
             form.add("client_id", properties.google().clientId());
             form.add("client_secret", properties.google().clientSecret());
-            form.add("redirect_uri", properties.google().redirectUri());
+            form.add("redirect_uri", resolvedRedirectUri);
             form.add("grant_type", "authorization_code");
 
             Map<?, ?> token = restClient.post().uri(TOKEN_URI)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(form).retrieve().body(Map.class);
 
-            String accessToken = String.valueOf(token.get("access_token"));
+            String accessToken = OAuthResponses.requireString(
+                    token, "access_token", AuthErrorCode.GOOGLE_OAUTH_EXCHANGE_FAILED);
 
             Map<?, ?> profile = restClient.get().uri(USER_INFO_URI)
                     .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(Map.class);
 
+            String subject = OAuthResponses.requireString(
+                    profile, "sub", AuthErrorCode.GOOGLE_OAUTH_EXCHANGE_FAILED);
             return new OAuthProfile(
-                    String.valueOf(profile.get("sub")),
+                    subject,
                     String.valueOf(profile.get("email")),
                     Boolean.parseBoolean(String.valueOf(profile.get("email_verified"))));
         } catch (RestClientException e) {

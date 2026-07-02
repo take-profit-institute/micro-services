@@ -3,10 +3,14 @@ package org.profit.candle.market.client;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.market.dto.request.KiwoomStockRequest;
 import org.profit.candle.market.dto.response.KiwoomStockResponse;
+import org.profit.candle.market.exception.MarketErrorCode;
+import org.profit.candle.market.exception.MarketException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 @Component
 @RequiredArgsConstructor
@@ -16,18 +20,40 @@ public class KiwoomMarketClient {
     private final KiwoomAuthClient kiwoomAuthClient;
 
     public KiwoomStockResponse getStockInfo(String stockCode){
-        String token = kiwoomAuthClient.issueToken().token();
+        String token = token();
 
         KiwoomStockRequest request = new KiwoomStockRequest(stockCode);
 
-        return kiwoomWebClient.post()
+        KiwoomStockResponse response = kiwoomWebClient.post()
                 .uri("/api/dostk/stkinfo")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
                 .header("api-id", "ka10001")
                 .header("authorization", "Bearer " + token)
                 .bodyValue(request)
                 .retrieve()
+                .onStatus(HttpStatusCode::isError, httpResponse -> httpResponse.bodyToMono(String.class)
+                        .defaultIfEmpty("")
+                        .flatMap(body -> Mono.error(new MarketException(MarketErrorCode.KIWOOM_HTTP_FAILED))))
                 .bodyToMono(KiwoomStockResponse.class)
                 .block();
+        validate(response);
+        return response;
+    }
+
+    private String token() {
+        var response = kiwoomAuthClient.issueToken();
+        if (response == null || response.token() == null || response.token().isBlank()) {
+            throw new MarketException(MarketErrorCode.KIWOOM_INVALID_RESPONSE);
+        }
+        return response.token();
+    }
+
+    private static void validate(KiwoomStockResponse response) {
+        if (response == null || response.stockCode() == null || response.stockCode().isBlank()) {
+            throw new MarketException(MarketErrorCode.KIWOOM_INVALID_RESPONSE);
+        }
+        if (response.returnCode() != 0) {
+            throw new MarketException(MarketErrorCode.KIWOOM_BUSINESS_FAILED);
+        }
     }
 }

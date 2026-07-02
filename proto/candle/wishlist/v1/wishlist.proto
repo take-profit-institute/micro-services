@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package candle.wishlist.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.wishlist.v1";
+
+import "google/protobuf/timestamp.proto";
+import "candle/common/v1/common.proto";
+
+service WishlistService {
+  rpc AddWishlistItem(AddWishlistItemRequest) returns (AddWishlistItemResponse);
+  rpc RemoveWishlistItem(RemoveWishlistItemRequest) returns (RemoveWishlistItemResponse);
+  rpc ListWishlistItems(ListWishlistItemsRequest) returns (ListWishlistItemsResponse);
+}
+
+message AddWishlistItemRequest {
+  string user_id = 1;
+  string symbol = 2;
+  string display_name = 3;
+  string market = 4;
+  candle.common.v1.CommandMetadata command_metadata = 5;
+}
+
+message AddWishlistItemResponse {
+  WishlistItem item = 1;
+}
+
+message RemoveWishlistItemRequest {
+  string user_id = 1;
+  string symbol = 2;
+  candle.common.v1.CommandMetadata command_metadata = 3;
+}
+
+message RemoveWishlistItemResponse {
+}
+
+message ListWishlistItemsRequest {
+  string user_id = 1;
+  candle.common.v1.PageRequest page_request = 2;
+}
+
+message ListWishlistItemsResponse {
+  repeated WishlistItem items = 1;
+  candle.common.v1.PageResponse page_response = 2;
+}
+
+message WishlistItem {
+  string id = 1;
+  string user_id = 2;
+  string symbol = 3;
+  string display_name = 4;
+  string market = 5;
+  google.protobuf.Timestamp created_at = 6;
+}

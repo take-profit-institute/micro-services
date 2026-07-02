@@ -1,0 +1,46 @@
+description = 'Wishlist service'
+
+apply plugin: 'com.google.protobuf'
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-grpc-server'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'com.google.protobuf:protobuf-java'
+    implementation 'io.grpc:grpc-stub'
+    implementation 'io.grpc:grpc-protobuf'
+    implementation 'io.grpc:grpc-netty-shaded'
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+}
+
+sourceSets {
+    main {
+        proto {
+            srcDir "${rootDir}/proto"
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:4.34.2'
+    }
+    plugins {
+        grpc {
+            artifact = 'io.grpc:protoc-gen-grpc-java:1.80.0'
+        }
+    }
+    generateProtoTasks {
+        all().configureEach { task ->
+            task.plugins {
+                grpc {}
+            }
+        }
+    }
+}
