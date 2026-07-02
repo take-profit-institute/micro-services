@@ -21,8 +21,9 @@ message Reservation {
   string scheduled_date = 9;
   int64 reserved_amount = 10;
   ReservationStatus status = 11;
-  string parent_order_id = 12;
-  google.protobuf.Timestamp created_at = 13;
+  string parent_reservation_id = 12;
+  string converted_order_id = 13;
+  google.protobuf.Timestamp created_at = 14;
 }
 
 message ListReservationsRequest {
@@ -58,7 +59,7 @@ message CancelReservationResponse {
   int64 released_amount = 2;
 }
 
-// 정정 = 원예약 취소 후 parent_order_id를 가진 새 예약 생성(CAN-006~008).
+// 정정 = 원예약 취소 후 parent_reservation_id를 가진 새 예약 생성(CAN-006~008).
 message AmendReservationRequest {
   string user_id = 1;
   string reservation_id = 2;
@@ -71,9 +72,53 @@ message AmendReservationRequest {
 }
 message AmendReservationResponse { Reservation reservation = 1; }
 
+// ── 배치 전용 (BFF 노출 아님) ────────────────────────────────────────
+
+// 09:00 배치 트리거 — OPEN+LIMIT RESERVED 예약을 CONVERTING으로 전이하고
+// ReservationDue 이벤트를 Outbox에 기록한다.
+message ProcessOpenLimitReservationsRequest {
+  string scheduled_date = 1; // YYYY-MM-DD
+}
+message ProcessOpenLimitReservationsResponse {
+  int32 processed_count = 1;
+}
+
+// 08:30 배치 트리거 — PREV_CLOSE 예약을 전일 종가로 즉시 체결
+message ProcessPrevCloseReservationsRequest {
+  string scheduled_date = 1; // YYYY-MM-DD (체결 대상 예약의 scheduled_date)
+}
+message ProcessPrevCloseReservationsResponse {
+  int32 processed_count = 1;
+}
+
+// 15:40 배치 트리거 — TODAY_CLOSE 예약을 당일 종가로 즉시 체결
+// 반드시 ChartService.CloseDailyCandles 완료 후 호출해야 한다.
+message ProcessTodayCloseReservationsRequest {
+  string scheduled_date = 1; // YYYY-MM-DD (체결 대상 예약의 scheduled_date)
+}
+message ProcessTodayCloseReservationsResponse {
+  int32 processed_count = 1;
+}
+
+// order_svc가 ReservationDue를 수신해 Order를 생성한 뒤 호출한다.
+// reservation을 CONVERTING → EXECUTED로 전이하고 converted_order_id를 기록한다.
+message MarkReservationConvertedRequest {
+  string reservation_id = 1;
+  string converted_order_id = 2;
+}
+message MarkReservationConvertedResponse {
+  Reservation reservation = 1;
+}
+
 service ReservationService {
   rpc ListReservations(ListReservationsRequest) returns (ListReservationsResponse);
   rpc PlaceReservation(PlaceReservationRequest) returns (PlaceReservationResponse);
   rpc CancelReservation(CancelReservationRequest) returns (CancelReservationResponse);
   rpc AmendReservation(AmendReservationRequest) returns (AmendReservationResponse);
+
+  // 배치 전용
+  rpc ProcessOpenLimitReservations(ProcessOpenLimitReservationsRequest) returns (ProcessOpenLimitReservationsResponse);
+  rpc ProcessPrevCloseReservations(ProcessPrevCloseReservationsRequest) returns (ProcessPrevCloseReservationsResponse);
+  rpc ProcessTodayCloseReservations(ProcessTodayCloseReservationsRequest) returns (ProcessTodayCloseReservationsResponse);
+  rpc MarkReservationConverted(MarkReservationConvertedRequest) returns (MarkReservationConvertedResponse);
 }
