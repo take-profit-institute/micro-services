@@ -132,7 +132,8 @@ public class KiwoomWebSocketClient {
                     parseAbsInt(values.path("10").asText()),
                     parseInt(values.path("11").asText()),
                     parseDouble(values.path("12").asText()),
-                    parseLong(values.path("13").asText())
+                    parseLong(values.path("13").asText()),
+                    tick.getTickedAt().toString()
             );
 
             stockPricePublisher.publish(message);

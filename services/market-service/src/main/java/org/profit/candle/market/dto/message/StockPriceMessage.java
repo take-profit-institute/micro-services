@@ -6,6 +6,7 @@ public record StockPriceMessage(
         int currentPrice,
         int priceChange,
         double priceChangeRate,
-        long tradingVolume
+        long tradingVolume,
+        String timestamp   // ISO-8601 (발행 시각). 프론트 실시간 그래프의 x축.
 ) {
 }
