@@ -2,11 +2,13 @@ package org.profit.candle.trading.reservation.repository;
 
 import jakarta.persistence.LockModeType;
 import org.profit.candle.trading.reservation.entity.ReservationEntity;
+import org.profit.candle.trading.reservation.entity.ReservationOrderKindValue;
 import org.profit.candle.trading.reservation.entity.ReservationStatusValue;
 import org.profit.candle.trading.reservation.entity.ReservationTimingValue;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -14,7 +16,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ReservationRepository extends JpaRepository<ReservationEntity, UUID> {
-
     /** RSV-009 상세: 본인 예약 상세 조회. userId까지 같이 받아 본인 소유가 아니면 빈 결과로 권한을 체크한다. */
     Optional<ReservationEntity> findByIdAndUserId(UUID id, UUID userId);
 
@@ -51,4 +52,23 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
      */
     List<ReservationEntity> findByScheduledDateAndStatusAndTiming(
             LocalDate scheduledDate, ReservationStatusValue status, ReservationTimingValue timing);
+
+    /**
+     * OPEN+MARKET 배치 체결 대상 조회. scheduled_date + status + timing + orderKind + symbol
+     * 조합으로 DB에서 직접 필터링한다 — Java stream 필터링 대비 DB 부하 감소.
+     */
+    @Query("""
+            select r from ReservationEntity r
+            where r.scheduledDate = :scheduledDate
+              and r.status = :status
+              and r.timing = :timing
+              and r.orderKind = :orderKind
+              and r.symbol = :symbol
+            """)
+    List<ReservationEntity> findByScheduledDateAndStatusAndTimingAndOrderKindAndSymbol(
+            @Param("scheduledDate") LocalDate scheduledDate,
+            @Param("status") ReservationStatusValue status,
+            @Param("timing") ReservationTimingValue timing,
+            @Param("orderKind") ReservationOrderKindValue orderKind,
+            @Param("symbol") String symbol);
 }

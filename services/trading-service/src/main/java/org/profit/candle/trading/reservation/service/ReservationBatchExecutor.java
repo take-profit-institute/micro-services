@@ -17,18 +17,9 @@ import java.util.UUID;
 /**
  * 종가 배치 체결의 건별 트랜잭션 실행 단위.
  *
- * <p>{@link DefaultReservationBatchService}에서 내부 메서드를 @Transactional로 선언해도
- * Spring AOP self-invocation 때문에 프록시를 우회해 트랜잭션이 적용되지 않는다.
- * 이를 방지하기 위해 트랜잭션 경계가 필요한 메서드들을 별도 @Service로 분리했다.</p>
- *
- * <p>Qodo 지적사항 반영:</p>
- * <ul>
- *   <li>#1 (rollback-only): lockBalance는 REQUIRES_NEW로 분리 — AccountException이
- *       외부 트랜잭션을 rollback-only로 마킹하지 않도록 한다.</li>
- *   <li>#2 (락 보유시간 + 보상): 락 획득 → 상태 검증만 하고 즉시 커밋 → 외부 호출 →
- *       다시 락 획득 → 상태 전이. executeUnderLock이 no-op(이미 상태 변경된 경우)이면
- *       lockBalance로 선점된 잔고를 releaseBalance로 보상한다.</li>
- * </ul>
+ * <p>Spring AOP self-invocation 방지를 위해 별도 @Service로 분리했다.
+ * 이 클래스의 모든 public 메서드는 외부(DefaultReservationBatchService)에서만 호출해야 한다 —
+ * 내부에서 자기 자신의 메서드를 호출하면 프록시를 우회해 @Transactional이 무시된다.</p>
  */
 @Slf4j
 @Service
@@ -70,13 +61,23 @@ public class ReservationBatchExecutor {
     }
 
     /**
+     * releaseBalance를 REQUIRES_NEW 트랜잭션으로 실행한다.
+     * lockBalance 보상용 — executeUnderLock 실패/no-op 시 DefaultReservationBatchService가
+     * 직접 호출한다. self-invocation을 막기 위해 이 클래스 내부에서는 절대 호출하지 않는다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void releaseBalanceInNewTransaction(UUID userId, long amount) {
+        if (userId == null || amount <= 0) return;
+        accountService.releaseBalance(userId, amount);
+    }
+
+    /**
      * EXECUTED 전이 + Outbox 기록 — 트랜잭션 보장.
      *
-     * <p>락 재획득 시점에 이미 다른 트랜잭션(사용자 취소 등)이 상태를 바꿔 RESERVED가 아니면
-     * no-op으로 빠진다. 이 경우 BUY 예약에서 이미 커밋된 lockBalance를 보상(releaseBalance)한다.
-     * releaseBalance도 REQUIRES_NEW로 분리해 현재 트랜잭션과 독립적으로 커밋된다 (Qodo #2).</p>
+     * <p>락 재획득 시점에 RESERVED가 아니면 false 반환. 보상(releaseBalance)은
+     * 호출 측(DefaultReservationBatchService)이 try-finally로 처리한다.</p>
      *
-     * @return EXECUTED 전이 성공 여부 (false면 호출 측에서 보상 처리)
+     * @return EXECUTED 전이 성공 여부
      */
     @Transactional
     public boolean executeUnderLock(UUID reservationId, long executedPrice, long reservedAmount) {
@@ -85,16 +86,6 @@ public class ReservationBatchExecutor {
                 .orElse(null);
 
         if (reservation == null || !reservation.reserved()) {
-            // no-op — BUY 잔고 선점이 있었으면 보상
-            if (reservedAmount > 0) {
-                try {
-                    releaseBalanceInNewTransaction(reservation != null
-                            ? reservation.getUserId()
-                            : null, reservedAmount);
-                } catch (Exception e) {
-                    log.error("잔고 보상 실패 — reservationId={}, amount={}", reservationId, reservedAmount, e);
-                }
-            }
             return false;
         }
 
@@ -113,15 +104,5 @@ public class ReservationBatchExecutor {
                         executedPrice,
                         reservedAmount));
         return true;
-    }
-
-    /**
-     * releaseBalance를 REQUIRES_NEW 트랜잭션으로 실행한다 — executeUnderLock no-op 시 보상용.
-     * lockBalanceInNewTransaction과 동일한 이유로 별도 트랜잭션으로 분리한다.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void releaseBalanceInNewTransaction(UUID userId, long amount) {
-        if (userId == null || amount <= 0) return;
-        accountService.releaseBalance(userId, amount);
     }
 }

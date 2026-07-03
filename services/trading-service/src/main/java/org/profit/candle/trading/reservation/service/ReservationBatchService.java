@@ -26,10 +26,18 @@ public interface ReservationBatchService {
     void markConverted(UUID reservationId, UUID convertedOrderId);
 
     /**
-     * PREV_CLOSE(전일종가) 예약 체결. 08:30 배치 트리거.
-     * ChartService.GetPreviousClose(baseDate=오늘)로 전일 종가를 조회해 즉시 체결한다.
+     * OPEN+MARKET(시가 시장가) 예약 체결. Market Kafka 이벤트 수신 시 호출.
+     * 수신한 현재가로 당일 해당 종목의 OPEN+MARKET RESERVED 예약을 즉시 체결한다.
      *
+     * @param targetDate 체결 대상 예약의 scheduled_date (보통 오늘)
+     * @param symbol     현재가 이벤트의 종목코드
+     * @param price      현재가 (원 단위)
      * @return 처리된 예약 건수
+     */
+    int processOpenMarketReservations(LocalDate targetDate, String symbol, long price);
+     /* ChartService.GetPreviousClose(baseDate=오늘)로 전일 종가를 조회해 즉시 체결한다.
+            *
+            * @return 처리된 예약 건수
      */
     int processPrevCloseReservations(LocalDate targetDate);
 

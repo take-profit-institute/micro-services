@@ -127,6 +127,69 @@ public class DefaultReservationBatchService implements ReservationBatchService {
     }
 
     @Override
+    public int processOpenMarketReservations(LocalDate targetDate, String symbol, long price) {
+        // 5번: price 유효성 검증 — 0/음수면 즉시 거부
+        if (price <= 0) {
+            log.error("유효하지 않은 현재가 수신 — symbol={}, price={}", symbol, price);
+            return 0;
+        }
+
+        // 7번: DB에서 symbol/orderKind까지 필터링 — Java stream 필터링 제거
+        List<ReservationEntity> candidates = reservationRepository
+                .findByScheduledDateAndStatusAndTimingAndOrderKindAndSymbol(
+                        targetDate, ReservationStatusValue.RESERVED, ReservationTimingValue.OPEN,
+                        ReservationOrderKindValue.MARKET, symbol);
+
+        int count = 0;
+        for (ReservationEntity candidate : candidates) {
+            if (!batchExecutor.checkReservedUnderLock(candidate.getId())) continue;
+
+            long reservedAmount = 0;
+            if (candidate.getSide() == ReservationSideValue.BUY) {
+                BigDecimal amount = BigDecimal.valueOf(price)
+                        .multiply(BigDecimal.valueOf(candidate.getQuantity()));
+                BigDecimal fee = amount.multiply(FEE_RATE).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal total = amount.add(fee);
+                try {
+                    reservedAmount = total.longValueExact();
+                } catch (ArithmeticException e) {
+                    log.error("금액 계산 오버플로 — reservationId={}, amount={}",
+                            candidate.getId(), total, e);
+                    batchExecutor.markFailedUnderLock(candidate.getId());
+                    continue;
+                }
+
+                try {
+                    batchExecutor.lockBalanceInNewTransaction(candidate.getUserId(), reservedAmount);
+                } catch (Exception e) {
+                    log.error("잔고 부족으로 체결 실패 — reservationId={}, userId={}, amount={}",
+                            candidate.getId(), candidate.getUserId(), reservedAmount, e);
+                    batchExecutor.markFailedUnderLock(candidate.getId());
+                    continue;
+                }
+            }
+
+            boolean executed = false;
+            try {
+                executed = batchExecutor.executeUnderLock(candidate.getId(), price, reservedAmount);
+            } finally {
+                if (!executed && reservedAmount > 0) {
+                    try {
+                        batchExecutor.releaseBalanceInNewTransaction(candidate.getUserId(), reservedAmount);
+                    } catch (Exception e) {
+                        log.error("잔고 보상 실패, 재시도 유도 — reservationId={}, userId={}, amount={}",
+                                candidate.getId(), candidate.getUserId(), reservedAmount, e);
+                        throw new RuntimeException("잔고 보상 실패 — reservationId: "
+                                + candidate.getId(), e);
+                    }
+                }
+            }
+            if (executed) count++;
+        }
+        return count;
+    }
+
+    @Override
     public int processPrevCloseReservations(LocalDate targetDate) {
         // PREV_CLOSE: baseDate = targetDate(오늘) → 전일 거래일 종가 조회
         return processCloseReservations(ReservationTimingValue.PREV_CLOSE, targetDate, targetDate);
@@ -204,10 +267,24 @@ public class DefaultReservationBatchService implements ReservationBatchService {
             }
 
             // 4단계: 락 재획득 → EXECUTED 전이 → Outbox 기록
-            // executeUnderLock이 false(no-op)이면 내부에서 자동으로 보상(releaseBalance)한다.
-            if (batchExecutor.executeUnderLock(candidate.getId(), executedPrice, reservedAmount)) {
-                count++;
+            // lockBalance가 이미 커밋됐으므로 executeUnderLock 실패/no-op 시
+            // try-finally로 보상(releaseBalance)을 보장한다 (Qodo #2).
+            boolean executed = false;
+            try {
+                executed = batchExecutor.executeUnderLock(candidate.getId(), executedPrice, reservedAmount);
+            } finally {
+                if (!executed && reservedAmount > 0) {
+                    try {
+                        batchExecutor.releaseBalanceInNewTransaction(candidate.getUserId(), reservedAmount);
+                    } catch (Exception e) {
+                        log.error("잔고 보상 실패, 재시도 유도 — reservationId={}, userId={}, amount={}",
+                                candidate.getId(), candidate.getUserId(), reservedAmount, e);
+                        throw new RuntimeException("잔고 보상 실패 — reservationId: "
+                                + candidate.getId(), e);
+                    }
+                }
             }
+            if (executed) count++;
         }
         return count;
     }
