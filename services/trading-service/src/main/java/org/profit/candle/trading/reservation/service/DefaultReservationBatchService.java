@@ -14,6 +14,7 @@ import org.profit.candle.trading.reservation.event.ReservationOutboxOperations;
 import org.profit.candle.trading.reservation.exception.ReservationErrorCode;
 import org.profit.candle.trading.reservation.exception.ReservationException;
 import org.profit.candle.trading.reservation.repository.ReservationRepository;
+import org.profit.candle.trading.support.TradingFeePolicy;
 import org.profit.candle.trading.support.event.OutboxWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,11 +30,13 @@ import java.util.UUID;
  *
  * <p>구현 범위:</p>
  * <ul>
- *   <li>OPEN+LIMIT: ReservationDue Kafka 이벤트 발행 → order_svc가 Order 생성 (Option C)</li>
+ *   <li>OPEN+LIMIT: 일별(ProcessOpenLimitReservations) + 건별(ProcessSingleOpenLimitReservation)
+ *       두 가지 패턴을 모두 지원한다. 건별은 order의 cancelExpiredPendingOrder 패턴과 동일.</li>
+ *   <li>OPEN+MARKET: Market 현재가 Kafka 이벤트 수신 시 즉시 체결</li>
  *   <li>PREV_CLOSE: ChartService.GetPreviousClose(baseDate=오늘) → 전일 종가로 즉시 체결</li>
  *   <li>TODAY_CLOSE: ChartService.GetPreviousClose(baseDate=내일) → 당일 종가로 즉시 체결
  *       (CloseDailyCandles로 종가 확정 후 배치가 호출해야 함)</li>
- *   <li>OPEN+MARKET: Market 도메인 현재가 스키마 확정 후 추가 예정</li>
+ *   <li>EXPIRED: 당일 scheduled_date가 지났는데 RESERVED인 예약을 건별로 EXPIRED 처리 + 잔고 반환</li>
  * </ul>
  *
  * <p>건별 트랜잭션이 필요한 작업(락 획득/상태 전이/잔고 선점)은 {@link ReservationBatchExecutor}에
@@ -44,8 +47,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DefaultReservationBatchService implements ReservationBatchService {
 
-    private static final BigDecimal FEE_RATE = new BigDecimal("0.00015");
-
     private final ReservationRepository reservationRepository;
     private final ChartServiceClient chartServiceClient;
     private final OutboxWriter outboxWriter;
@@ -55,30 +56,8 @@ public class DefaultReservationBatchService implements ReservationBatchService {
     @Override
     @Transactional
     public int processOpenLimitReservations(LocalDate targetDate) {
-        // ── 트랜잭션 설계 결정 ────────────────────────────────────────────
-        // 현재: @Transactional 하나로 당일 OPEN+LIMIT 전체를 묶음.
-        // 한 건이라도 예외가 나면 전체 롤백되는 리스크가 있다.
-        //
-        // 이 구조를 선택한 이유:
-        //   - startConverting()이 실패하는 케이스는 !reservation.reserved()뿐이고,
-        //     루프 진입 전 이미 continue로 걸러냄.
-        //   - save()/outboxWriter.record() 실패 시 해당 건은 RESERVED 상태로 남아
-        //     다음 배치 실행에서 재처리된다 — 실질적 전체 롤백 리스크가 낮음.
-        //   - 7/9 발표 일정상 단순 구조를 우선함.
-        //
-        // 개선 방안 (발표 후 리팩토링 이슈로 고려):
-        //
-        // [방안 A] 배치 담당자가 건별로 gRPC 호출하도록 proto 변경 (권장)
-        //   - ProcessOpenLimitReservationsRequest의 scheduled_date 대신 reservation_id를 받음.
-        //   - 배치 서비스가 대상 목록을 조회한 뒤 reservation_id마다 RPC를 따로 호출.
-        //   - order의 ExpirePendingOrders/cancelExpiredPendingOrder와 완전히 동일한 패턴.
-        //   - trading-service 코드 변경 없이 proto + 배치 서비스만 수정하면 됨.
-        //   - 단점: 배치 담당자 협의 필요, RPC 호출 횟수 증가(건수만큼).
-        //
-        // [방안 B] 건별 트랜잭션을 위한 Helper 클래스 분리
-        //   → 이미 processCloseReservations에서 ReservationBatchExecutor로 구현됨.
-        //      OPEN+LIMIT도 동일하게 리팩토링 가능.
-        // ─────────────────────────────────────────────────────────────────
+        // 일별 배치 — 전체를 하나의 트랜잭션으로 처리한다.
+        // 건별 처리가 필요하면 listOpenLimitReservationIds + processSingleOpenLimitReservation을 사용한다.
         List<ReservationEntity> candidates = reservationRepository
                 .findByScheduledDateAndStatusAndTiming(
                         targetDate, ReservationStatusValue.RESERVED, ReservationTimingValue.OPEN);
@@ -174,7 +153,7 @@ public class DefaultReservationBatchService implements ReservationBatchService {
             if (candidate.getSide() == ReservationSideValue.BUY) {
                 BigDecimal amount = BigDecimal.valueOf(price)
                         .multiply(BigDecimal.valueOf(candidate.getQuantity()));
-                BigDecimal fee = amount.multiply(FEE_RATE).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal fee = amount.multiply(TradingFeePolicy.FEE_RATE).setScale(0, RoundingMode.HALF_UP);
                 BigDecimal total = amount.add(fee);
                 try {
                     reservedAmount = total.longValueExact();
@@ -271,7 +250,7 @@ public class DefaultReservationBatchService implements ReservationBatchService {
             if (candidate.getSide() == ReservationSideValue.BUY) {
                 BigDecimal amount = BigDecimal.valueOf(executedPrice)
                         .multiply(BigDecimal.valueOf(candidate.getQuantity()));
-                BigDecimal fee = amount.multiply(FEE_RATE).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal fee = amount.multiply(TradingFeePolicy.FEE_RATE).setScale(0, RoundingMode.HALF_UP);
                 BigDecimal total = amount.add(fee);
                 try {
                     reservedAmount = total.longValueExact(); // 범위 초과 시 ArithmeticException
