@@ -11,13 +11,12 @@ spring:
     username: ${POSTGRES_USER:candle}
     password: ${POSTGRES_PASSWORD:candle}
     driver-class-name: org.postgresql.Driver
+  flyway:
+    locations: classpath:migration
   data:
     redis:
       host: localhost
       port: 6379
-    url: ${MARKET_DB_URL:jdbc:postgresql://localhost:5432/candle_market}
-    username: ${MARKET_DB_USERNAME:candle}
-    password: ${MARKET_DB_PASSWORD:candle}
 
 server:
   port: 8083
