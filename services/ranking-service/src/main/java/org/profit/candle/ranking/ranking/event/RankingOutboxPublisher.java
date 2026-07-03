@@ -3,8 +3,10 @@ package org.profit.candle.ranking.ranking.event;
 import java.time.Clock;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.ranking.ranking.cache.RankingCache;
 import org.profit.candle.ranking.support.idempotency.RankingCommandRepository;
+import org.springframework.dao.DataAccessException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -12,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class RankingOutboxPublisher {
 
     private static final String TOPIC = "ranking.daily-finalized.v1";
@@ -35,10 +38,11 @@ public class RankingOutboxPublisher {
 
     /** 새 랭킹 완료 후 latest-date 캐시를 갱신하되 Redis 장애는 Outbox 발행을 되돌리지 않는다. */
     private void refreshLatestDate(String rankingDate) {
+        LocalDate completedDate = LocalDate.parse(rankingDate);
         try {
-            rankingCache.putLatestDate(LocalDate.parse(rankingDate));
-        } catch (RuntimeException ignored) {
-            // 조회 시 DB의 최신 완료일과 비교해 누락되거나 오래된 캐시를 복구한다.
+            rankingCache.putLatestDate(completedDate);
+        } catch (DataAccessException exception) {
+            log.warn("Latest ranking date cache refresh failed: rankingDate={}", rankingDate, exception);
         }
     }
 }
