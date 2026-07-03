@@ -12,10 +12,10 @@ public class IdempotencyRecord {
     @EmbeddedId
     private ReservationIdempotencyRecordId id;
 
-    @Convert(converter = EncryptedPayloadConverter.class)
     @Column(name = "request_hash", nullable = false, length = 64)
     private String requestHash;
 
+    @Convert(converter = EncryptedPayloadConverter.class)
     @Column(name = "response_payload", nullable = false)
     private byte[] responsePayload;
 
