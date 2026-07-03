@@ -33,19 +33,30 @@ public class MarketPriceConsumer {
 
     @KafkaListener(topics = TOPIC, groupId = GROUP_ID)
     public void consume(ConsumerRecord<String, String> record) {
+        MarketPriceEvent event;
         try {
-            MarketPriceEvent event = objectMapper.readValue(record.value(), MarketPriceEvent.class);
+            event = objectMapper.readValue(record.value(), MarketPriceEvent.class);
+        } catch (Exception e) {
+            // 역직렬화 실패 = poison pill — 재시도해도 동일하게 실패하므로 로그만 남기고 skip.
+            // value는 PII 포함 가능성 있어 로그에 포함하지 않는다.
+            log.error("현재가 이벤트 역직렬화 실패 — offset={}, topic={}",
+                    record.offset(), record.topic(), e);
+            return;
+        }
+
+        try {
             log.info("현재가 이벤트 수신 — symbol={}, price={}", event.symbol(), event.price());
 
-            // 당일 OPEN+MARKET RESERVED 예약을 수신한 현재가로 체결
             int count = reservationBatchService.processOpenMarketReservations(
                     LocalDate.now(), event.symbol(), event.price());
 
             log.info("OPEN+MARKET 체결 완료 — symbol={}, price={}, count={}",
                     event.symbol(), event.price(), count);
         } catch (Exception e) {
-            log.error("현재가 이벤트 처리 실패 — offset={}, value={}",
-                    record.offset(), record.value(), e);
+            // 역직렬화 성공 후 처리 실패 — 예외를 재throw해 오프셋 커밋을 막고 재시도 유도.
+            log.error("현재가 이벤트 처리 실패 — symbol={}, offset={}",
+                    event.symbol(), record.offset(), e);
+            throw new RuntimeException("OPEN+MARKET 체결 처리 실패 — symbol: " + event.symbol(), e);
         }
     }
 }

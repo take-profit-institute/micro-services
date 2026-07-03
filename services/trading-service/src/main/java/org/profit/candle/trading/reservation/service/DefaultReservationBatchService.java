@@ -128,15 +128,17 @@ public class DefaultReservationBatchService implements ReservationBatchService {
 
     @Override
     public int processOpenMarketReservations(LocalDate targetDate, String symbol, long price) {
-        // OPEN+MARKET: Kafka로 수신한 현재가로 즉시 체결.
-        // 해당 종목의 당일 OPEN+MARKET RESERVED 예약만 처리한다.
+        // 5번: price 유효성 검증 — 0/음수면 즉시 거부
+        if (price <= 0) {
+            log.error("유효하지 않은 현재가 수신 — symbol={}, price={}", symbol, price);
+            return 0;
+        }
+
+        // 7번: DB에서 symbol/orderKind까지 필터링 — Java stream 필터링 제거
         List<ReservationEntity> candidates = reservationRepository
-                .findByScheduledDateAndStatusAndTiming(
-                        targetDate, ReservationStatusValue.RESERVED, ReservationTimingValue.OPEN)
-                .stream()
-                .filter(r -> r.getOrderKind() == ReservationOrderKindValue.MARKET
-                        && r.getSymbol().equals(symbol))
-                .toList();
+                .findByScheduledDateAndStatusAndTimingAndOrderKindAndSymbol(
+                        targetDate, ReservationStatusValue.RESERVED, ReservationTimingValue.OPEN,
+                        ReservationOrderKindValue.MARKET, symbol);
 
         int count = 0;
         for (ReservationEntity candidate : candidates) {
