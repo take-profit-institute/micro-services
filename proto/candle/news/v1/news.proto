@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package candle.news.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.news.v1";
+
+import "google/protobuf/timestamp.proto";
+
+service NewsService {
+  rpc GetStockNews(GetStockNewsRequest) returns (GetStockNewsResponse);
+}
+
+message GetStockNewsRequest {
+  string stock_code = 1;
+}
+
+message GetStockNewsResponse {
+  repeated NewsArticle articles = 1;
+}
+
+message NewsArticle {
+  string id = 1;
+  string title = 2;
+  string content_summary = 3;
+  string url = 4;
+  string source = 5;
+  google.protobuf.Timestamp published_at = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
