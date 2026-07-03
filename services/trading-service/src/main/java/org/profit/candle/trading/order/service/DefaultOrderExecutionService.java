@@ -84,12 +84,13 @@ public class DefaultOrderExecutionService implements OrderExecutionService {
 
     @Override
     public int fillLimitOrdersIfConditionMet(String symbol, long currentPrice) {
-        // 락 없는 후보 조회 — 건별로 limitFillExecutor가 락 잡고 재검증 후 처리.
-        List<OrderEntity> candidates = orderRepository
+        // 락 없는 후보 조회 — Projection으로 id/side/priceKrw만 로드 (엔티티 전체 로딩 방지).
+        List<OrderRepository.LimitOrderCandidate> candidates = orderRepository
                 .findPendingLimitOrdersBySymbol(symbol, OrderStatusValue.PENDING);
 
         int count = 0;
-        for (OrderEntity candidate : candidates) {
+        int failCount = 0;
+        for (OrderRepository.LimitOrderCandidate candidate : candidates) {
             // 1차 조건 필터 (락 없는 상태) — 락 획득 후 Executor 내부에서 재검증한다.
             boolean mayFill = switch (candidate.getSide()) {
                 case BUY -> currentPrice <= candidate.getPriceKrw();
@@ -102,9 +103,16 @@ public class DefaultOrderExecutionService implements OrderExecutionService {
                     count++;
                 }
             } catch (Exception e) {
+                // 일시적 오류(DB 락 경합, 네트워크 등) — 실패 건 수집 후 루프 완료 시 재throw.
+                // 재throw하면 컨슈머가 오프셋 커밋을 막고 Kafka 재시도를 유도한다.
                 log.error("지정가 조건 체결 실패 — orderId={}, symbol={}, price={}",
                         candidate.getId(), symbol, currentPrice, e);
+                failCount++;
             }
+        }
+        if (failCount > 0) {
+            throw new RuntimeException(
+                    "지정가 조건 체결 일부 실패 — symbol: " + symbol + ", failCount: " + failCount);
         }
         return count;
     }

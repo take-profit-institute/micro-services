@@ -42,6 +42,16 @@ public class OrderMarketPriceConsumer {
         }
 
         try {
+            if (event.symbol() == null || event.symbol().isBlank()) {
+                log.error("현재가 이벤트 symbol 누락 — offset={}", record.offset());
+                return;
+            }
+            if (event.price() <= 0) {
+                log.error("현재가 이벤트 유효하지 않은 price — symbol={}, price={}, offset={}",
+                        event.symbol(), event.price(), record.offset());
+                return;
+            }
+
             // 1. 캐시 갱신 — 시장가 즉시 체결(EXE-001)에서 getCurrentPriceKrw()가 읽는 값
             cachedMarketPriceProvider.updatePrice(event.symbol(), event.price());
 

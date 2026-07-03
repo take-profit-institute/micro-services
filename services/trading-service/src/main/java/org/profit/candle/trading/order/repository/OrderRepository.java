@@ -3,7 +3,6 @@ package org.profit.candle.trading.order.repository;
 import jakarta.persistence.LockModeType;
 import org.profit.candle.trading.order.entity.OrderEntity;
 import org.profit.candle.trading.order.entity.OrderStatusValue;
-import org.profit.candle.trading.order.service.OrderLimitFillExecutor;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -40,13 +39,21 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
 
     /**
      * EXE-002: 지정가 조건 체결 후보 조회.
-     * symbol + PENDING + LIMIT 조합으로 현재가 이벤트 수신 시 체결 가능 여부를 검사할 주문을 가져온다.
-     * 락 없이 id만 가볍게 가져온다 — 실제 체결은 {@link OrderLimitFillExecutor}가
-     * 건별로 findByIdForUpdate로 락을 잡고 처리한다.
+     * symbol + PENDING + LIMIT 조합으로 현재가 이벤트 수신 시 체결 가능 여부를 검사할 주문을 조회한다.
+     * 1차 필터(side/priceKrw)에 필요한 필드만 Projection으로 조회해 엔티티 전체 로딩을 피한다.
+     * 실제 체결은 서비스 레이어가 건별로 findByIdForUpdate로 락을 잡고 처리한다.
      */
-    @Query("select o from OrderEntity o where o.symbol = :symbol and o.status = :status " +
+    @Query("select o.id as id, o.side as side, o.priceKrw as priceKrw " +
+            "from OrderEntity o where o.symbol = :symbol and o.status = :status " +
             "and o.orderKind = org.profit.candle.trading.order.entity.OrderKindValue.LIMIT")
-    List<OrderEntity> findPendingLimitOrdersBySymbol(
+    List<LimitOrderCandidate> findPendingLimitOrdersBySymbol(
             @Param("symbol") String symbol,
             @Param("status") OrderStatusValue status);
+
+    /** EXE-002 후보 조회용 Projection — id/side/priceKrw만 로드한다. */
+    interface LimitOrderCandidate {
+        UUID getId();
+        org.profit.candle.trading.order.entity.OrderSideValue getSide();
+        Long getPriceKrw();
+    }
 }

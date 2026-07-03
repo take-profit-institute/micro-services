@@ -8,6 +8,8 @@ import org.profit.candle.trading.order.entity.OrderEntity;
 import org.profit.candle.trading.order.entity.OrderSideValue;
 import org.profit.candle.trading.order.event.OrderFilledPayload;
 import org.profit.candle.trading.order.event.OrderOutboxOperations;
+import org.profit.candle.trading.order.exception.OrderErrorCode;
+import org.profit.candle.trading.order.exception.OrderException;
 import org.profit.candle.trading.order.repository.ExecutionRepository;
 import org.profit.candle.trading.order.repository.OrderRepository;
 import org.profit.candle.trading.reservation.service.ReservationBatchExecutor;
@@ -15,6 +17,8 @@ import org.profit.candle.trading.support.event.OutboxWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -31,8 +35,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderLimitFillExecutor {
 
-    private static final double FEE_RATE = 0.00015;
-    private static final double TAX_RATE = 0.0018;
+    private static final BigDecimal FEE_RATE = new BigDecimal("0.00015");
+    private static final BigDecimal TAX_RATE = new BigDecimal("0.0018");
 
     private final OrderRepository orderRepository;
     private final ExecutionRepository executionRepository;
@@ -66,13 +70,28 @@ public class OrderLimitFillExecutor {
     }
 
     void doFill(OrderEntity order, long currentPriceKrw) {
-        long grossAmount = currentPriceKrw * order.getQuantity();
-        long feeKrw = (long) (grossAmount * FEE_RATE);
-        long taxKrw = order.getSide() == OrderSideValue.SELL
-                ? (long) (grossAmount * TAX_RATE) : 0;
-        long netAmountKrw = order.getSide() == OrderSideValue.BUY
-                ? grossAmount + feeKrw
-                : grossAmount - feeKrw - taxKrw;
+        BigDecimal gross = BigDecimal.valueOf(currentPriceKrw)
+                .multiply(BigDecimal.valueOf(order.getQuantity()));
+        BigDecimal fee = gross.multiply(FEE_RATE).setScale(0, RoundingMode.DOWN);
+        BigDecimal tax = order.getSide() == OrderSideValue.SELL
+                ? gross.multiply(TAX_RATE).setScale(0, RoundingMode.DOWN)
+                : BigDecimal.ZERO;
+        BigDecimal net = order.getSide() == OrderSideValue.BUY
+                ? gross.add(fee)
+                : gross.subtract(fee).subtract(tax);
+
+        long grossAmount;
+        long feeKrw;
+        long taxKrw;
+        long netAmountKrw;
+        try {
+            grossAmount = gross.longValueExact();
+            feeKrw = fee.longValueExact();
+            taxKrw = tax.longValueExact();
+            netAmountKrw = net.longValueExact();
+        } catch (ArithmeticException e) {
+            throw new OrderException(OrderErrorCode.INVALID_QUANTITY, e);
+        }
 
         Instant now = Instant.now(clock);
         ExecutionEntity execution = ExecutionEntity.create(
