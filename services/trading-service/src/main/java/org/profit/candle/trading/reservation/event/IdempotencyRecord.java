@@ -1,9 +1,7 @@
 package org.profit.candle.trading.reservation.event;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.EmbeddedId;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import org.profit.candle.common.security.EncryptedPayloadConverter;
 
 import java.time.Instant;
 
@@ -17,6 +15,7 @@ public class IdempotencyRecord {
     @Column(name = "request_hash", nullable = false, length = 64)
     private String requestHash;
 
+    @Convert(converter = EncryptedPayloadConverter.class)
     @Column(name = "response_payload", nullable = false)
     private byte[] responsePayload;
 

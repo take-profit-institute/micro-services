@@ -26,3 +26,7 @@ server:
 trading:
   idempotency:
     default-ttl: ${TRADING_IDEMPOTENCY_TTL:P1D}
+
+candle:
+  security:
+    payload-encryption-key: ${PAYLOAD_ENCRYPTION_KEY}
