@@ -38,7 +38,7 @@ public class RankingOutboxPublisher {
         try {
             rankingCache.putLatestDate(LocalDate.parse(rankingDate));
         } catch (RuntimeException ignored) {
-            // 다음 조회가 DB fallback으로 캐시를 다시 생성한다.
+            // 조회 시 DB의 최신 완료일과 비교해 누락되거나 오래된 캐시를 복구한다.
         }
     }
 }

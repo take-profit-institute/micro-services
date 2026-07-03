@@ -62,15 +62,14 @@ public class DefaultRankingQueryService implements RankingQueryService {
         return ranking;
     }
 
-    /** Redis 또는 DB에서 마지막 완료일을 조회하고 Redis miss를 복구한다. */
+    /** DB의 마지막 완료일을 기준으로 누락되거나 오래된 Redis 날짜를 복구한다. */
     private LocalDate latestDate() {
-        Optional<LocalDate> cached = safeCache(cache::findLatestDate);
-        if (cached.isPresent()) {
-            return cached.get();
-        }
         LocalDate rankingDate = repository.findLatestCompletedDate()
                 .orElseThrow(() -> new RankingException(RankingErrorCode.RANKING_NOT_FOUND));
-        safeCacheWrite(() -> cache.putLatestDate(rankingDate));
+        Optional<LocalDate> cached = safeCache(cache::findLatestDate);
+        if (cached.isEmpty() || !cached.get().equals(rankingDate)) {
+            safeCacheWrite(() -> cache.putLatestDate(rankingDate));
+        }
         return rankingDate;
     }
 
