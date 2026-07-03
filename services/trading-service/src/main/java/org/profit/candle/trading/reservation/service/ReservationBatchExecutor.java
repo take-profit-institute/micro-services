@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.trading.account.service.AccountService;
 import org.profit.candle.trading.reservation.entity.ReservationEntity;
+import org.profit.candle.trading.reservation.entity.ReservationOrderKindValue;
+import org.profit.candle.trading.reservation.event.ReservationDuePayload;
 import org.profit.candle.trading.reservation.event.ReservationExecutedPayload;
 import org.profit.candle.trading.reservation.event.ReservationOutboxOperations;
 import org.profit.candle.trading.reservation.repository.ReservationRepository;
@@ -40,15 +42,73 @@ public class ReservationBatchExecutor {
         return reservation != null && reservation.reserved();
     }
 
-    /** FAILED 전이 — 별도 트랜잭션으로 커밋 보장. */
+    /** FAILED 전이 — 별도 트랜잭션으로 커밋 보장. reservedAmountKrw > 0이면 잔고 반환. */
     @Transactional
     public void markFailedUnderLock(UUID reservationId) {
         reservationRepository.findByIdForUpdate(reservationId).ifPresent(reservation -> {
             if (reservation.reserved()) {
+                // FAILED 전이 + 잔고 반환을 같은 트랜잭션에서 처리
+                if (reservation.getReservedAmountKrw() > 0) {
+                    accountService.releaseBalance(reservation.getUserId(),
+                            reservation.getReservedAmountKrw());
+                }
                 reservation.markFailed();
                 reservationRepository.save(reservation);
             }
         });
+    }
+
+    /**
+     * EXPIRED 전이 — order의 cancelExpiredPendingOrder 패턴과 동일.
+     * RESERVED → EXPIRED 전이 + reservedAmountKrw > 0이면 releaseBalance().
+     *
+     * @return 처리 성공 여부 (false면 이미 RESERVED 아님)
+     */
+    @Transactional
+    public boolean expireUnderLock(UUID reservationId) {
+        ReservationEntity reservation = reservationRepository
+                .findByIdForUpdate(reservationId)
+                .orElse(null);
+        if (reservation == null || !reservation.reserved()) return false;
+
+        if (reservation.getReservedAmountKrw() > 0) {
+            accountService.releaseBalance(reservation.getUserId(),
+                    reservation.getReservedAmountKrw());
+        }
+        reservation.markExpired();
+        reservationRepository.save(reservation);
+        return true;
+    }
+
+    /**
+     * 건별 OPEN+LIMIT 처리 — order의 cancelExpiredPendingOrder 패턴과 동일.
+     * RESERVED → CONVERTING 전이 + ReservationDue Outbox 기록.
+     *
+     * @return 처리 성공 여부 (false면 이미 RESERVED 아님)
+     */
+    @Transactional
+    public boolean processOpenLimitUnderLock(UUID reservationId) {
+        ReservationEntity reservation = reservationRepository
+                .findByIdForUpdate(reservationId)
+                .orElse(null);
+        if (reservation == null || !reservation.reserved()) return false;
+        if (reservation.getOrderKind() != ReservationOrderKindValue.LIMIT) return false;
+
+        reservation.startConverting();
+        reservationRepository.save(reservation);
+
+        outboxWriter.record(outboxOperations, "ReservationDue",
+                reservation.getId().toString(),
+                new ReservationDuePayload(
+                        reservation.getId().toString(),
+                        reservation.getUserId().toString(),
+                        reservation.getAccountId().toString(),
+                        reservation.getSymbol(),
+                        reservation.getSide().name(),
+                        reservation.getQuantity(),
+                        reservation.getPriceKrw(),
+                        reservation.getIdempotencyKey()));
+        return true;
     }
 
     /**

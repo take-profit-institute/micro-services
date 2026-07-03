@@ -23,7 +23,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-
 /**
  * 배치 체결 처리 구현체. DefaultReservationService(사용자 명령)와 분리해
  * 배치 전용 트랜잭션 경계와 로직을 독립적으로 관리한다.
@@ -124,6 +123,33 @@ public class DefaultReservationBatchService implements ReservationBatchService {
 
         reservation.markConverted(convertedOrderId);
         reservationRepository.save(reservation);
+    }
+
+    @Override
+    public List<UUID> listOpenLimitReservationIds(LocalDate targetDate) {
+        // 건별 배치 처리를 위한 대상 id 목록 조회 — order의 findIdsByStatus 패턴과 동일.
+        // id만 조회해 엔티티 전체 로딩을 피한다.
+        return reservationRepository.findOpenLimitReservationIds(
+                targetDate, ReservationStatusValue.RESERVED);
+    }
+
+    @Override
+    public boolean processSingleOpenLimitReservation(UUID reservationId) {
+        // order의 cancelExpiredPendingOrder 패턴과 동일 — 건별 트랜잭션 보장.
+        return batchExecutor.processOpenLimitUnderLock(reservationId);
+    }
+
+    @Override
+    public List<UUID> listExpirableReservationIds(LocalDate targetDate) {
+        // EXPIRED 처리 대상 id 목록 조회 — timing 무관, id만 조회.
+        return reservationRepository.findExpirableReservationIds(
+                targetDate, ReservationStatusValue.RESERVED);
+    }
+
+    @Override
+    public boolean expireReservation(UUID reservationId) {
+        // order의 cancelExpiredPendingOrder 패턴과 동일 — 건별 트랜잭션 보장.
+        return batchExecutor.expireUnderLock(reservationId);
     }
 
     @Override
