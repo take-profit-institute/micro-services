@@ -13,6 +13,7 @@ import org.profit.candle.trading.order.exception.OrderException;
 import org.profit.candle.trading.order.repository.ExecutionRepository;
 import org.profit.candle.trading.order.repository.OrderRepository;
 import org.profit.candle.trading.reservation.service.ReservationBatchExecutor;
+import org.profit.candle.trading.support.TradingFeePolicy;
 import org.profit.candle.trading.support.event.OutboxWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,9 +35,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class OrderLimitFillExecutor {
-
-    private static final BigDecimal FEE_RATE = new BigDecimal("0.00015");
-    private static final BigDecimal TAX_RATE = new BigDecimal("0.0018");
 
     private final OrderRepository orderRepository;
     private final ExecutionRepository executionRepository;
@@ -72,9 +70,9 @@ public class OrderLimitFillExecutor {
     void doFill(OrderEntity order, long currentPriceKrw) {
         BigDecimal gross = BigDecimal.valueOf(currentPriceKrw)
                 .multiply(BigDecimal.valueOf(order.getQuantity()));
-        BigDecimal fee = gross.multiply(FEE_RATE).setScale(0, RoundingMode.DOWN);
+        BigDecimal fee = gross.multiply(TradingFeePolicy.FEE_RATE).setScale(0, RoundingMode.DOWN);
         BigDecimal tax = order.getSide() == OrderSideValue.SELL
-                ? gross.multiply(TAX_RATE).setScale(0, RoundingMode.DOWN)
+                ? gross.multiply(TradingFeePolicy.TAX_RATE).setScale(0, RoundingMode.DOWN)
                 : BigDecimal.ZERO;
         BigDecimal net = order.getSide() == OrderSideValue.BUY
                 ? gross.add(fee)
