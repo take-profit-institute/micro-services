@@ -5,7 +5,7 @@ spring:
     server:
       port: ${LEARNING_GRPC_PORT:50059}
   datasource:
-    url: ${LEARNING_DB_URL:jdbc:postgresql://localhost:5432/learning?stringtype=unspecified}
+    url: ${LEARNING_DB_URL:jdbc:postgresql://localhost:5432/candle_learning?stringtype=unspecified}
     username: ${LEARNING_DB_USERNAME:candle}
     password: ${LEARNING_DB_PASSWORD:candle}
   jpa:
