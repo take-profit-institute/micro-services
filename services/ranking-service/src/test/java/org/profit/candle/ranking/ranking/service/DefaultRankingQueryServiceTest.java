@@ -60,6 +60,19 @@ class DefaultRankingQueryServiceTest {
         assertThat(page.rankings()).hasSize(2);
     }
 
+    /** Redis에 이전 완료일이 남아 있어도 DB 기준 최신 완료일로 교체하는지 검증한다. */
+    @Test
+    void listRankingsRepairsStaleLatestDateCache() {
+        FakeRankingRepository repository = new FakeRankingRepository(rankings(2));
+        FakeRankingCache cache = new FakeRankingCache();
+        cache.latestDate = RANKING_DATE.minusDays(1);
+
+        var page = new DefaultRankingQueryService(repository, cache).listRankings(20, "");
+
+        assertThat(page.rankings()).extracting(RankingResult::rankingDate).containsOnly(RANKING_DATE);
+        assertThat(cache.latestDate).isEqualTo(RANKING_DATE);
+    }
+
     /** 내 순위가 없을 때 Ranking 전용 NOT_FOUND 오류를 반환하는지 검증한다. */
     @Test
     void getMyRankingReturnsNotFound() {
