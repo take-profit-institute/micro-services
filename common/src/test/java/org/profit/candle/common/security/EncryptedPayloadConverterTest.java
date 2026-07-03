@@ -134,4 +134,13 @@ class EncryptedPayloadConverterTest {
                 .satisfies(e -> assertThat(((CandleException) e).errorCode())
                         .isEqualTo(CommonErrorCode.PAYLOAD_DECRYPTION_FAILED));
     }
+
+    @Test
+    @DisplayName("null 키로 초기화하면 즉시 예외가 발생한다")
+    void initKey_nullKey_throwsImmediately() {
+        assertThatThrownBy(() -> EncryptedPayloadConverter.initKey(null))
+                .isInstanceOf(CandleException.class)
+                .satisfies(e -> assertThat(((CandleException) e).errorCode())
+                        .isEqualTo(CommonErrorCode.INVALID_ENCRYPTION_KEY));
+    }
 }
