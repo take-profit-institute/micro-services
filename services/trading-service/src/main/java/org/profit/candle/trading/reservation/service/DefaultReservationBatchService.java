@@ -177,8 +177,10 @@ public class DefaultReservationBatchService implements ReservationBatchService {
                     try {
                         batchExecutor.releaseBalanceInNewTransaction(candidate.getUserId(), reservedAmount);
                     } catch (Exception e) {
-                        log.error("잔고 보상 실패 — reservationId={}, userId={}, amount={}",
+                        log.error("잔고 보상 실패, 재시도 유도 — reservationId={}, userId={}, amount={}",
                                 candidate.getId(), candidate.getUserId(), reservedAmount, e);
+                        throw new RuntimeException("잔고 보상 실패 — reservationId: "
+                                + candidate.getId(), e);
                     }
                 }
             }
@@ -275,8 +277,10 @@ public class DefaultReservationBatchService implements ReservationBatchService {
                     try {
                         batchExecutor.releaseBalanceInNewTransaction(candidate.getUserId(), reservedAmount);
                     } catch (Exception e) {
-                        log.error("잔고 보상 실패 — reservationId={}, userId={}, amount={}",
+                        log.error("잔고 보상 실패, 재시도 유도 — reservationId={}, userId={}, amount={}",
                                 candidate.getId(), candidate.getUserId(), reservedAmount, e);
+                        throw new RuntimeException("잔고 보상 실패 — reservationId: "
+                                + candidate.getId(), e);
                     }
                 }
             }

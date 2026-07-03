@@ -8,7 +8,9 @@ import org.profit.candle.trading.reservation.service.ReservationBatchService;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /**
  * Market 도메인의 현재가 Kafka 이벤트를 구독해 OPEN+MARKET 예약을 즉시 체결한다.
@@ -27,9 +29,11 @@ public class MarketPriceConsumer {
     // TODO: Market 담당자(팀장)와 협의 후 확정
     private static final String TOPIC = "market.open-price.v1";
     private static final String GROUP_ID = "trading-service-open-market";
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final ReservationBatchService reservationBatchService;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @KafkaListener(topics = TOPIC, groupId = GROUP_ID)
     public void consume(ConsumerRecord<String, String> record) {
@@ -47,13 +51,17 @@ public class MarketPriceConsumer {
         try {
             log.info("현재가 이벤트 수신 — symbol={}, price={}", event.symbol(), event.price());
 
+            // Clock 주입으로 KST 기준 오늘 날짜 계산 — LocalDate.now() 직접 호출 방지 (Qodo #3)
+            LocalDate today = LocalDate.now(clock.withZone(KST));
+
             int count = reservationBatchService.processOpenMarketReservations(
-                    LocalDate.now(), event.symbol(), event.price());
+                    today, event.symbol(), event.price());
 
             log.info("OPEN+MARKET 체결 완료 — symbol={}, price={}, count={}",
                     event.symbol(), event.price(), count);
         } catch (Exception e) {
-            // 역직렬화 성공 후 처리 실패 — 예외를 재throw해 오프셋 커밋을 막고 재시도 유도.
+            // 처리 실패(보상 실패 포함) — 예외를 재throw해 오프셋 커밋을 막고 재시도 유도 (Qodo #2).
+            // 보상(releaseBalance) 실패도 여기서 잡혀 재시도되므로 영구 잔고 락을 방지한다.
             log.error("현재가 이벤트 처리 실패 — symbol={}, offset={}",
                     event.symbol(), record.offset(), e);
             throw new RuntimeException("OPEN+MARKET 체결 처리 실패 — symbol: " + event.symbol(), e);
