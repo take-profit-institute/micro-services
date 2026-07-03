@@ -8,8 +8,7 @@ import org.profit.candle.trading.reservation.entity.ReservationEntity;
 import org.profit.candle.trading.reservation.entity.ReservationOrderKindValue;
 import org.profit.candle.trading.reservation.entity.ReservationSideValue;
 import org.profit.candle.trading.reservation.entity.ReservationStatusValue;
-import org.profit.candle.trading.reservation.entity.ReservationTimingValue;
-import org.profit.candle.trading.reservation.event.ReservationDuePayload;
+import org.profit.candle.trading.reservation.entity.ReservationTimingValue;import org.profit.candle.trading.reservation.event.ReservationDuePayload;
 import org.profit.candle.trading.reservation.event.ReservationOutboxOperations;
 import org.profit.candle.trading.reservation.exception.ReservationErrorCode;
 import org.profit.candle.trading.reservation.exception.ReservationException;
@@ -23,7 +22,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-
 /**
  * 배치 체결 처리 구현체. DefaultReservationService(사용자 명령)와 분리해
  * 배치 전용 트랜잭션 경계와 로직을 독립적으로 관리한다.
@@ -124,6 +122,42 @@ public class DefaultReservationBatchService implements ReservationBatchService {
 
         reservation.markConverted(convertedOrderId);
         reservationRepository.save(reservation);
+    }
+
+    @Override
+    public List<UUID> listOpenLimitReservationIds(LocalDate targetDate) {
+        // 건별 배치 처리를 위한 대상 목록 조회 — order의 findIdsByStatus 패턴과 동일.
+        // 락 없이 id만 조회한다. 실제 처리는 processSingleOpenLimitReservation()이 건별로 락 잡고 처리.
+        return reservationRepository
+                .findByScheduledDateAndStatusAndTiming(
+                        targetDate, ReservationStatusValue.RESERVED, ReservationTimingValue.OPEN)
+                .stream()
+                .filter(r -> r.getOrderKind() == ReservationOrderKindValue.LIMIT)
+                .map(ReservationEntity::getId)
+                .toList();
+    }
+
+    @Override
+    public boolean processSingleOpenLimitReservation(UUID reservationId) {
+        // order의 cancelExpiredPendingOrder 패턴과 동일 — 건별 트랜잭션 보장.
+        return batchExecutor.processOpenLimitUnderLock(reservationId);
+    }
+
+    @Override
+    public List<UUID> listExpirableReservationIds(LocalDate targetDate) {
+        // EXPIRED 처리 대상: scheduled_date가 targetDate이고 아직 RESERVED인 예약 전체.
+        // timing 무관 — OPEN/PREV_CLOSE/TODAY_CLOSE 모두 포함.
+        return reservationRepository.findByScheduledDateAndStatus(
+                        targetDate, ReservationStatusValue.RESERVED)
+                .stream()
+                .map(ReservationEntity::getId)
+                .toList();
+    }
+
+    @Override
+    public boolean expireReservation(UUID reservationId) {
+        // order의 cancelExpiredPendingOrder 패턴과 동일 — 건별 트랜잭션 보장.
+        return batchExecutor.expireUnderLock(reservationId);
     }
 
     @Override

@@ -54,6 +54,13 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
             LocalDate scheduledDate, ReservationStatusValue status, ReservationTimingValue timing);
 
     /**
+     * EXPIRED 처리 대상 조회 — timing 무관, scheduled_date + status 조합.
+     * 15:40 이후 당일 아직 RESERVED인 예약 전체를 조회한다.
+     */
+    List<ReservationEntity> findByScheduledDateAndStatus(
+            LocalDate scheduledDate, ReservationStatusValue status);
+
+    /**
      * OPEN+MARKET 배치 체결 대상 조회. scheduled_date + status + timing + orderKind + symbol
      * 조합으로 DB에서 직접 필터링한다 — Java stream 필터링 대비 DB 부하 감소.
      */
