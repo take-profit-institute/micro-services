@@ -76,6 +76,7 @@ public class StockRankingService {
                         parseLongAbs(item.currentPrice()),
                         parseLong(item.priceChange()),
                         parseDouble(item.priceChangeRate()),
+                        item.priceChangeSign(),
                         parseLong(item.tradingVolume())
                 ))
                 .toList();

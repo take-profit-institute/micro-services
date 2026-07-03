@@ -22,6 +22,6 @@ public record KiwoomPriceRankItem(
         String tradingVolume,
 
         @JsonProperty("pred_pre_sig")
-        String priceSign
+        String priceChangeSign
 ){
 }

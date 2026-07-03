@@ -37,8 +37,6 @@ public class KiwoomRankingClient {
                 .bodyToMono(KiwoomPriceRankResponse.class)
                 .block();
 
-        System.out.println("ranking response = " + response);
-
         return response;
     }
 

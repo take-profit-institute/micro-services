@@ -11,8 +11,12 @@ public class StockRankingScheduler {
     private final StockRankingService stockRankingService;
 
     @Scheduled(fixedDelay = 60000)
-    public void refreshStockRanking() {
+    public void refreshRisingRanking() {
         stockRankingService.refreshRisingRanking();
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void refreshFallingRanking() {
         stockRankingService.refreshFallingRanking();
     }
 }

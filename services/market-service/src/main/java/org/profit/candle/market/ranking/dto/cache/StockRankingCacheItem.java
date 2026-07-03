@@ -7,6 +7,7 @@ public record StockRankingCacheItem(
         long currentPrice,
         long priceChange,
         double priceChangeRate,
+        String priceChangeSign,
         long tradingVolume
 ) {
 }
