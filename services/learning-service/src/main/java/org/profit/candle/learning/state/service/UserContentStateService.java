@@ -1,8 +1,10 @@
-package org.profit.candle.learning.state;
+package org.profit.candle.learning.state.service;
 
 import lombok.RequiredArgsConstructor;
-import org.profit.candle.learning.content.Content;
-import org.profit.candle.learning.content.ContentService;
+import org.profit.candle.learning.content.entity.Content;
+import org.profit.candle.learning.content.service.ContentService;
+import org.profit.candle.learning.state.entity.UserContentState;
+import org.profit.candle.learning.state.repository.UserContentStateRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;

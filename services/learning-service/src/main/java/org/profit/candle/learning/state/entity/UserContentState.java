@@ -1,8 +1,8 @@
-package org.profit.candle.learning.state;
+package org.profit.candle.learning.state.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.profit.candle.learning.content.Content;
+import org.profit.candle.learning.content.entity.Content;
 
 import java.time.Instant;
 import java.util.UUID;
