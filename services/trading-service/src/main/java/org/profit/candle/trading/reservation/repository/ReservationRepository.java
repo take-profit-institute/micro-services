@@ -61,6 +61,29 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
             LocalDate scheduledDate, ReservationStatusValue status);
 
     /**
+     * 건별 OPEN+LIMIT 배치 처리용 id 목록 조회 — order의 findIdsByStatus 패턴과 동일.
+     * 엔티티 전체 로딩 없이 id만 조회한다.
+     */
+    @Query("select r.id from ReservationEntity r " +
+            "where r.scheduledDate = :scheduledDate " +
+            "and r.status = :status " +
+            "and r.timing = org.profit.candle.trading.reservation.entity.ReservationTimingValue.OPEN " +
+            "and r.orderKind = org.profit.candle.trading.reservation.entity.ReservationOrderKindValue.LIMIT")
+    List<UUID> findOpenLimitReservationIds(
+            @Param("scheduledDate") LocalDate scheduledDate,
+            @Param("status") ReservationStatusValue status);
+
+    /**
+     * EXPIRED 처리용 id 목록 조회 — timing 무관, id만 조회.
+     */
+    @Query("select r.id from ReservationEntity r " +
+            "where r.scheduledDate = :scheduledDate " +
+            "and r.status = :status")
+    List<UUID> findExpirableReservationIds(
+            @Param("scheduledDate") LocalDate scheduledDate,
+            @Param("status") ReservationStatusValue status);
+
+    /**
      * OPEN+MARKET 배치 체결 대상 조회. scheduled_date + status + timing + orderKind + symbol
      * 조합으로 DB에서 직접 필터링한다 — Java stream 필터링 대비 DB 부하 감소.
      */
