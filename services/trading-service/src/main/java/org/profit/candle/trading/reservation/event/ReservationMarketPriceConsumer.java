@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.profit.candle.trading.reservation.service.ReservationBatchService;
+import org.profit.candle.trading.support.event.MarketPriceEvent;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -24,11 +25,11 @@ import java.time.ZoneId;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class MarketPriceConsumer {
+public class ReservationMarketPriceConsumer {
 
     // TODO: Market 담당자(팀장)와 협의 후 확정
     private static final String TOPIC = "market.open-price.v1";
-    private static final String GROUP_ID = "trading-service-open-market";
+    private static final String GROUP_ID = "trading-service-reservation-market-price";
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final ReservationBatchService reservationBatchService;
