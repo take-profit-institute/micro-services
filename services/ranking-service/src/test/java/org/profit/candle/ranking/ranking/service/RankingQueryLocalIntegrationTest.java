@@ -18,7 +18,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 @EnabledIfEnvironmentVariable(named = "RUN_LOCAL_RANKING_QUERY_TEST", matches = "true")
 class RankingQueryLocalIntegrationTest {
 
-    private static final LocalDate TEST_DATE = LocalDate.of(2099, 12, 29);
+    private static final LocalDate TEST_DATE = LocalDate.of(9999, 12, 31);
     private static final UUID FIRST_USER = UUID.fromString("80000000-0000-4000-8000-000000000001");
     private static final UUID SECOND_USER = UUID.fromString("80000000-0000-4000-8000-000000000002");
 
