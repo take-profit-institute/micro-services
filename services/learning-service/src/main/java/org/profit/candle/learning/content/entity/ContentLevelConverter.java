@@ -1,4 +1,4 @@
-package org.profit.candle.learning.content;
+package org.profit.candle.learning.content.entity;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;

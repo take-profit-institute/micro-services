@@ -1,7 +1,11 @@
-package org.profit.candle.learning.content;
+package org.profit.candle.learning.content.service;
 
 import lombok.RequiredArgsConstructor;
-import org.profit.candle.learning.exception.ContentNotFoundException;
+import org.profit.candle.learning.content.entity.Content;
+import org.profit.candle.learning.content.entity.ContentLevel;
+import org.profit.candle.learning.exception.LearningErrorCode;
+import org.profit.candle.learning.exception.LearningException;
+import org.profit.candle.learning.content.repository.ContentRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -20,7 +24,7 @@ public class ContentService {
 
     public Content getById(UUID id) {
         return contentRepository.findById(id)
-                .orElseThrow(ContentNotFoundException::new);
+                .orElseThrow(() -> new LearningException(LearningErrorCode.CONTENT_NOT_FOUND));
     }
 
     /**

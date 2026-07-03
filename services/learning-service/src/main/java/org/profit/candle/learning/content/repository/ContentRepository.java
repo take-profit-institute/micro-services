@@ -1,5 +1,7 @@
-package org.profit.candle.learning.content;
+package org.profit.candle.learning.content.repository;
 
+import org.profit.candle.learning.content.entity.ContentLevel;
+import org.profit.candle.learning.content.entity.Content;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

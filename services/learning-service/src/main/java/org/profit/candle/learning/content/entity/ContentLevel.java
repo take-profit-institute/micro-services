@@ -1,8 +1,7 @@
-package org.profit.candle.learning.content;
+package org.profit.candle.learning.content.entity;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-
 import java.util.Arrays;
 
 @Getter

@@ -1,5 +1,26 @@
 spring:
   application:
     name: learning-service
+  grpc:
+    server:
+      port: ${LEARNING_GRPC_PORT:50059}
+  datasource:
+    url: ${LEARNING_DB_URL:jdbc:postgresql://localhost:5432/learning?stringtype=unspecified}
+    username: ${LEARNING_DB_USERNAME:candle}
+    password: ${LEARNING_DB_PASSWORD:candle}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: learning
+  flyway:
+    locations: classpath:migration
+    default-schema: learning
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 server:
-  port: 8088
+  port: ${LEARNING_SERVER_PORT:8088}
