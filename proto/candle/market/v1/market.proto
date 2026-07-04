@@ -17,8 +17,24 @@ message GetQuoteResponse { Quote quote = 1; }
 message BatchQuotesRequest { repeated string symbols = 1; }
 message BatchQuotesResponse { repeated Quote quotes = 1; }
 
+// 당일 실시간 시세 그래프의 초기 스냅샷. 키움 주식틱차트(ka10079)를 조회해 오늘치 틱을 돌려준다.
+// 장마감이어도 오늘 그래프를 그릴 수 있게 REST 로 당겨오는 경로다. 라이브 갱신은 WS(Redis)로 별도.
+message IntradayTick {
+  int64 price = 1;                       // 체결가(원)
+  google.protobuf.Timestamp ts = 2;      // 체결시각
+}
+message GetIntradayTicksRequest {
+  string symbol = 1;
+  int32 limit = 2;                       // 최근 N개(0 이면 서버 기본값)
+}
+message GetIntradayTicksResponse {
+  string symbol = 1;
+  repeated IntradayTick ticks = 2;       // 오래된 -> 최신
+}
+
 service MarketService {
   rpc SearchStocks(SearchStocksRequest) returns (SearchStocksResponse);
   rpc GetQuote(GetQuoteRequest) returns (GetQuoteResponse);
   rpc BatchQuotes(BatchQuotesRequest) returns (BatchQuotesResponse);
+  rpc GetIntradayTicks(GetIntradayTicksRequest) returns (GetIntradayTicksResponse);
 }

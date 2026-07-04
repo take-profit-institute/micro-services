@@ -3,16 +3,21 @@ spring:
     name: market-service
   config:
     import: optional:file:.env[.properties]
+  grpc:
+    server:
+      port: ${MARKET_GRPC_PORT:50063}
   datasource:
-    url: ${MARKET_DB_URL:jdbc:postgresql://localhost:5432/candle_market}
-    username: ${MARKET_DB_USERNAME:candle}
-    password: ${MARKET_DB_PASSWORD:candle}
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
+    url: jdbc:postgresql://localhost:5433/market
+    username: ${POSTGRES_USER:candle}
+    password: ${POSTGRES_PASSWORD:candle}
+    driver-class-name: org.postgresql.Driver
   flyway:
     locations: classpath:migration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
 server:
   port: 8083
 kiwoom:

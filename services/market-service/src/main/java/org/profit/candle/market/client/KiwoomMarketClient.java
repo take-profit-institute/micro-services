@@ -2,7 +2,9 @@ package org.profit.candle.market.client;
 
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.market.dto.request.KiwoomStockRequest;
+import org.profit.candle.market.dto.request.KiwoomTickChartRequest;
 import org.profit.candle.market.dto.response.KiwoomStockResponse;
+import org.profit.candle.market.dto.response.KiwoomTickChartResponse;
 import org.profit.candle.market.exception.MarketErrorCode;
 import org.profit.candle.market.exception.MarketException;
 import org.springframework.http.HttpHeaders;
@@ -37,6 +39,32 @@ public class KiwoomMarketClient {
                 .bodyToMono(KiwoomStockResponse.class)
                 .block();
         validate(response);
+        return response;
+    }
+
+    /** 주식틱차트조회(ka10079) — 당일 틱 시리즈. 초기 그래프 스냅샷용. */
+    public KiwoomTickChartResponse getTickChart(String stockCode) {
+        String token = token();
+
+        KiwoomTickChartResponse response = kiwoomWebClient.post()
+                .uri("/api/dostk/chart")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
+                .header("api-id", "ka10079")
+                .header("authorization", "Bearer " + token)
+                .bodyValue(KiwoomTickChartRequest.ofOneTick(stockCode))
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, httpResponse -> httpResponse.bodyToMono(String.class)
+                        .defaultIfEmpty("")
+                        .flatMap(body -> Mono.error(new MarketException(MarketErrorCode.KIWOOM_HTTP_FAILED))))
+                .bodyToMono(KiwoomTickChartResponse.class)
+                .block();
+
+        if (response == null) {
+            throw new MarketException(MarketErrorCode.KIWOOM_INVALID_RESPONSE);
+        }
+        if (response.returnCode() != 0) {
+            throw new MarketException(MarketErrorCode.KIWOOM_BUSINESS_FAILED);
+        }
         return response;
     }
 
