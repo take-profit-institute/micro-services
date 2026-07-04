@@ -4,7 +4,7 @@ apply plugin: 'com.google.protobuf'
 
 dependencies {
     // gRPC
-    implementation 'org.springframework.boot:spring-boot-grpc-server'
+    implementation 'org.springframework.boot:spring-boot-starter-grpc-server'
     implementation 'com.google.protobuf:protobuf-java'
     implementation 'io.grpc:grpc-stub'
     implementation 'io.grpc:grpc-protobuf'
