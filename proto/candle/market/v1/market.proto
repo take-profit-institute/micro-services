@@ -32,9 +32,28 @@ message GetIntradayTicksResponse {
   repeated IntradayTick ticks = 2;       // 오래된 -> 최신
 }
 
+// 종목 상세를 보는 뷰어에게 라이브 tick 을 팬아웃한다. 스냅샷용 Quote 와 달리 5% 판정에 쓰는
+// 시가(open_price)까지 싣는다. 스트림이 열리면 구독 수요(viewer)가 잡히고, 닫히면 해제된다.
+message LiveQuote {
+  string symbol = 1;
+  int64 price = 2;                       // 현재가(원)
+  int64 change = 3;                      // 전일 대비
+  double change_rate = 4;                // 등락률 %
+  int64 open_price = 5;                  // 오늘 시가(원)
+  int64 trading_volume = 6;              // 누적 거래량
+  string price_change_sign = 7;          // 키움 부호코드
+  google.protobuf.Timestamp ts = 8;      // 체결시각
+}
+// 심볼당 스트림 1개 = 멀티플렉스 단위. BFF 가 브라우저 뷰어를 자기 쪽에서 ref-count 하고,
+// 심볼별 뷰어 0→1 에 이 스트림을 열고 1→0 에 닫는다. 같은 심볼을 N 명이 봐도 upstream 은 1개.
+message StreamQuotesRequest {
+  string symbol = 1;
+}
+
 service MarketService {
   rpc SearchStocks(SearchStocksRequest) returns (SearchStocksResponse);
   rpc GetQuote(GetQuoteRequest) returns (GetQuoteResponse);
   rpc BatchQuotes(BatchQuotesRequest) returns (BatchQuotesResponse);
   rpc GetIntradayTicks(GetIntradayTicksRequest) returns (GetIntradayTicksResponse);
+  rpc StreamQuotes(StreamQuotesRequest) returns (stream LiveQuote);
 }

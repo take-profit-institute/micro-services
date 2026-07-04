@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.wishlist.wishlist.dto.AddWishlistItemCommand;
 import org.profit.candle.wishlist.wishlist.dto.ListWishlistItemsResult;
 import org.profit.candle.wishlist.wishlist.dto.RemoveWishlistItemCommand;
+import org.profit.candle.wishlist.event.OutboxWriter;
 import org.profit.candle.wishlist.wishlist.dto.WishlistItemResult;
 import org.profit.candle.wishlist.wishlist.entity.WishlistItem;
 import org.profit.candle.wishlist.wishlist.exception.WishlistErrorCode;
@@ -26,6 +27,7 @@ public class DefaultWishlistService implements WishlistService {
 
     private final WishlistItemReader reader;
     private final WishlistItemWriter writer;
+    private final OutboxWriter outboxWriter;
     private final Clock clock;
 
     @Override
@@ -33,19 +35,19 @@ public class DefaultWishlistService implements WishlistService {
     public WishlistItemResult add(AddWishlistItemCommand command) {
         String symbol = normalizeSymbol(command.symbol());
         Instant now = clock.instant();
-        WishlistItem item = reader.findActive(command.userId(), symbol)
-                .map(existing -> {
-                    existing.updateSnapshot(command.displayName(), command.market(), now);
-                    return existing;
-                })
-                .orElseGet(() -> WishlistItem.add(
-                        command.userId(),
-                        symbol,
-                        command.displayName(),
-                        command.market(),
-                        now
-                ));
-        return toResult(writer.save(item));
+        WishlistItem existing = reader.findActive(command.userId(), symbol).orElse(null);
+        if (existing != null) {
+            existing.updateSnapshot(command.displayName(), command.market(), now);
+            return toResult(writer.save(existing));
+        }
+
+        WishlistItem saved = writer.save(WishlistItem.add(
+                command.userId(), symbol, command.displayName(), command.market(), now));
+        // 이 심볼의 활성 관심 유저가 0→1 로 늘었으면 실시간 구독 수요 활성 이벤트를 발행한다.
+        if (reader.listActiveBySymbol(symbol).size() == 1) {
+            outboxWriter.recordSymbolActivated(symbol);
+        }
+        return toResult(saved);
     }
 
     @Override
@@ -55,6 +57,10 @@ public class DefaultWishlistService implements WishlistService {
         WishlistItem item = reader.findActive(command.userId(), symbol)
                 .orElseThrow(() -> new WishlistException(WishlistErrorCode.ITEM_NOT_FOUND));
         item.remove(clock.instant());
+        // 이 심볼의 활성 관심 유저가 1→0 으로 줄었으면 구독 수요 비활성 이벤트를 발행한다.
+        if (reader.listActiveBySymbol(symbol).isEmpty()) {
+            outboxWriter.recordSymbolDeactivated(symbol);
+        }
     }
 
     @Override
