@@ -206,6 +206,122 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
     }
 
     @Override
+    public void listOpenLimitReservations(ListOpenLimitReservationsRequest request,
+                                          StreamObserver<ListOpenLimitReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            var ids = reservationBatchService.listOpenLimitReservationIds(targetDate)
+                    .stream().map(UUID::toString).toList();
+            observer.onNext(ListOpenLimitReservationsResponse.newBuilder()
+                    .addAllReservationIds(ids)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void processSingleOpenLimitReservation(ProcessSingleOpenLimitReservationRequest request,
+                                                  StreamObserver<ProcessSingleOpenLimitReservationResponse> observer) {
+        try {
+            boolean processed = reservationBatchService.processSingleOpenLimitReservation(
+                    UUID.fromString(request.getReservationId()));
+            observer.onNext(ProcessSingleOpenLimitReservationResponse.newBuilder()
+                    .setProcessed(processed)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
+        }
+    }
+
+    @Override
+    public void listStaleConvertingReservations(ListStaleConvertingReservationsRequest request,
+                                                StreamObserver<ListStaleConvertingReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            var ids = reservationBatchService.listStaleConvertingReservationIds(targetDate)
+                    .stream().map(UUID::toString).toList();
+            observer.onNext(ListStaleConvertingReservationsResponse.newBuilder()
+                    .addAllReservationIds(ids)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void failStaleConvertingReservation(FailStaleConvertingReservationRequest request,
+                                               StreamObserver<FailStaleConvertingReservationResponse> observer) {
+        try {
+            boolean failed = reservationBatchService.failStaleConvertingReservation(
+                    UUID.fromString(request.getReservationId()));
+            observer.onNext(FailStaleConvertingReservationResponse.newBuilder()
+                    .setFailed(failed)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
+        }
+    }
+
+    @Override
+    public void listExpirableReservations(ListExpirableReservationsRequest request, StreamObserver<ListExpirableReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            var ids = reservationBatchService.listExpirableReservationIds(targetDate)
+                    .stream().map(UUID::toString).toList();
+            observer.onNext(ListExpirableReservationsResponse.newBuilder()
+                    .addAllReservationIds(ids)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void expireReservation(ExpireReservationRequest request,
+                                  StreamObserver<ExpireReservationResponse> observer) {
+        try {
+            boolean expired = reservationBatchService.expireReservation(
+                    UUID.fromString(request.getReservationId()));
+            observer.onNext(ExpireReservationResponse.newBuilder()
+                    .setExpired(expired)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
+        }
+    }
+
+    @Override
     public void processPrevCloseReservations(ProcessPrevCloseReservationsRequest request,
                                              StreamObserver<ProcessPrevCloseReservationsResponse> observer) {
         try {

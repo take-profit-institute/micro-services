@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 /**
@@ -107,9 +108,13 @@ public class DefaultReservationService implements ReservationService {
         ReservationEntity reservation = reservationRepository.findByIdAndUserIdForUpdate(reservationId, userId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
-        // RSV-006~008: 배치 마감 후에는 취소 불가 — 배치가 이미 처리 중일 수 있다.
-        // place/amend와 동일하게 timing 기준으로 마감 시간을 검증한다.
-        deadlineValidator.requireBeforeDeadline(reservation.getTiming());
+        // RSV-006~008: scheduled_date가 오늘인 예약만 배치 마감 시간 검증.
+        // 미래 날짜 예약은 오늘 배치와 무관하므로 시간 무관하게 취소 가능.
+        // KST 기준으로 오늘 날짜를 계산한다 — deadlineValidator도 KST 기준이라 일관성 유지.
+        LocalDate todayKst = LocalDate.now(clock.withZone(ZoneId.of("Asia/Seoul")));
+        if (reservation.getScheduledDate().equals(todayKst)) {
+            deadlineValidator.requireBeforeDeadline(reservation.getTiming());
+        }
 
         return doCancel(reservation, userId);
     }
