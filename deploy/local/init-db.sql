@@ -18,6 +18,7 @@ CREATE DATABASE candle_stock      WITH OWNER candle;
 CREATE DATABASE candle_market      WITH OWNER candle;
 CREATE DATABASE candle_notification WITH OWNER candle;
 CREATE DATABASE candle_wishlist    WITH OWNER candle;
+CREATE DATABASE candle_news       WITH OWNER candle;
 
 CREATE DATABASE candle_trading    WITH OWNER candle;  -- account + trading 통합
 CREATE DATABASE candle_portfolio  WITH OWNER candle;
