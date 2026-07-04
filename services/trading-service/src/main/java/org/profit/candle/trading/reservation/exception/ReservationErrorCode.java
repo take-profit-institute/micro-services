@@ -28,6 +28,10 @@ public enum ReservationErrorCode implements ErrorCode {
             "RESERVATION_INVALID_SCHEDULED_DATE",
             "예약 실행일은 내일부터 7일 이내여야 합니다 (전일종가는 내일로 고정)."
     ),
+    SCHEDULED_DATE_NOT_TRADING_DAY(
+            "RESERVATION_SCHEDULED_DATE_NOT_TRADING_DAY",
+            "예약 실행일이 휴장일입니다 (주말·공휴일). 거래일을 선택해주세요."
+    ),
     DUPLICATE_PENDING_RESERVATION(
             "RESERVATION_DUPLICATE_PENDING",
             "해당 종목에 이미 접수된 예약이 있습니다."

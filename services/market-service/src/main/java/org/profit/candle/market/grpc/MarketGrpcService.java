@@ -8,10 +8,15 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.market.dto.IntradayTickResult;
 import org.profit.candle.market.exception.MarketException;
 import org.profit.candle.market.service.MarketIntradayService;
+import org.profit.candle.market.session.MarketSession;
 import org.profit.candle.market.stream.QuoteStreamBroker;
 import org.profit.candle.proto.market.v1.GetIntradayTicksRequest;
 import org.profit.candle.proto.market.v1.GetIntradayTicksResponse;
+import org.profit.candle.proto.market.v1.GetMarketStatusRequest;
+import org.profit.candle.proto.market.v1.GetMarketStatusResponse;
 import org.profit.candle.proto.market.v1.IntradayTick;
+import org.profit.candle.proto.market.v1.IsTradingDayRequest;
+import org.profit.candle.proto.market.v1.IsTradingDayResponse;
 import org.profit.candle.proto.market.v1.LiveQuote;
 import org.profit.candle.proto.market.v1.MarketServiceGrpc;
 import org.profit.candle.proto.market.v1.StreamQuotesRequest;
@@ -33,6 +38,7 @@ public class MarketGrpcService extends MarketServiceGrpc.MarketServiceImplBase {
 
     private final MarketIntradayService intradayService;
     private final QuoteStreamBroker quoteStreamBroker;
+    private final MarketSession marketSession;
 
     @Override
     public void getIntradayTicks(GetIntradayTicksRequest request,
@@ -56,6 +62,38 @@ public class MarketGrpcService extends MarketServiceGrpc.MarketServiceImplBase {
         } catch (RuntimeException e) {
             observer.onError(Status.INTERNAL.withDescription("INTERNAL").asRuntimeException());
         }
+    }
+
+    @Override
+    public void getMarketStatus(GetMarketStatusRequest request,
+            StreamObserver<GetMarketStatusResponse> observer) {
+        // 주말·공휴일·정규장 시간을 모두 반영한 권위 소스(MarketSession).
+        // open = 지금 정규장 체결 가능 시간(거래일 && 09:00~15:30 KST).
+        String session = marketSession.status(); // "OPEN" | "CLOSED"
+        observer.onNext(GetMarketStatusResponse.newBuilder()
+                .setOpen("OPEN".equals(session))
+                .setTradingDay(marketSession.isTradingDay())
+                .setSession(session)
+                .build());
+        observer.onCompleted();
+    }
+
+    @Override
+    public void isTradingDay(IsTradingDayRequest request,
+            StreamObserver<IsTradingDayResponse> observer) {
+        // 예약 실행 예정일(scheduled_date)이 주말·휴장일이 아닌지 검증하는 용도.
+        final java.time.LocalDate date;
+        try {
+            date = java.time.LocalDate.parse(request.getDate());
+        } catch (java.time.format.DateTimeParseException e) {
+            observer.onError(Status.INVALID_ARGUMENT
+                    .withDescription("date must be YYYY-MM-DD").asRuntimeException());
+            return;
+        }
+        observer.onNext(IsTradingDayResponse.newBuilder()
+                .setTradingDay(marketSession.isTradingDay(date))
+                .build());
+        observer.onCompleted();
     }
 
     @Override

@@ -50,10 +50,31 @@ message StreamQuotesRequest {
   string symbol = 1;
 }
 
+// 거래일/장 운영 상태. 주말·공휴일·정규장 시간(09:00~15:30 KST)을 모두 반영한
+// 권위 소스다. trading(즉시 주문 거래시간 검증)과 BFF(장마감 예약 전환)가 이 값을
+// 단일 소스로 사용한다. 휴장일은 batch가 채우는 market_holidays 테이블이 소유한다.
+message GetMarketStatusRequest {}
+message GetMarketStatusResponse {
+  bool open = 1;         // 지금 정규장 체결 가능 시간인가 (거래일 && 09:00~15:30 KST)
+  bool trading_day = 2;  // 오늘이 거래일인가 (주말·휴장일 제외)
+  string session = 3;    // "OPEN" | "CLOSED"
+}
+
+// 임의 날짜의 거래일 여부. 예약 주문의 실행 예정일(scheduled_date)이 주말·휴장일이
+// 아닌지 검증하는 데 쓴다. 판정은 GetMarketStatus와 동일한 권위 소스(MarketSession)다.
+message IsTradingDayRequest {
+  string date = 1;  // "YYYY-MM-DD" (KST 기준 civil date)
+}
+message IsTradingDayResponse {
+  bool trading_day = 1;  // 주말·휴장일이 아니면 true
+}
+
 service MarketService {
   rpc SearchStocks(SearchStocksRequest) returns (SearchStocksResponse);
   rpc GetQuote(GetQuoteRequest) returns (GetQuoteResponse);
   rpc BatchQuotes(BatchQuotesRequest) returns (BatchQuotesResponse);
   rpc GetIntradayTicks(GetIntradayTicksRequest) returns (GetIntradayTicksResponse);
   rpc StreamQuotes(StreamQuotesRequest) returns (stream LiveQuote);
+  rpc GetMarketStatus(GetMarketStatusRequest) returns (GetMarketStatusResponse);
+  rpc IsTradingDay(IsTradingDayRequest) returns (IsTradingDayResponse);
 }

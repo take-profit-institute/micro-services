@@ -43,14 +43,18 @@ public class MarketSession {
         return now().toLocalDate();
     }
 
-    /** 거래일 여부. 주말·휴장일을 배제한다. */
+    /** 오늘(KST) 거래일 여부. 주말·휴장일을 배제한다. */
     public boolean isTradingDay() {
-        LocalDate today = tradingDate();
-        DayOfWeek day = today.getDayOfWeek();
+        return isTradingDay(tradingDate());
+    }
+
+    /** 주어진 날짜의 거래일 여부. 주말·휴장일을 배제한다. */
+    public boolean isTradingDay(LocalDate date) {
+        DayOfWeek day = date.getDayOfWeek();
         if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
             return false;
         }
-        return !tradingCalendar.isHoliday(today);
+        return !tradingCalendar.isHoliday(date);
     }
 
     /** wishlist 입력 계약의 marketStatus 값. 정규장 시간이면 OPEN, 아니면 CLOSED. */
