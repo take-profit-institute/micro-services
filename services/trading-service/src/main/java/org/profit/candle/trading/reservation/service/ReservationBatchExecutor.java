@@ -106,7 +106,8 @@ public class ReservationBatchExecutor {
                         reservation.getSymbol(),
                         reservation.getSide().name(),
                         reservation.getQuantity(),
-                        reservation.getPriceKrw(),
+                        reservation.getPriceKrw() == null ? 0L : reservation.getPriceKrw(),
+                        reservation.getReservedAmountKrw(),
                         reservation.getIdempotencyKey()));
         return true;
     }
