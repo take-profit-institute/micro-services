@@ -69,6 +69,11 @@ public class ContentService {
         return contentRepository.findAll(publishedSpec(category, level, null), pageable);
     }
 
+    public Page<Content> adminList(Boolean published, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return contentRepository.findAll(adminSpec(published), pageable);
+    }
+
     public Page<Content> search(String query, String category,
                                 ContentLevel level, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
@@ -104,5 +109,11 @@ public class ContentService {
             }
             return predicate;
         };
+    }
+
+    private Specification<Content> adminSpec(Boolean published) {
+        return (root, cq, cb) -> published == null
+                ? cb.conjunction()
+                : cb.equal(root.get("published"), published);
     }
 }
