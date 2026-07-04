@@ -17,8 +17,10 @@ import org.profit.candle.notification.device.entity.DevicePlatform;
 import org.profit.candle.notification.device.service.DeviceTokenService;
 import org.profit.candle.notification.idempotency.service.IdempotencyExecutor;
 import org.profit.candle.notification.notification.dto.CreateNotificationCommand;
+import org.profit.candle.notification.notification.dto.DeleteNotificationResult;
 import org.profit.candle.notification.notification.dto.DeliveryResult;
 import org.profit.candle.notification.notification.dto.ListNotificationsResult;
+import org.profit.candle.notification.notification.dto.MarkAllAsReadResult;
 import org.profit.candle.notification.notification.dto.NotificationResult;
 import org.profit.candle.notification.notification.entity.NotificationStatus;
 import org.profit.candle.notification.notification.entity.NotificationType;
@@ -34,6 +36,10 @@ import org.profit.candle.proto.notification.v1.GetDeliveryStatusRequest;
 import org.profit.candle.proto.notification.v1.GetDeliveryStatusResponse;
 import org.profit.candle.proto.notification.v1.ListNotificationsRequest;
 import org.profit.candle.proto.notification.v1.ListNotificationsResponse;
+import org.profit.candle.proto.notification.v1.DeleteNotificationRequest;
+import org.profit.candle.proto.notification.v1.DeleteNotificationResponse;
+import org.profit.candle.proto.notification.v1.MarkAllAsReadRequest;
+import org.profit.candle.proto.notification.v1.MarkAllAsReadResponse;
 import org.profit.candle.proto.notification.v1.MarkAsReadRequest;
 import org.profit.candle.proto.notification.v1.MarkAsReadResponse;
 import org.profit.candle.proto.notification.v1.NotificationServiceGrpc;
@@ -196,6 +202,84 @@ public class NotificationGrpcService
 
             MarkAsReadResponse response = MarkAsReadResponse.newBuilder()
                     .setNotification(toNotificationProto(result))
+                    .build();
+
+            observer.onNext(response);
+            observer.onCompleted();
+        } catch (NotificationException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (RuntimeException e) {
+            observer.onError(Status.INTERNAL
+                    .withDescription(NotificationErrorCode.INTERNAL_ERROR.code())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void markAllAsRead(
+            MarkAllAsReadRequest request,
+            StreamObserver<MarkAllAsReadResponse> observer
+    ) {
+        try {
+            UUID userId = parseUuid(request.getUserId(), NotificationErrorCode.INVALID_USER_ID);
+            String idempotencyKey =
+                    requireIdempotencyKey(request.getCommandMetadata().getIdempotencyKey());
+
+            MarkAllAsReadResult result = idempotencyExecutor.execute(
+                    userId,
+                    "MarkAllAsRead",
+                    idempotencyKey,
+                    requestHash(request.toBuilder()
+                            .clearCommandMetadata()
+                            .build()
+                            .toByteArray()),
+                    MarkAllAsReadResult.class,
+                    () -> notificationService.markAllAsRead(userId, idempotencyKey)
+            );
+
+            MarkAllAsReadResponse response = MarkAllAsReadResponse.newBuilder()
+                    .setUpdatedCount(result.updatedCount())
+                    .build();
+
+            observer.onNext(response);
+            observer.onCompleted();
+        } catch (NotificationException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (RuntimeException e) {
+            observer.onError(Status.INTERNAL
+                    .withDescription(NotificationErrorCode.INTERNAL_ERROR.code())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void deleteNotification(
+            DeleteNotificationRequest request,
+            StreamObserver<DeleteNotificationResponse> observer
+    ) {
+        try {
+            UUID userId = parseUuid(request.getUserId(), NotificationErrorCode.INVALID_USER_ID);
+            UUID notificationId = parseUuid(
+                    request.getNotificationId(),
+                    NotificationErrorCode.INVALID_NOTIFICATION_ID
+            );
+            String idempotencyKey =
+                    requireIdempotencyKey(request.getCommandMetadata().getIdempotencyKey());
+
+            DeleteNotificationResult result = idempotencyExecutor.execute(
+                    userId,
+                    "DeleteNotification",
+                    idempotencyKey,
+                    requestHash(request.toBuilder()
+                            .clearCommandMetadata()
+                            .build()
+                            .toByteArray()),
+                    DeleteNotificationResult.class,
+                    () -> notificationService.deleteNotification(userId, notificationId, idempotencyKey)
+            );
+
+            DeleteNotificationResponse response = DeleteNotificationResponse.newBuilder()
+                    .setSuccess(result.deleted())
                     .build();
 
             observer.onNext(response);
