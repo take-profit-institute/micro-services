@@ -46,8 +46,11 @@ public class DefaultOrderService implements OrderService {
     public OrderEntity placeOrder(UUID userId, PlaceOrderCommand command) {
         tradingHoursValidator.requireMarketOpen();
 
-        if (command.quantity() <= 0 || command.price() <= 0) {
+        if (command.quantity() <= 0) {
             throw new OrderException(OrderErrorCode.INVALID_QUANTITY);
+        }
+        if (command.kind() == OrderKindValue.LIMIT && command.price() <= 0) {
+            throw new OrderException(OrderErrorCode.INVALID_PRICE);
         }
 
         AccountEntity account = accountService.getAccount(userId);
@@ -57,14 +60,14 @@ public class DefaultOrderService implements OrderService {
             throw new OrderException(OrderErrorCode.DUPLICATE_PENDING_ORDER);
         }
 
-        long amount = command.price() * command.quantity();
-        long fee = BigDecimal.valueOf(amount)
-                .multiply(TradingFeePolicy.FEE_RATE)
-                .setScale(0, RoundingMode.DOWN)
-                .longValue();
         long reservedAmountKrw = 0;
 
-        if (command.side() == OrderSideValue.BUY) {
+        if (command.side() == OrderSideValue.BUY && command.kind() == OrderKindValue.LIMIT) {
+            long amount = command.price() * command.quantity();
+            long fee = BigDecimal.valueOf(amount)
+                    .multiply(TradingFeePolicy.FEE_RATE)
+                    .setScale(0, RoundingMode.DOWN)
+                    .longValue();
             reservedAmountKrw = amount + fee;
             accountService.lockBalance(userId, reservedAmountKrw);
         }
