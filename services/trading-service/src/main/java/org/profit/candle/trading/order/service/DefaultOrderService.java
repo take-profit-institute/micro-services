@@ -17,22 +17,19 @@ import org.profit.candle.trading.order.event.OrderPlacedPayload;
 import org.profit.candle.trading.order.exception.OrderErrorCode;
 import org.profit.candle.trading.order.exception.OrderException;
 import org.profit.candle.trading.order.repository.OrderRepository;
+import org.profit.candle.trading.support.TradingFeePolicy;
 import org.profit.candle.trading.support.event.OutboxWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Order 도메인 업무 서비스. 메서드는 IdempotencyExecutor의 트랜잭션 안에서 호출되어
- * 상태 변경 + outbox 기록이 멱등성 record와 한 트랜잭션으로 commit된다.
- */
 @Service
 @RequiredArgsConstructor
 public class DefaultOrderService implements OrderService {
-
-    private static final double FEE_RATE = 0.00015;
 
     private final OrderRepository orderRepository;
     private final AccountService accountService;
@@ -52,12 +49,16 @@ public class DefaultOrderService implements OrderService {
 
         AccountEntity account = accountService.getAccount(userId);
 
-        if (orderRepository.existsByAccountIdAndSymbolAndStatus(account.getId(), command.symbol(), OrderStatusValue.PENDING)) {
+        if (orderRepository.existsByAccountIdAndSymbolAndStatus(
+                account.getId(), command.symbol(), OrderStatusValue.PENDING)) {
             throw new OrderException(OrderErrorCode.DUPLICATE_PENDING_ORDER);
         }
 
         long amount = command.price() * command.quantity();
-        long fee = Math.round(amount * FEE_RATE);
+        long fee = BigDecimal.valueOf(amount)
+                .multiply(TradingFeePolicy.FEE_RATE)
+                .setScale(0, RoundingMode.DOWN)
+                .longValue();
         long reservedAmountKrw = 0;
 
         if (command.side() == OrderSideValue.BUY) {
@@ -72,13 +73,44 @@ public class DefaultOrderService implements OrderService {
                 command.quantity(), priceKrw, reservedAmountKrw, command.idempotencyKey());
         orderRepository.save(order);
 
-        outboxWriter.record(outboxOperations, "OrderPlaced", order.getId().toString(), new OrderPlacedPayload(
-                order.getId().toString(), userId.toString(), order.getSymbol(), order.getSide().name(),
-                order.getQuantity(), order.getPriceKrw() == null ? 0 : order.getPriceKrw(), reservedAmountKrw));
+        outboxWriter.record(outboxOperations, "OrderPlaced", order.getId().toString(),
+                new OrderPlacedPayload(
+                        order.getId().toString(), userId.toString(), order.getSymbol(),
+                        order.getSide().name(), order.getQuantity(),
+                        order.getPriceKrw() == null ? 0 : order.getPriceKrw(), reservedAmountKrw));
 
         if (command.kind() == OrderKindValue.MARKET) {
             return orderExecutionService.fillMarketOrder(order.getId());
         }
+
+        return order;
+    }
+
+    @Override
+    @Transactional
+    public OrderEntity placeOrderFromReservation(UUID userId, PlaceOrderCommand command) {
+        // 거래시간 검증 없음 — 배치 트리거라 시간 무관
+        // lockBalance 없음 — 예약 생성 시점에 이미 잠금됨
+        // fillMarketOrder 없음 — OPEN+LIMIT이라 즉시 체결 불필요
+
+        AccountEntity account = accountService.getAccount(userId);
+
+        if (orderRepository.existsByAccountIdAndSymbolAndStatus(
+                account.getId(), command.symbol(), OrderStatusValue.PENDING)) {
+            throw new OrderException(OrderErrorCode.DUPLICATE_PENDING_ORDER);
+        }
+
+        // OPEN+LIMIT이라 항상 지정가 — priceKrw는 command.price() 그대로
+        OrderEntity order = OrderEntity.place(
+                userId, account.getId(), command.symbol(), command.side(), command.kind(),
+                command.quantity(), command.price(), 0L, command.idempotencyKey());
+        orderRepository.save(order);
+
+        outboxWriter.record(outboxOperations, "OrderPlaced", order.getId().toString(),
+                new OrderPlacedPayload(
+                        order.getId().toString(), userId.toString(), order.getSymbol(),
+                        order.getSide().name(), order.getQuantity(),
+                        order.getPriceKrw() == null ? 0 : order.getPriceKrw(), 0L));
 
         return order;
     }
@@ -94,17 +126,12 @@ public class DefaultOrderService implements OrderService {
     @Override
     @Transactional
     public OrderEntity amendOrder(UUID userId, UUID orderId, AmendOrderCommand command) {
-        // CAN-005: PENDING 지정가 주문만 정정 가능.
-        // 비관적 락 — 정정과 취소/배치가 같은 주문을 동시에 노리는 경합 방지.
         OrderEntity original = orderRepository.findByIdAndUserIdForUpdate(orderId, userId)
                 .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
-        // markCancelled()가 내부에서 PENDING/LIMIT 여부를 검증한다 (CAN-005).
-        // — PENDING이 아니면 ORDER_NOT_PENDING, 지정가가 아니면 MARKET_ORDER_CANNOT_BE_CANCELLED
         long releasedAmount = original.getReservedAmountKrw();
         original.markCancelled();
 
-        // CAN-004: 원주문 취소 시 reserved_balance 즉시 반환.
         if (releasedAmount > 0 && original.getSide() == OrderSideValue.BUY) {
             accountService.releaseBalance(userId, releasedAmount);
         }
@@ -113,15 +140,15 @@ public class DefaultOrderService implements OrderService {
         outboxWriter.record(outboxOperations, "OrderCancelled", original.getId().toString(),
                 new OrderCancelledPayload(original.getId().toString(), userId.toString(), releasedAmount));
 
-        // CAN-007: 신규 주문 생성.
-        // 거래시간 검증은 생략 — 원주문이 이미 정규장 안에서 접수된 PENDING이라는 게
-        // 정정 가능 전제 조건이므로, 별도로 다시 거는 건 불필요하다.
         if (command.quantity() <= 0 || command.price() <= 0) {
             throw new OrderException(OrderErrorCode.INVALID_QUANTITY);
         }
 
         long amount = command.price() * command.quantity();
-        long fee = Math.round(amount * FEE_RATE);
+        long fee = BigDecimal.valueOf(amount)
+                .multiply(TradingFeePolicy.FEE_RATE)
+                .setScale(0, RoundingMode.DOWN)
+                .longValue();
         long newReservedAmountKrw = 0;
 
         if (original.getSide() == OrderSideValue.BUY) {
@@ -129,7 +156,6 @@ public class DefaultOrderService implements OrderService {
             accountService.lockBalance(userId, newReservedAmountKrw);
         }
 
-        // CAN-008: 신규 주문에 parent_order_id = 원주문 ID.
         OrderEntity amended = OrderEntity.placeWithParent(
                 userId, original.getAccountId(), original.getSymbol(), original.getSide(),
                 OrderKindValue.LIMIT, command.quantity(), command.price(),
