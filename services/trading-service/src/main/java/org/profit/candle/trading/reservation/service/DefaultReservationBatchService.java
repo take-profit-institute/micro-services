@@ -83,7 +83,8 @@ public class DefaultReservationBatchService implements ReservationBatchService {
                             reservation.getSymbol(),
                             reservation.getSide().name(),
                             reservation.getQuantity(),
-                            reservation.getPriceKrw(),
+                            reservation.getPriceKrw() == null ? 0L : reservation.getPriceKrw(),
+                            reservation.getReservedAmountKrw(),
                             reservation.getIdempotencyKey()));
             count++;
         }
