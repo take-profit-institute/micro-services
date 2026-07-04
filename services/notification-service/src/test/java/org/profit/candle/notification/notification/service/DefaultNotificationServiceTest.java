@@ -278,9 +278,22 @@ class DefaultNotificationServiceTest {
         }
 
         @Override
+        public List<Notification> listByUserIdAndStatus(UUID userId, NotificationStatus status) {
+            return notifications.stream()
+                    .filter(notification -> notification.getUserId().equals(userId))
+                    .filter(notification -> notification.getStatus() == status)
+                    .toList();
+        }
+
+        @Override
         public Notification save(Notification notification) {
             notifications.add(notification);
             return notification;
+        }
+
+        @Override
+        public void delete(Notification notification) {
+            notifications.removeIf(existing -> existing.getId().equals(notification.getId()));
         }
 
         private List<Notification> sorted(UUID userId) {
