@@ -1,9 +1,10 @@
 package org.profit.candle.trading.reservation.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.profit.candle.trading.reservation.exception.ReservationException;
 import org.profit.candle.trading.reservation.service.ReservationBatchService;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -34,6 +35,7 @@ public class ReservationConvertedConsumer {
         try {
             event = objectMapper.readValue(record.value(), ReservationConvertedPayload.class);
         } catch (Exception e) {
+            // poison pill — 재시도해도 동일하게 실패하므로 skip.
             log.error("ReservationConverted 역직렬화 실패 — offset={}, topic={}",
                     record.offset(), record.topic(), e);
             return;
@@ -46,7 +48,13 @@ public class ReservationConvertedConsumer {
 
             log.info("ReservationConverted 처리 완료 — reservationId={}, orderId={}",
                     event.reservationId(), event.orderId());
+        } catch (ReservationException | IllegalArgumentException e) {
+            // 이미 EXECUTED/CANCELLED 등 상태 전이 불가, 또는 UUID 파싱 실패 —
+            // 재시도해도 동일하게 실패하므로 skip (poison pill 방지).
+            log.warn("ReservationConverted skip — reservationId={}, reason={}",
+                    event.reservationId(), e.getMessage());
         } catch (Exception e) {
+            // 일시적 오류(DB 장애 등) — 재throw로 오프셋 커밋 차단, Kafka 재시도 유도.
             log.error("ReservationConverted 처리 실패 — reservationId={}, offset={}",
                     event.reservationId(), record.offset(), e);
             throw new RuntimeException("ReservationConverted 처리 실패 — reservationId: "

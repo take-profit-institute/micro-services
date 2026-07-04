@@ -105,16 +105,6 @@ public class ReservationEntity {
         this.updatedAt = updatedAt;
     }
 
-    /**
-     * 신규 예약 생성. (RSV-001~008)
-     * 가용 가능 금액 검증(BUY)이나 보유 수량 검증(SELL), scheduled_date 범위 검증(RSV-006~008)은
-     * 호출 측({@code ReservationService})의 책임이다 — 이 팩토리는 검증된 입력을 받아
-     * RESERVED 상태로 생성만 한다.
-     *
-     * <p>timing별 order_kind 제약(RSV-002/003), order_kind == LIMIT일 때만 price_krw 존재하는
-     * 제약은 DB CHECK 제약과 동일하게 여기서도 한 번 더 검사한다 — Entity는 항상 유지되어야
-     * 하는 상태 규칙을 스스로 지킨다.</p>
-     */
     public static ReservationEntity reserve(UUID userId, UUID accountId, String symbol, ReservationSideValue side,
                                             ReservationTimingValue timing, ReservationOrderKindValue orderKind,
                                             long quantity, Long priceKrw, LocalDate scheduledDate,
@@ -131,7 +121,6 @@ public class ReservationEntity {
                 idempotencyKey, null, now, now);
     }
 
-    /** RSV-002/003: OPEN은 MARKET/LIMIT만, TODAY_CLOSE/PREV_CLOSE는 AFTER_HOURS_CLOSE만 허용. */
     private static void validateTimingOrderKind(ReservationTimingValue timing, ReservationOrderKindValue orderKind) {
         boolean valid = switch (timing) {
             case OPEN -> orderKind == ReservationOrderKindValue.MARKET
@@ -143,7 +132,6 @@ public class ReservationEntity {
         }
     }
 
-    /** LIMIT일 때만 price_krw 존재 (시가+지정가 케이스만 가격을 가짐). */
     private static void validatePrice(ReservationOrderKindValue orderKind, Long priceKrw) {
         if (orderKind == ReservationOrderKindValue.LIMIT && priceKrw == null) {
             throw new ReservationException(ReservationErrorCode.LIMIT_RESERVATION_REQUIRES_PRICE);
@@ -160,7 +148,6 @@ public class ReservationEntity {
         return status == ReservationStatusValue.RESERVED;
     }
 
-    /** 시가+지정가 케이스(6종 중 1개)만 이 전이를 탄다 — Order/Reservation 도메인 경계의 핵심. */
     public void startConverting() {
         if (!reserved()) {
             throw new ReservationException(ReservationErrorCode.RESERVATION_NOT_RESERVED);
@@ -172,7 +159,6 @@ public class ReservationEntity {
         this.updatedAt = Instant.now();
     }
 
-    /** ReservationConverted 이벤트 수신 시 호출 (order_svc 전환 완료). */
     public void markConverted(UUID convertedOrderId) {
         if (status != ReservationStatusValue.CONVERTING) {
             throw new ReservationException(ReservationErrorCode.RESERVATION_NOT_CONVERTING);
@@ -182,7 +168,6 @@ public class ReservationEntity {
         this.updatedAt = Instant.now();
     }
 
-    /** 자체 완결 케이스(MARKET/AFTER_HOURS_CLOSE) 배치 체결 처리. */
     public void markExecuted() {
         if (!reserved()) {
             throw new ReservationException(ReservationErrorCode.RESERVATION_NOT_RESERVED);
@@ -191,7 +176,6 @@ public class ReservationEntity {
         this.updatedAt = Instant.now();
     }
 
-    /** 취소 처리 (RSV-016/017/018). RESERVED 상태만 취소 가능. */
     public void markCancelled() {
         if (!reserved()) {
             throw new ReservationException(ReservationErrorCode.RESERVATION_NOT_RESERVED);
@@ -200,16 +184,20 @@ public class ReservationEntity {
         this.updatedAt = Instant.now();
     }
 
-    /** 배치 처리 실패 (잔고 부족 등). */
+    /**
+     * 배치 처리 실패 (잔고 부족, ReservationDue 유실 등).
+     * RESERVED 또는 CONVERTING 상태에서 호출 가능 —
+     * CONVERTING 타임아웃 배치(failConvertingUnderLock)에서도 호출한다.
+     */
     public void markFailed() {
-        if (!reserved()) {
+        if (status != ReservationStatusValue.RESERVED
+                && status != ReservationStatusValue.CONVERTING) {
             throw new ReservationException(ReservationErrorCode.RESERVATION_NOT_RESERVED);
         }
         this.status = ReservationStatusValue.FAILED;
         this.updatedAt = Instant.now();
     }
 
-    /** 접수 마감 후 미처리 등 자동 만료. */
     public void markExpired() {
         if (!reserved()) {
             throw new ReservationException(ReservationErrorCode.RESERVATION_NOT_RESERVED);
@@ -218,7 +206,6 @@ public class ReservationEntity {
         this.updatedAt = Instant.now();
     }
 
-    /** CAN-006/007/008: 정정 = 원예약 취소 + parent 참조를 가진 신규 예약 생성. 신규 측에서 호출. */
     public void linkParent(UUID parentReservationId) {
         this.parentReservationId = parentReservationId;
         this.updatedAt = Instant.now();
