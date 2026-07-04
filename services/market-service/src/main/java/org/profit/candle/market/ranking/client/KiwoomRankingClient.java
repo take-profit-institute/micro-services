@@ -3,7 +3,9 @@ package org.profit.candle.market.ranking.client;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.market.client.KiwoomAuthClient;
 import org.profit.candle.market.ranking.dto.request.KiwoomPriceRankRequest;
+import org.profit.candle.market.ranking.dto.request.KiwoomVolumeSpikeRequest;
 import org.profit.candle.market.ranking.dto.response.KiwoomPriceRankResponse;
+import org.profit.candle.market.ranking.dto.response.KiwoomVolumeSpikeResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -38,6 +40,20 @@ public class KiwoomRankingClient {
                 .block();
 
         return response;
+    }
+
+    public KiwoomVolumeSpikeResponse getVolumeSpikeStocks() {
+        String token = kiwoomAuthClient.issueToken().token();
+
+        return kiwoomWebClient.post()
+                .uri("/api/dostk/rkinfo")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
+                .header("api-id", "ka10023")
+                .header("authorization", "Bearer " + token)
+                .bodyValue(KiwoomVolumeSpikeRequest.volumeSpike())
+                .retrieve()
+                .bodyToMono(KiwoomVolumeSpikeResponse.class)
+                .block();
     }
 
 }
