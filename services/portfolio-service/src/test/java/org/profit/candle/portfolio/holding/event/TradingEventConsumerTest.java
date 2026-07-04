@@ -44,10 +44,10 @@ class TradingEventConsumerTest {
         consumer = new TradingEventConsumer(holdingService, consumedEventRepository, objectMapper);
     }
 
-    private String payload(UUID eventId, String side, long qty, long price) throws Exception {
+    // 멱등 키는 orderId(UUID 문자열). 테스트에선 orderId로 eventId UUID를 그대로 쓴다.
+    private String payload(UUID orderId, String side, long qty, long price) throws Exception {
         return objectMapper.writeValueAsString(
-                new OrderFilledPayload(eventId, "OrderFilled", 1,
-                        USER_ID, SYMBOL, side, qty, price, Instant.now()));
+                new OrderFilledPayload(orderId.toString(), USER_ID, SYMBOL, side, price, qty));
     }
 
     // ─── BUY / SELL 정상 처리 ────────────────────────────────────────────────

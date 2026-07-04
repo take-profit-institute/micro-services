@@ -98,6 +98,56 @@ public class DefaultOrderExecutionService implements OrderExecutionService {
     }
 
     @Override
+    @Transactional
+    public OrderEntity fillReservationOrder(UUID orderId, long executedPrice) {
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.pending()) {
+            throw new OrderException(OrderErrorCode.ORDER_NOT_PENDING);
+        }
+        if (executionRepository.findByOrderId(orderId).isPresent()) {
+            throw new OrderException(OrderErrorCode.ORDER_NOT_PENDING);
+        }
+
+        long gross = executedPrice * order.getQuantity(); // overflow는 예약 배치 단계에서 이미 검증됨
+
+        long feeKrw;
+        long taxKrw;
+        long netAmountKrw;
+        if (order.getSide() == OrderSideValue.BUY) {
+            // 예약 배치가 선점(lock)한 reserved_amount(=gross+fee)를 그대로 정산해 rounding 불일치를 없앤다.
+            netAmountKrw = order.getReservedAmountKrw();
+            feeKrw = Math.max(0, netAmountKrw - gross);
+            taxKrw = 0;
+        } else {
+            feeKrw = BigDecimal.valueOf(gross).multiply(TradingFeePolicy.FEE_RATE).setScale(0, RoundingMode.DOWN).longValue();
+            taxKrw = BigDecimal.valueOf(gross).multiply(TradingFeePolicy.TAX_RATE).setScale(0, RoundingMode.DOWN).longValue();
+            netAmountKrw = gross - feeKrw - taxKrw;
+        }
+
+        Instant now = Instant.now(clock);
+        ExecutionEntity execution = ExecutionEntity.create(
+                order.getId(), executedPrice, order.getQuantity(), feeKrw, taxKrw, netAmountKrw, now);
+        executionRepository.save(execution);
+
+        if (order.getSide() == OrderSideValue.BUY) {
+            accountService.settleBuy(order.getUserId(), order.getReservedAmountKrw(), netAmountKrw);
+        } else {
+            accountService.settleSell(order.getUserId(), netAmountKrw);
+        }
+
+        order.fill();
+        orderRepository.save(order);
+
+        outboxWriter.record(outboxOperations, "OrderFilled", order.getId().toString(),
+                new OrderFilledPayload(order.getId().toString(), order.getUserId().toString(),
+                        order.getSymbol(), order.getSide().name(), executedPrice,
+                        order.getQuantity(), feeKrw, taxKrw, netAmountKrw));
+        return order;
+    }
+
+    @Override
     public int fillLimitOrdersIfConditionMet(String symbol, long currentPrice) {
         // 락 없는 후보 조회 — Projection으로 id/side/priceKrw만 로드 (엔티티 전체 로딩 방지).
         List<OrderRepository.LimitOrderCandidate> candidates = orderRepository
