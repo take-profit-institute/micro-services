@@ -129,6 +129,7 @@ services:
       GRPC_MISSION_ADDR:      host.docker.internal:50058
       GRPC_LEARN_ADDR:        host.docker.internal:50059
       GRPC_STOCK_ADDR:        host.docker.internal:50060
+      GRPC_WISHLIST_ADDR:     host.docker.internal:50061
     ports: ["8080:8080"]
     extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
@@ -151,7 +152,7 @@ services:
       # 채팅 방 배정 REST(/chat/rooms) 주소: 'services' 프로파일 사용 시 http://chatting-service:8090
       # (/chat/ws WebSocket은 운영 시 ALB가 직접 passthrough — 이 게이트웨이는 REST만 프록시)
       GATEWAY_CHAT_URI: ${GATEWAY_CHAT_URI:-http://host.docker.internal:8090}
-      GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost,capacitor://localhost}
     ports: ["8000:8000"]
     extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:

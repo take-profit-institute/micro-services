@@ -21,6 +21,12 @@ service NotificationService {
   rpc MarkAsRead(MarkAsReadRequest)
       returns (MarkAsReadResponse);
 
+  rpc MarkAllAsRead(MarkAllAsReadRequest)
+      returns (MarkAllAsReadResponse);
+
+  rpc DeleteNotification(DeleteNotificationRequest)
+      returns (DeleteNotificationResponse);
+
   rpc CountUnread(CountUnreadRequest)
       returns (CountUnreadResponse);
 
@@ -110,6 +116,25 @@ message MarkAsReadRequest {
 
 message MarkAsReadResponse {
   Notification notification = 1;
+}
+
+message MarkAllAsReadRequest {
+  string user_id = 1;
+  candle.common.v1.CommandMetadata command_metadata = 2;
+}
+
+message MarkAllAsReadResponse {
+  int32 updated_count = 1;  // 이번 호출로 UNREAD→READ 전이된 건수
+}
+
+message DeleteNotificationRequest {
+  string user_id = 1;
+  string notification_id = 2;
+  candle.common.v1.CommandMetadata command_metadata = 3;
+}
+
+message DeleteNotificationResponse {
+  bool success = 1;  // false면 이미 삭제됨(멱등)
 }
 
 message CountUnreadRequest {

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,13 +66,18 @@ public class ContentService {
     public Page<Content> list(String category, ContentLevel level,
                               String sortBy, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, resolveSort(sortBy));
-        return contentRepository.findPublished(category, level, pageable);
+        return contentRepository.findAll(publishedSpec(category, level, null), pageable);
+    }
+
+    public Page<Content> adminList(Boolean published, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return contentRepository.findAll(adminSpec(published), pageable);
     }
 
     public Page<Content> search(String query, String category,
                                 ContentLevel level, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return contentRepository.searchByTitle(query, category, level, pageable);
+        return contentRepository.findAll(publishedSpec(category, level, query), pageable);
     }
 
     public long countAll() {
@@ -87,5 +93,27 @@ public class ContentService {
             case "POPULAR", "READ_COUNT" -> Sort.by(Sort.Direction.DESC, "readCount");
             default -> Sort.by(Sort.Direction.DESC, "createdAt"); // LATEST
         };
+    }
+
+    private Specification<Content> publishedSpec(String category, ContentLevel level, String query) {
+        return (root, cq, cb) -> {
+            var predicate = cb.isTrue(root.get("published"));
+            if (category != null && !category.isBlank()) {
+                predicate = cb.and(predicate, cb.equal(root.get("category"), category));
+            }
+            if (level != null) {
+                predicate = cb.and(predicate, cb.equal(root.get("level"), level));
+            }
+            if (query != null && !query.isBlank()) {
+                predicate = cb.and(predicate, cb.like(cb.lower(root.get("title")), "%" + query.toLowerCase() + "%"));
+            }
+            return predicate;
+        };
+    }
+
+    private Specification<Content> adminSpec(Boolean published) {
+        return (root, cq, cb) -> published == null
+                ? cb.conjunction()
+                : cb.equal(root.get("published"), published);
     }
 }

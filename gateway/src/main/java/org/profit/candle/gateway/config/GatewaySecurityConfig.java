@@ -35,7 +35,7 @@ public class GatewaySecurityConfig {
     @Value("${gateway.jwt.hmac-secret}")
     private String hmacSecret;
 
-    @Value("${gateway.cors.allowed-origin-patterns:http://localhost:3000}")
+    @Value("${gateway.cors.allowed-origin-patterns:http://localhost:3000,http://localhost:3001}")
     private List<String> allowedOrigins;
 
     // auth 경로 + preflight: JWT 검증 없이 통과

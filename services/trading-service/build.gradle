@@ -24,6 +24,9 @@ dependencies {
 
     // gRPC 클라이언트 (ChartService 호출). starter 가 netty 전송 + GrpcChannelFactory 오토컨피그 제공.
     implementation 'org.springframework.boot:spring-boot-starter-grpc-client'
+
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'org.springframework.boot:spring-boot-kafka'
 }
 
 // 공용 proto 디렉터리(리포 루트 /proto)에서 stub 생성

@@ -11,6 +11,7 @@ service LearningService {
   rpc CreateContent(CreateContentRequest) returns (ContentResponse);
   rpc UpdateContent(UpdateContentRequest) returns (ContentResponse);
   rpc DeleteContent(DeleteContentRequest) returns (DeleteContentResponse);
+  rpc ListAdminContents(ListAdminContentsRequest) returns (ListAdminContentsResponse);
   rpc GetContent(GetContentRequest) returns (ContentDetailResponse);
   rpc ListContents(ListContentsRequest) returns (ListContentsResponse);
   rpc SearchContents(SearchContentsRequest) returns (ListContentsResponse);
@@ -67,6 +68,19 @@ message DeleteContentRequest {
 
 message DeleteContentResponse {
   bool success = 1;
+}
+
+message ListAdminContentsRequest {
+  optional bool published = 1;
+  int32 page = 2;
+  int32 size = 3;
+}
+
+message ListAdminContentsResponse {
+  repeated ContentResponse contents = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 size = 4;
 }
 
 message GetContentRequest {

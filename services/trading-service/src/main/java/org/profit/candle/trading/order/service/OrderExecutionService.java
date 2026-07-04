@@ -16,6 +16,14 @@ public interface OrderExecutionService {
     OrderEntity fillMarketOrder(UUID orderId);
 
     /**
+     * 예약(시장가/종가) 배치가 확정한 체결가로 PENDING Order를 즉시 체결한다.
+     * fillMarketOrder와 달리 현재가를 조회하지 않고 넘겨받은 executedPrice를 쓴다.
+     * BUY는 예약 시점에 선점(lock)된 reserved_amount로 정산해 rounding 불일치를 없앤다.
+     * 같은 트랜잭션에서 ExecutionEntity 생성, 잔고 정산, OrderFilled 발행까지 수행한다.
+     */
+    OrderEntity fillReservationOrder(UUID orderId, long executedPrice);
+
+    /**
      * 지정가 조건 체결 (EXE-002). Market 현재가 이벤트 수신 시 호출.
      * symbol의 PENDING 지정가 주문 중 currentPrice로 체결 가능한 것들을 즉시 체결한다.
      *

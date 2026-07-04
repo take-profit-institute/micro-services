@@ -3,9 +3,10 @@ spring:
     name: news-service
   grpc:
     client:
-      channels:
+      # Spring Boot 4.1 spring-boot-grpc-client 규격: `channel`(단수) + `target`.
+      channel:
         stock-service:
-          address: ${STOCK_SERVICE_GRPC_ADDRESS:static://localhost:50060}
+          target: ${STOCK_SERVICE_GRPC_ADDRESS:static://localhost:50060}
   datasource:
     url: ${NEWS_DB_URL:jdbc:postgresql://localhost:5432/candle_news}
     username: ${NEWS_DB_USERNAME:candle}

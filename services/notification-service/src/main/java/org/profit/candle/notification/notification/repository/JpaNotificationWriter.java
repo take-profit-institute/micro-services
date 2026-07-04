@@ -14,4 +14,9 @@ public class JpaNotificationWriter implements NotificationWriter {
     public Notification save(Notification notification) {
         return notificationJpaRepository.save(notification);
     }
+
+    @Override
+    public void delete(Notification notification) {
+        notificationJpaRepository.delete(notification);
+    }
 }
