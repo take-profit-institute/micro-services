@@ -18,8 +18,13 @@ public interface OrderService {
      * ReservationDue 이벤트 수신 시 Order 생성 (OPEN+LIMIT 예약 전환).
      * placeOrder()와 달리 거래시간 검증/lockBalance/즉시체결이 없다 —
      * 예약 생성 시점에 이미 처리됐기 때문이다.
+     * Outbox(ReservationConverted) 기록을 같은 트랜잭션에서 처리한다 — 원자성 보장.
+     *
+     * @param reservedAmountKrw 예약 생성 시점에 이미 lockBalance된 금액
+     * @param reservationId     전환 완료 후 ReservationConverted 이벤트에 담을 예약 ID
      */
-    OrderEntity placeOrderFromReservation(UUID userId, PlaceOrderCommand command);
+    OrderEntity placeOrderFromReservation(UUID userId, PlaceOrderCommand command,
+                                          long reservedAmountKrw, UUID reservationId);
 
     /**
      * 사용자가 직접 주문을 취소한다. (CAN-001~004)

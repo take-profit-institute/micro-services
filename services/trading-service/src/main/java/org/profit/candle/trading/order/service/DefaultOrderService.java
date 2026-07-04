@@ -1,6 +1,7 @@
 package org.profit.candle.trading.order.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.trading.account.entity.AccountEntity;
 import org.profit.candle.trading.account.service.AccountService;
 import org.profit.candle.trading.order.dto.AmendOrderCommand;
@@ -25,8 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DefaultOrderService implements OrderService {
@@ -88,29 +91,41 @@ public class DefaultOrderService implements OrderService {
 
     @Override
     @Transactional
-    public OrderEntity placeOrderFromReservation(UUID userId, PlaceOrderCommand command) {
+    public OrderEntity placeOrderFromReservation(UUID userId, PlaceOrderCommand command,
+                                                 long reservedAmountKrw, UUID reservationId) {
         // 거래시간 검증 없음 — 배치 트리거라 시간 무관
         // lockBalance 없음 — 예약 생성 시점에 이미 잠금됨
         // fillMarketOrder 없음 — OPEN+LIMIT이라 즉시 체결 불필요
 
         AccountEntity account = accountService.getAccount(userId);
 
-        if (orderRepository.existsByAccountIdAndSymbolAndStatus(
-                account.getId(), command.symbol(), OrderStatusValue.PENDING)) {
-            throw new OrderException(OrderErrorCode.DUPLICATE_PENDING_ORDER);
+        // 멱등 처리 — 동일 idempotencyKey로 이미 생성된 Order가 있으면 그대로 반환
+        // Kafka 재시도 시 중복 생성 방지 (IdempotencyExecutor와 동일한 의도)
+        Optional<OrderEntity> existing = orderRepository.findByIdempotencyKey(command.idempotencyKey());
+        if (existing.isPresent()) {
+            log.info("ReservationDue 멱등 처리 — 이미 처리된 건 skip, orderId={}",
+                    existing.get().getId());
+            return existing.get();
         }
 
-        // OPEN+LIMIT이라 항상 지정가 — priceKrw는 command.price() 그대로
         OrderEntity order = OrderEntity.place(
                 userId, account.getId(), command.symbol(), command.side(), command.kind(),
-                command.quantity(), command.price(), 0L, command.idempotencyKey());
+                command.quantity(), command.price(), reservedAmountKrw, command.idempotencyKey());
         orderRepository.save(order);
+
+        // ReservationConverted Outbox — Order 생성과 같은 트랜잭션으로 원자성 보장 (Qodo #4)
+        outboxWriter.record(outboxOperations, "ReservationConverted",
+                reservationId.toString(),
+                new org.profit.candle.trading.order.event.ReservationConvertedPayload(
+                        reservationId.toString(),
+                        order.getId().toString(),
+                        userId.toString()));
 
         outboxWriter.record(outboxOperations, "OrderPlaced", order.getId().toString(),
                 new OrderPlacedPayload(
                         order.getId().toString(), userId.toString(), order.getSymbol(),
                         order.getSide().name(), order.getQuantity(),
-                        order.getPriceKrw() == null ? 0 : order.getPriceKrw(), 0L));
+                        order.getPriceKrw() == null ? 0 : order.getPriceKrw(), reservedAmountKrw));
 
         return order;
     }

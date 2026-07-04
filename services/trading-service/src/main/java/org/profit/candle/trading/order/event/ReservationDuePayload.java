@@ -11,6 +11,7 @@ public record ReservationDuePayload(
         String symbol,
         String side,
         long quantity,
-        Long priceKrw,
+        long priceKrw,
+        long reservedAmountKrw,
         String idempotencyKey
 ) {}

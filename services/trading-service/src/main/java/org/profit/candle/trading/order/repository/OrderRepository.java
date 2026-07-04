@@ -2,6 +2,7 @@ package org.profit.candle.trading.order.repository;
 
 import jakarta.persistence.LockModeType;
 import org.profit.candle.trading.order.entity.OrderEntity;
+import org.profit.candle.trading.order.entity.OrderKindValue;
 import org.profit.candle.trading.order.entity.OrderStatusValue;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -13,16 +14,24 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
-    /** ORD-005: 본인 주문 상세 조회. userId까지 같이 받아 본인 소유가 아니면 빈 결과로 권한을 체크한다. */
+    /**
+     * ORD-005: 본인 주문 상세 조회. userId까지 같이 받아 본인 소유가 아니면 빈 결과로 권한을 체크한다.
+     */
     Optional<OrderEntity> findByIdAndUserId(UUID id, UUID userId);
 
-    /** ORD-004: 본인 주문 목록 조회. */
+    /**
+     * ORD-004: 본인 주문 목록 조회.
+     */
     List<OrderEntity> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
-    /** ORD-004: 상태 필터가 적용된 본인 주문 목록 조회. */
+    /**
+     * ORD-004: 상태 필터가 적용된 본인 주문 목록 조회.
+     */
     List<OrderEntity> findByUserIdAndStatusOrderByCreatedAtDesc(UUID userId, OrderStatusValue status);
 
-    /** ORD-009: 동일 계좌·동일 종목 PENDING 주문 존재 여부. DB의 부분 unique index가 최종 방어선이다. */
+    /**
+     * ORD-009: 동일 계좌·동일 종목 PENDING 주문 존재 여부. DB의 부분 unique index가 최종 방어선이다.
+     */
     boolean existsByAccountIdAndSymbolAndStatus(UUID accountId, String symbol, OrderStatusValue status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -50,10 +59,20 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("symbol") String symbol,
             @Param("status") OrderStatusValue status);
 
-    /** EXE-002 후보 조회용 Projection — id/side/priceKrw만 로드한다. */
+    /**
+     * EXE-002 후보 조회용 Projection — id/side/priceKrw만 로드한다.
+     */
     interface LimitOrderCandidate {
         UUID getId();
+
         org.profit.candle.trading.order.entity.OrderSideValue getSide();
+
         Long getPriceKrw();
     }
+
+    /**
+     * ReservationDue 멱등 처리 — 동일 idempotencyKey로 이미 생성된 Order 조회.
+     * Kafka 재시도 시 이미 생성된 Order를 그대로 반환해 중복 생성을 방지한다.
+     */
+    Optional<OrderEntity> findByIdempotencyKey(String idempotencyKey);
 }
