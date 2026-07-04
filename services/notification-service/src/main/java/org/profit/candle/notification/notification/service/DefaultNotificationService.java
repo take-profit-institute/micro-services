@@ -12,9 +12,11 @@ import org.profit.candle.notification.delivery.repository.NotificationDeliveryRe
 import org.profit.candle.notification.delivery.service.NotificationDeliveryService;
 import org.profit.candle.notification.device.repository.DeviceTokenReader;
 import org.profit.candle.notification.notification.dto.CreateNotificationCommand;
+import org.profit.candle.notification.notification.dto.DeleteNotificationResult;
 import org.profit.candle.notification.notification.dto.DeliveryResult;
 import org.profit.candle.notification.notification.dto.ListNotificationsCriteria;
 import org.profit.candle.notification.notification.dto.ListNotificationsResult;
+import org.profit.candle.notification.notification.dto.MarkAllAsReadResult;
 import org.profit.candle.notification.notification.dto.NotificationResult;
 import org.profit.candle.notification.notification.entity.Notification;
 import org.profit.candle.notification.notification.entity.NotificationStatus;
@@ -103,6 +105,37 @@ public class DefaultNotificationService implements NotificationService {
         outboxEventService.recordNotificationRead(notification, idempotencyKey);
 
         return toResult(notification);
+    }
+
+    @Override
+    @Transactional
+    public MarkAllAsReadResult markAllAsRead(UUID userId, String idempotencyKey) {
+        List<Notification> unread =
+                notificationReader.listByUserIdAndStatus(userId, NotificationStatus.UNREAD);
+        for (Notification notification : unread) {
+            notification.markAsRead();
+            outboxEventService.recordNotificationRead(notification, idempotencyKey);
+        }
+        return new MarkAllAsReadResult(unread.size());
+    }
+
+    @Override
+    @Transactional
+    public DeleteNotificationResult deleteNotification(
+            UUID userId,
+            UUID notificationId,
+            String idempotencyKey
+    ) {
+        // 이미 삭제된 경우는 멱등 성공(false)으로 처리 — 존재하지 않으면 no-op.
+        Notification notification = notificationReader.findById(notificationId).orElse(null);
+        if (notification == null) {
+            return new DeleteNotificationResult(false);
+        }
+        if (!notification.getUserId().equals(userId)) {
+            throw new NotificationException(NotificationErrorCode.NOTIFICATION_ACCESS_DENIED);
+        }
+        notificationWriter.delete(notification);
+        return new DeleteNotificationResult(true);
     }
 
     @Override

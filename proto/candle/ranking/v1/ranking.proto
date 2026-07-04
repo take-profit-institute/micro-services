@@ -7,13 +7,47 @@ option java_package = "org.profit.candle.proto.ranking.v1";
 
 import "candle/common/v1/common.proto";
 
-message RankingEntry { int64 rank = 1; string user_id = 2; string nickname = 3; string return_rate = 4; }
-message ListRankingsRequest { candle.common.v1.PageRequest page = 1; }
-message ListRankingsResponse { repeated RankingEntry rankings = 1; candle.common.v1.PageResponse page = 2; }
-message GetMyRankingRequest { string user_id = 1; }
-message GetMyRankingResponse { RankingEntry ranking = 1; }
+message RankingEntry {
+  int64 rank = 1;
+  string user_id = 2;
+  string nickname = 3;
+  string return_rate = 4;
+  int64 total_asset = 5;
+  int32 trade_count = 6;
+  string ranking_date = 7;
+}
+
+message FinalizeDailyRankingRequest {
+  string ranking_date = 1;
+  candle.common.v1.CommandMetadata command_metadata = 2;
+}
+
+message FinalizeDailyRankingResponse {
+  string ranking_date = 1;
+  int32 ranked_user_count = 2;
+}
+
+message ListRankingsRequest {
+  // 서버 기본값은 20, 최대값은 100이다.
+  candle.common.v1.PageRequest page = 1;
+}
+
+message ListRankingsResponse {
+  repeated RankingEntry rankings = 1;
+  candle.common.v1.PageResponse page = 2;
+}
+
+message GetMyRankingRequest {
+  // 인증 metadata의 x-user-id와 일치해야 한다.
+  string user_id = 1;
+}
+
+message GetMyRankingResponse {
+  RankingEntry ranking = 1;
+}
 
 service RankingService {
+  rpc FinalizeDailyRanking(FinalizeDailyRankingRequest) returns (FinalizeDailyRankingResponse);
   rpc ListRankings(ListRankingsRequest) returns (ListRankingsResponse);
   rpc GetMyRanking(GetMyRankingRequest) returns (GetMyRankingResponse);
 }

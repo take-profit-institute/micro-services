@@ -11,6 +11,8 @@ import org.profit.candle.portfolio.analytics.dto.SectorBreakdownResult;
 import org.profit.candle.portfolio.analytics.dto.TradingStatsResult;
 import org.profit.candle.portfolio.analytics.service.PortfolioAnalyticsService;
 import org.profit.candle.portfolio.analytics.service.PortfolioSnapshotService;
+import org.profit.candle.proto.common.v1.PageResponse;
+import org.profit.candle.proto.portfolio.v1.DailyPortfolioSnapshot;
 import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsRequest;
 import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsResponse;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioHistoryRequest;
@@ -21,6 +23,8 @@ import org.profit.candle.proto.portfolio.v1.GetSectorBreakdownRequest;
 import org.profit.candle.proto.portfolio.v1.GetSectorBreakdownResponse;
 import org.profit.candle.proto.portfolio.v1.GetTradingStatsRequest;
 import org.profit.candle.proto.portfolio.v1.GetTradingStatsResponse;
+import org.profit.candle.proto.portfolio.v1.ListDailyPortfolioSnapshotsRequest;
+import org.profit.candle.proto.portfolio.v1.ListDailyPortfolioSnapshotsResponse;
 import org.profit.candle.proto.portfolio.v1.MonthlyReturn;
 import org.profit.candle.proto.portfolio.v1.PortfolioServiceGrpc;
 import org.profit.candle.proto.portfolio.v1.PortfolioSnapshot;
@@ -32,6 +36,7 @@ import org.profit.candle.proto.portfolio.v1.TradingStats;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 @Component
 @RequiredArgsConstructor
@@ -135,6 +140,35 @@ public class PortfolioGrpcService extends PortfolioServiceGrpc.PortfolioServiceI
     }
 
     @Override
+    public void listDailyPortfolioSnapshots(ListDailyPortfolioSnapshotsRequest request,
+                                            StreamObserver<ListDailyPortfolioSnapshotsResponse> observer) {
+        try {
+            var result = snapshotService.listDailySnapshots(
+                    LocalDate.parse(request.getSnapshotDate()),
+                    request.getPage().getPageSize(),
+                    blankToNull(request.getPage().getPageToken()));
+
+            ListDailyPortfolioSnapshotsResponse.Builder builder = ListDailyPortfolioSnapshotsResponse.newBuilder()
+                    .setPage(PageResponse.newBuilder()
+                            .setNextPageToken(result.nextPageToken())
+                            .build());
+
+            result.snapshots().forEach(s -> builder.addSnapshots(DailyPortfolioSnapshot.newBuilder()
+                    .setUserId(s.userId())
+                    .setTotalAsset(s.totalAsset())
+                    .setCumulativeReturnRate(s.cumulativeReturnRate())
+                    .build()));
+
+            observer.onNext(builder.build());
+            observer.onCompleted();
+        } catch (DateTimeParseException | IllegalArgumentException e) {
+            observer.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+        } catch (Exception e) {
+            observer.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+        }
+    }
+
+    @Override
     public void getTradingStats(GetTradingStatsRequest request,
                                 StreamObserver<GetTradingStatsResponse> observer) {
         try {
@@ -175,5 +209,9 @@ public class PortfolioGrpcService extends PortfolioServiceGrpc.PortfolioServiceI
         } catch (Exception e) {
             observer.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
         }
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

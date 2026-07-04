@@ -1,6 +1,6 @@
 package org.profit.candle.trading.account.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.trading.account.entity.AccountEntity;
@@ -29,11 +29,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AccountUserCreatedEventConsumer {
 
+    private static final String TOPIC = "auth.user-created.v1";
+    private static final String GROUP_ID = "trading-service";
+
     private final ConsumedEventRepository consumedEventRepository;
     private final AccountRepository accountRepository;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "auth.user-created.v1")
+    @KafkaListener(topics = TOPIC, groupId = GROUP_ID)
     @Transactional
     public void onUserCreated(String rawPayload) {
         UserCreatedPayload payload;

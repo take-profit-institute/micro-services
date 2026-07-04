@@ -21,6 +21,21 @@ public interface JpaPortfolioSnapshotRepository
     Optional<PortfolioSnapshotEntity> findByUserIdAndDate(@Param("userId") String userId, @Param("date") LocalDate date);
 
     @Override
+    @Query(value = """
+            SELECT *
+            FROM portfolio_snapshots s
+            WHERE s.snapshot_date = :date
+              AND (:lastUserId IS NULL OR s.user_id > :lastUserId)
+            ORDER BY s.user_id ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<PortfolioSnapshotEntity> findDailySnapshotsAfterUserId(
+            @Param("date") LocalDate date,
+            @Param("lastUserId") String lastUserId,
+            @Param("limit") int limit
+    );
+
+    @Override
     default Optional<PortfolioSnapshotEntity> findLatestBefore(String userId, LocalDate date) {
         return findFirstByUserIdAndSnapshotDateLessThanOrderBySnapshotDateDesc(userId, date);
     }
