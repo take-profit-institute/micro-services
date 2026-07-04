@@ -64,6 +64,21 @@ public interface ReservationBatchService {
     int processTodayCloseReservations(LocalDate targetDate);
 
     /**
+     * CONVERTING 타임아웃 처리 대상 목록 조회.
+     * scheduled_date가 targetDate이고 아직 CONVERTING 상태인 예약 id 목록을 반환한다.
+     * 15:30 이후 (ExpirePendingOrders와 같은 시점) 배치가 호출한다.
+     */
+    List<UUID> listStaleConvertingReservationIds(LocalDate targetDate);
+
+    /**
+     * 건별 CONVERTING 타임아웃 처리.
+     * CONVERTING → FAILED 전이 + reservedAmountKrw > 0이면 releaseBalance().
+     *
+     * @return 처리 성공 여부 (false면 이미 CONVERTING 아님)
+     */
+    boolean failStaleConvertingReservation(UUID reservationId);
+
+    /**
      * EXPIRED 처리 대상 목록 조회 — scheduled_date가 targetDate이고 아직 RESERVED인 예약 id 목록.
      * 배치가 이 메서드로 목록을 받아 expireReservation()을 건별 호출한다.
      * 15:40 이후 (ProcessTodayCloseReservations 완료 후) 호출해야 한다.

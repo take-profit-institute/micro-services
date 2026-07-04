@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.trading.account.service.AccountService;
 import org.profit.candle.trading.reservation.entity.ReservationEntity;
 import org.profit.candle.trading.reservation.entity.ReservationOrderKindValue;
+import org.profit.candle.trading.reservation.entity.ReservationStatusValue;
 import org.profit.candle.trading.reservation.event.ReservationDuePayload;
 import org.profit.candle.trading.reservation.event.ReservationExecutedPayload;
 import org.profit.candle.trading.reservation.event.ReservationOutboxOperations;
@@ -17,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 /**
- * 종가 배치 체결의 건별 트랜잭션 실행 단위.
+ * 배치 체결의 건별 트랜잭션 실행 단위.
  *
  * <p>Spring AOP self-invocation 방지를 위해 별도 @Service로 분리했다.
  * 이 클래스의 모든 public 메서드는 외부(DefaultReservationBatchService)에서만 호출해야 한다 —
@@ -47,7 +48,6 @@ public class ReservationBatchExecutor {
     public void markFailedUnderLock(UUID reservationId) {
         reservationRepository.findByIdForUpdate(reservationId).ifPresent(reservation -> {
             if (reservation.reserved()) {
-                // FAILED 전이 + 잔고 반환을 같은 트랜잭션에서 처리
                 if (reservation.getReservedAmountKrw() > 0) {
                     accountService.releaseBalance(reservation.getUserId(),
                             reservation.getReservedAmountKrw());
@@ -108,6 +108,30 @@ public class ReservationBatchExecutor {
                         reservation.getQuantity(),
                         reservation.getPriceKrw(),
                         reservation.getIdempotencyKey()));
+        return true;
+    }
+
+    /**
+     * CONVERTING 타임아웃 처리 — 당일 15:30 이후에도 CONVERTING 상태인 예약을 FAILED로 전이.
+     * ReservationDue 이벤트가 유실되거나 order_svc가 처리 실패한 케이스를 정리한다.
+     * reservedAmountKrw > 0이면 releaseBalance()로 잔고 반환.
+     *
+     * @return 처리 성공 여부 (false면 이미 CONVERTING 아님)
+     */
+    @Transactional
+    public boolean failConvertingUnderLock(UUID reservationId) {
+        ReservationEntity reservation = reservationRepository
+                .findByIdForUpdate(reservationId)
+                .orElse(null);
+        if (reservation == null
+                || reservation.getStatus() != ReservationStatusValue.CONVERTING) return false;
+
+        if (reservation.getReservedAmountKrw() > 0) {
+            accountService.releaseBalance(reservation.getUserId(),
+                    reservation.getReservedAmountKrw());
+        }
+        reservation.markFailed();
+        reservationRepository.save(reservation);
         return true;
     }
 

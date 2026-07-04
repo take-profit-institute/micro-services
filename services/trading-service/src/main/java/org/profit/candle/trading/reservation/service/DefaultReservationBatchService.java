@@ -119,6 +119,16 @@ public class DefaultReservationBatchService implements ReservationBatchService {
     }
 
     @Override
+    public List<UUID> listStaleConvertingReservationIds(LocalDate targetDate) {
+        return reservationRepository.findStaleConvertingReservationIds(targetDate);
+    }
+
+    @Override
+    public boolean failStaleConvertingReservation(UUID reservationId) {
+        return batchExecutor.failConvertingUnderLock(reservationId);
+    }
+
+    @Override
     public List<UUID> listExpirableReservationIds(LocalDate targetDate) {
         // EXPIRED 처리 대상 id 목록 조회 — timing 무관, id만 조회.
         return reservationRepository.findExpirableReservationIds(

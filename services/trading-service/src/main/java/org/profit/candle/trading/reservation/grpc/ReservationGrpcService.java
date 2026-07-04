@@ -245,8 +245,46 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
     }
 
     @Override
-    public void listExpirableReservations(ListExpirableReservationsRequest request,
-                                          StreamObserver<ListExpirableReservationsResponse> observer) {
+    public void listStaleConvertingReservations(ListStaleConvertingReservationsRequest request,
+                                                StreamObserver<ListStaleConvertingReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            var ids = reservationBatchService.listStaleConvertingReservationIds(targetDate)
+                    .stream().map(UUID::toString).toList();
+            observer.onNext(ListStaleConvertingReservationsResponse.newBuilder()
+                    .addAllReservationIds(ids)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void failStaleConvertingReservation(FailStaleConvertingReservationRequest request,
+                                               StreamObserver<FailStaleConvertingReservationResponse> observer) {
+        try {
+            boolean failed = reservationBatchService.failStaleConvertingReservation(
+                    UUID.fromString(request.getReservationId()));
+            observer.onNext(FailStaleConvertingReservationResponse.newBuilder()
+                    .setFailed(failed)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
+        }
+    }
+
+    @Override
+    public void listExpirableReservations(ListExpirableReservationsRequest request, StreamObserver<ListExpirableReservationsResponse> observer) {
         try {
             if (request.getScheduledDate().isBlank()) {
                 observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
