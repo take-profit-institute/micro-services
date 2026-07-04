@@ -6,6 +6,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.profit.candle.trading.order.dto.PlaceOrderCommand;
 import org.profit.candle.trading.order.entity.OrderKindValue;
 import org.profit.candle.trading.order.entity.OrderSideValue;
+import org.profit.candle.trading.order.exception.OrderErrorCode;
 import org.profit.candle.trading.order.exception.OrderException;
 import org.profit.candle.trading.order.service.OrderService;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -60,15 +61,28 @@ public class ReservationDueConsumer {
                     event.priceKrw(),
                     event.idempotencyKey());
 
-            // Order 생성 + ReservationConverted Outbox 기록이 한 트랜잭션으로 처리됨
             orderService.placeOrderFromReservation(userId, command, event.reservedAmountKrw(), reservationId);
 
             log.info("ReservationDue 처리 완료 — reservationId={}", reservationId);
 
-        } catch (OrderException | DataIntegrityViolationException e) {
-            // 이미 처리된 건 (DUPLICATE_PENDING_ORDER, unique 위반) — skip (Qodo #5)
-            log.warn("ReservationDue skip (이미 처리됨) — reservationId={}, reason={}",
+        } catch (IllegalArgumentException e) {
+            // UUID 파싱 실패, enum valueOf 실패 등 poison pill — 재시도해도 동일하므로 skip (Qodo #3).
+            log.error("ReservationDue poison pill skip — reservationId={}, reason={}",
                     event.reservationId(), e.getMessage());
+        } catch (OrderException e) {
+            if (e.errorCode() == OrderErrorCode.DUPLICATE_PENDING_ORDER) {
+                // 이미 처리된 건 — skip (Qodo #5)
+                log.warn("ReservationDue skip (이미 처리됨) — reservationId={}", event.reservationId());
+            } else {
+                // 그 외 비즈니스 실패 — 재throw로 Kafka 재시도 유도 (Qodo #1)
+                log.error("ReservationDue 비즈니스 실패 — reservationId={}, errorCode={}",
+                        event.reservationId(), e.errorCode());
+                throw new RuntimeException("ReservationDue 처리 실패 — reservationId: "
+                        + event.reservationId(), e);
+            }
+        } catch (DataIntegrityViolationException e) {
+            // unique 위반 — 이미 처리된 건으로 간주, skip
+            log.warn("ReservationDue skip (unique 위반) — reservationId={}", event.reservationId());
         } catch (Exception e) {
             // 일시적 오류 — 재throw로 오프셋 커밋 차단, Kafka 재시도 유도
             log.error("ReservationDue 처리 실패 — reservationId={}, offset={}",

@@ -100,11 +100,16 @@ public class DefaultOrderService implements OrderService {
         AccountEntity account = accountService.getAccount(userId);
 
         // 멱등 처리 — 동일 idempotencyKey로 이미 생성된 Order가 있으면 그대로 반환
-        // Kafka 재시도 시 중복 생성 방지 (IdempotencyExecutor와 동일한 의도)
+        // ReservationConverted Outbox도 재발행 — reservation이 CONVERTING에 stuck되지 않도록 보장 (Qodo #2)
         Optional<OrderEntity> existing = orderRepository.findByIdempotencyKey(command.idempotencyKey());
         if (existing.isPresent()) {
-            log.info("ReservationDue 멱등 처리 — 이미 처리된 건 skip, orderId={}",
-                    existing.get().getId());
+            log.info("ReservationDue 멱등 처리 — 이미 처리된 건, orderId={}", existing.get().getId());
+            outboxWriter.record(outboxOperations, "ReservationConverted",
+                    reservationId.toString(),
+                    new org.profit.candle.trading.order.event.ReservationConvertedPayload(
+                            reservationId.toString(),
+                            existing.get().getId().toString(),
+                            userId.toString()));
             return existing.get();
         }
 
