@@ -110,6 +110,22 @@ message MarkReservationConvertedResponse {
   Reservation reservation = 1;
 }
 
+// 15:30 배치 트리거 — 당일 CONVERTING 상태로 남은 예약을 FAILED 처리.
+// ReservationDue 유실 또는 order_svc 처리 실패 케이스를 정리한다.
+// ExpirePendingOrders와 같은 시점에 호출한다.
+message ListStaleConvertingReservationsRequest {
+  string scheduled_date = 1; // YYYY-MM-DD
+}
+message ListStaleConvertingReservationsResponse {
+  repeated string reservation_ids = 1;
+}
+message FailStaleConvertingReservationRequest {
+  string reservation_id = 1;
+}
+message FailStaleConvertingReservationResponse {
+  bool failed = 1; // false면 이미 CONVERTING 아님 (skip)
+}
+
 // 건별 처리 — order의 ExpirePendingOrders/cancelExpiredPendingOrder 패턴과 동일.
 // 배치가 ListOpenLimitReservations로 대상 목록을 조회한 뒤 건별로 이 RPC를 호출한다.
 message ListOpenLimitReservationsRequest {
@@ -156,6 +172,8 @@ service ReservationService {
   // 배치 전용 — 건별 (order의 ExpirePendingOrders 패턴과 동일)
   rpc ListOpenLimitReservations(ListOpenLimitReservationsRequest) returns (ListOpenLimitReservationsResponse);
   rpc ProcessSingleOpenLimitReservation(ProcessSingleOpenLimitReservationRequest) returns (ProcessSingleOpenLimitReservationResponse);
+  rpc ListStaleConvertingReservations(ListStaleConvertingReservationsRequest) returns (ListStaleConvertingReservationsResponse);
+  rpc FailStaleConvertingReservation(FailStaleConvertingReservationRequest) returns (FailStaleConvertingReservationResponse);
   rpc ListExpirableReservations(ListExpirableReservationsRequest) returns (ListExpirableReservationsResponse);
   rpc ExpireReservation(ExpireReservationRequest) returns (ExpireReservationResponse);
 }
