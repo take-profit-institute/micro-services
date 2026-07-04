@@ -121,7 +121,7 @@ services:
       # gRPC 서비스는 호스트에서 로컬 실행 (50051~50060)
       GRPC_AUTH_ADDR:         host.docker.internal:50051
       GRPC_USER_ADDR:         host.docker.internal:50052
-      GRPC_MARKET_ADDR:       host.docker.internal:50053
+      GRPC_MARKET_ADDR:       host.docker.internal:50063
       GRPC_ACCOUNT_ADDR:      host.docker.internal:50054
       GRPC_PORTFOLIO_ADDR:    host.docker.internal:50055
       GRPC_RANKING_ADDR:      host.docker.internal:50056

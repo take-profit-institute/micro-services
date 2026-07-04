@@ -152,6 +152,27 @@ message RecordDailySnapshotRequest {
 }
 message RecordDailySnapshotResponse { PortfolioSnapshot snapshot = 1; }
 
+// ─── Daily Snapshot List (query) ───────────────────────────────────────────
+// RankingService가 EOD 랭킹 산출 시 호출하는 조회 RPC.
+// PortfolioService가 저장 완료한 일별 스냅샷만 user_id ASC cursor pagination으로 반환한다.
+// 조회 전용이므로 idempotency_key, CommandMetadata, Outbox 대상이 아니다.
+
+message DailyPortfolioSnapshot {
+  string user_id                = 1;
+  int64  total_asset            = 2;  // 현금 + 주식 평가금액
+  string cumulative_return_rate = 3;  // PortfolioSnapshot.cumulative_return_rate와 동일한 값
+}
+
+message ListDailyPortfolioSnapshotsRequest {
+  string snapshot_date = 1;  // KST 거래일, "2026-06-29" (YYYY-MM-DD)
+  candle.common.v1.PageRequest page = 2;  // default 100, max 500
+}
+
+message ListDailyPortfolioSnapshotsResponse {
+  repeated DailyPortfolioSnapshot snapshots = 1;
+  candle.common.v1.PageResponse page = 2;
+}
+
 // ─── Services ──────────────────────────────────────────────────────────────
 
 // BFF 테이블의 HoldingService → portfolio-service 가 구현
@@ -168,4 +189,6 @@ service PortfolioService {
   rpc GetTradingStats(GetTradingStatsRequest)           returns (GetTradingStatsResponse);
   rpc GetMonthlyReturns(GetMonthlyReturnsRequest)       returns (GetMonthlyReturnsResponse);
   rpc RecordDailySnapshot(RecordDailySnapshotRequest)   returns (RecordDailySnapshotResponse);
+  rpc ListDailyPortfolioSnapshots(ListDailyPortfolioSnapshotsRequest)
+      returns (ListDailyPortfolioSnapshotsResponse);
 }

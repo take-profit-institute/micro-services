@@ -1,11 +1,14 @@
 package org.profit.candle.portfolio.analytics.grpc;
 
 import io.grpc.stub.StreamObserver;
+import io.grpc.Status;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.profit.candle.portfolio.analytics.dto.DailyPortfolioSnapshotResult;
+import org.profit.candle.portfolio.analytics.dto.ListDailyPortfolioSnapshotsResult;
 import org.profit.candle.portfolio.analytics.dto.PortfolioHistoryResult;
 import org.profit.candle.portfolio.analytics.dto.PortfolioSnapshotResult;
 import org.profit.candle.portfolio.analytics.dto.PortfolioSummaryResult;
@@ -14,6 +17,7 @@ import org.profit.candle.portfolio.analytics.dto.SectorBreakdownResult;
 import org.profit.candle.portfolio.analytics.dto.TradingStatsResult;
 import org.profit.candle.portfolio.analytics.service.PortfolioAnalyticsService;
 import org.profit.candle.portfolio.analytics.service.PortfolioSnapshotService;
+import org.profit.candle.proto.common.v1.PageRequest;
 import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsRequest;
 import org.profit.candle.proto.portfolio.v1.GetMonthlyReturnsResponse;
 import org.profit.candle.proto.portfolio.v1.GetPortfolioHistoryRequest;
@@ -24,12 +28,16 @@ import org.profit.candle.proto.portfolio.v1.GetSectorBreakdownRequest;
 import org.profit.candle.proto.portfolio.v1.GetSectorBreakdownResponse;
 import org.profit.candle.proto.portfolio.v1.GetTradingStatsRequest;
 import org.profit.candle.proto.portfolio.v1.GetTradingStatsResponse;
+import org.profit.candle.proto.portfolio.v1.ListDailyPortfolioSnapshotsRequest;
+import org.profit.candle.proto.portfolio.v1.ListDailyPortfolioSnapshotsResponse;
 import org.profit.candle.proto.portfolio.v1.RecordDailySnapshotRequest;
 import org.profit.candle.proto.portfolio.v1.RecordDailySnapshotResponse;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -222,6 +230,77 @@ class PortfolioGrpcServiceTest {
                 .setUserId(USER_ID).setSnapshotDate("not-a-date").build(), observer);
 
         assertThat(observer.error).isNotNull();
+        assertThat(observer.completed).isFalse();
+    }
+
+    // ─── listDailyPortfolioSnapshots ────────────────────────────────────────
+
+    @Test
+    void listDailyPortfolioSnapshots_happyPath_mapsRowsAndPageToken() {
+        when(snapshotService.listDailySnapshots(LocalDate.of(2026, 6, 29), 500, "user-100"))
+                .thenReturn(new ListDailyPortfolioSnapshotsResult(List.of(
+                        new DailyPortfolioSnapshotResult("user-101", 1_100_000, "10.00"),
+                        new DailyPortfolioSnapshotResult("user-102", 900_000, "-10.00")),
+                        "user-102"));
+        CapturingObserver<ListDailyPortfolioSnapshotsResponse> observer = new CapturingObserver<>();
+
+        service.listDailyPortfolioSnapshots(ListDailyPortfolioSnapshotsRequest.newBuilder()
+                .setSnapshotDate("2026-06-29")
+                .setPage(PageRequest.newBuilder()
+                        .setPageSize(500)
+                        .setPageToken("user-100")
+                        .build())
+                .build(), observer);
+
+        assertThat(observer.completed).isTrue();
+        assertThat(observer.error).isNull();
+        assertThat(observer.value.getSnapshotsList()).hasSize(2);
+        assertThat(observer.value.getSnapshots(0).getUserId()).isEqualTo("user-101");
+        assertThat(observer.value.getSnapshots(0).getTotalAsset()).isEqualTo(1_100_000);
+        assertThat(observer.value.getSnapshots(0).getCumulativeReturnRate()).isEqualTo("10.00");
+        assertThat(observer.value.getPage().getNextPageToken()).isEqualTo("user-102");
+    }
+
+    @Test
+    void listDailyPortfolioSnapshots_emptyResult_returnsEmptyList() {
+        when(snapshotService.listDailySnapshots(LocalDate.of(2026, 6, 29), 0, null))
+                .thenReturn(new ListDailyPortfolioSnapshotsResult(List.of(), ""));
+        CapturingObserver<ListDailyPortfolioSnapshotsResponse> observer = new CapturingObserver<>();
+
+        service.listDailyPortfolioSnapshots(ListDailyPortfolioSnapshotsRequest.newBuilder()
+                .setSnapshotDate("2026-06-29")
+                .build(), observer);
+
+        assertThat(observer.completed).isTrue();
+        assertThat(observer.value.getSnapshotsList()).isEmpty();
+        assertThat(observer.value.getPage().getNextPageToken()).isEmpty();
+        verify(snapshotService).listDailySnapshots(LocalDate.of(2026, 6, 29), 0, null);
+    }
+
+    @Test
+    void listDailyPortfolioSnapshots_invalidDate_returnsInvalidArgument() {
+        CapturingObserver<ListDailyPortfolioSnapshotsResponse> observer = new CapturingObserver<>();
+
+        service.listDailyPortfolioSnapshots(ListDailyPortfolioSnapshotsRequest.newBuilder()
+                .setSnapshotDate("not-a-date")
+                .build(), observer);
+
+        assertThat(Status.fromThrowable(observer.error).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+        assertThat(observer.completed).isFalse();
+    }
+
+    @Test
+    void listDailyPortfolioSnapshots_invalidPageSize_returnsInvalidArgument() {
+        when(snapshotService.listDailySnapshots(LocalDate.of(2026, 6, 29), 501, null))
+                .thenThrow(new IllegalArgumentException("page_size must be between 1 and 500"));
+        CapturingObserver<ListDailyPortfolioSnapshotsResponse> observer = new CapturingObserver<>();
+
+        service.listDailyPortfolioSnapshots(ListDailyPortfolioSnapshotsRequest.newBuilder()
+                .setSnapshotDate("2026-06-29")
+                .setPage(PageRequest.newBuilder().setPageSize(501).build())
+                .build(), observer);
+
+        assertThat(Status.fromThrowable(observer.error).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
         assertThat(observer.completed).isFalse();
     }
 

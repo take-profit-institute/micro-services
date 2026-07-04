@@ -1,7 +1,6 @@
 package org.profit.candle.wishlist.market.redis;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.wishlist.market.dto.QuoteTick;
 import org.springframework.stereotype.Component;
@@ -14,7 +13,7 @@ public class QuoteMessageParser {
     public QuoteTick parse(String payload) {
         try {
             return objectMapper.readValue(payload, QuoteTick.class);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             throw new IllegalArgumentException("invalid quote payload", e);
         }
     }

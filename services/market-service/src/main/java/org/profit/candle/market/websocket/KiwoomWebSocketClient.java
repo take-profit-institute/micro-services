@@ -69,6 +69,13 @@ public class KiwoomWebSocketClient {
                                     JsonNode root = objectMapper.readTree(message);
                                     String trnm = root.path("trnm").asText();
 
+                                    // 키움 heartbeat — PING 수신 시 받은 메시지를 그대로 되돌려줘야
+                                    // 연결이 유지된다. 응답하지 않으면 서버가 R10002로 접속을 종료한다.
+                                    if ("PING".equals(trnm)) {
+                                        webSocket.sendText(message, true);
+                                        return WebSocket.Listener.super.onText(webSocket, data, true);
+                                    }
+
                                     if ("LOGIN".equals(trnm)) {
                                         if (root.path("return_code").asInt() == 0) {
                                             System.out.println("키움 WebSocket 로그인 성공");
@@ -132,7 +139,8 @@ public class KiwoomWebSocketClient {
                     parseAbsInt(values.path("10").asText()),
                     parseInt(values.path("11").asText()),
                     parseDouble(values.path("12").asText()),
-                    parseLong(values.path("13").asText())
+                    parseLong(values.path("13").asText()),
+                    tick.getTickedAt().toString()
             );
 
             stockPricePublisher.publish(message);

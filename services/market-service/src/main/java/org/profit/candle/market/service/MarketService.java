@@ -32,7 +32,8 @@ public class MarketService {
                 response.getCurrentPriceValue(),
                 response.getPriceChangeValue(),
                 response.getPriceChangeRateValue(),
-                response.getTradingVolumeValue()
+                response.getTradingVolumeValue(),
+                java.time.Instant.now().toString()
         ));
     }
 }

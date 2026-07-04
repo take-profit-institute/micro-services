@@ -13,10 +13,14 @@ import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotReader;
 import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotWriter;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -88,5 +92,57 @@ class DefaultPortfolioSnapshotServiceTest {
 
         verify(snapshotWriter).save(captor.capture());
         assertThat(captor.getValue().cumulativeReturnRate()).isEqualTo("0.00");
+    }
+
+    @Test
+    void listDailySnapshots_defaultPageSize_fetchesOneExtraAndReturnsNextToken() {
+        List<PortfolioSnapshotEntity> rows = snapshots(101);
+        when(snapshotReader.findDailySnapshotsAfterUserId(eq(TODAY), isNull(), eq(101))).thenReturn(rows);
+
+        var result = service.listDailySnapshots(TODAY, 0, "");
+
+        assertThat(result.snapshots()).hasSize(100);
+        assertThat(result.snapshots().get(0).userId()).isEqualTo("user-001");
+        assertThat(result.snapshots().get(0).totalAsset()).isEqualTo(1_000_001);
+        assertThat(result.snapshots().get(0).cumulativeReturnRate()).isEqualTo("1.00");
+        assertThat(result.nextPageToken()).isEqualTo("user-100");
+    }
+
+    @Test
+    void listDailySnapshots_usesPageTokenAsLastUserId() {
+        when(snapshotReader.findDailySnapshotsAfterUserId(TODAY, "user-100", 3))
+                .thenReturn(snapshots(2, 101));
+
+        var result = service.listDailySnapshots(TODAY, 2, "user-100");
+
+        assertThat(result.snapshots()).extracting("userId")
+                .containsExactly("user-101", "user-102");
+        assertThat(result.nextPageToken()).isEmpty();
+    }
+
+    @Test
+    void listDailySnapshots_rejectsPageSizeOverMax() {
+        assertThatThrownBy(() -> service.listDailySnapshots(TODAY, 501, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("page_size must be between 1 and 500");
+    }
+
+    private List<PortfolioSnapshotEntity> snapshots(int count) {
+        return snapshots(count, 1);
+    }
+
+    private List<PortfolioSnapshotEntity> snapshots(int count, int firstUserNumber) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(i -> {
+                    int n = firstUserNumber + i;
+                    return new PortfolioSnapshotEntity(
+                            String.format("user-%03d", n),
+                            TODAY,
+                            1_000_000L + n,
+                            800_000L + n,
+                            n,
+                            String.format("%d.00", n));
+                })
+                .toList();
     }
 }
