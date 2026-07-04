@@ -114,15 +114,12 @@ public class StockRankingService {
     public void refreshVolumeSpikeRanking() {
         KiwoomVolumeSpikeResponse response = kiwoomRankingClient.getVolumeSpikeStocks();
 
-        if (response == null) {
+        if (response == null || response.returnCode() != 0) {
             throw new RankingException(RankingErrorCode.RANKING_API_ERROR);
         }
 
-        if (response.returnCode() != 0) {
-            System.out.println("Volume Spike API returnCode = " + response.returnCode());
-            System.out.println("Volume Spike API returnMsg = " + response.returnMsg());
-
-            throw new RankingException(RankingErrorCode.RANKING_API_ERROR);
+        if (response.items() == null || response.items().isEmpty()) {
+            throw new RankingException(RankingErrorCode.EMPTY_RANKING_DATA);
         }
 
         AtomicInteger rank = new AtomicInteger(1);
