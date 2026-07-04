@@ -21,126 +21,99 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class StockRankingService {
 
     private final KiwoomRankingClient kiwoomRankingClient;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RankingCacheService rankingCacheService;
 
     public void refreshRisingRanking() {
         KiwoomPriceRankResponse response = kiwoomRankingClient.getRisingStocks();
 
-        validateResponse(response);
+        validatePriceRankResponse(response);
 
-        List<StockRankingCacheItem> rankingItems = toCacheItems(response.items());
+        AtomicInteger rank = rankingCacheService.rankCounter();
 
-        redisTemplate.opsForValue().set(
-                StockRankingRedisKey.RISING,
-                rankingItems,
-                Duration.ofMinutes(2)
-        );
-}
+        List<StockRankingCacheItem> rankingItems =
+                rankingCacheService.toCacheItems(response.items(), item ->
+                        new StockRankingCacheItem(
+                                rank.getAndIncrement(),
+                                item.stockCode(),
+                                item.stockName(),
+                                rankingCacheService.parseLongAbs(item.currentPrice()),
+                                rankingCacheService.parseLong(item.priceChange()),
+                                rankingCacheService.parseDouble(item.priceChangeRate()),
+                                item.priceChangeSign(),
+                                rankingCacheService.parseLong(item.tradingVolume())
+                        )
+                );
+
+        rankingCacheService.save(StockRankingRedisKey.RISING, rankingItems);
+    }
+
     public void refreshFallingRanking() {
         KiwoomPriceRankResponse response = kiwoomRankingClient.getFallingStocks();
 
-        validateResponse(response);
+        validatePriceRankResponse(response);
 
-        List<StockRankingCacheItem> rankingItems = toCacheItems(response.items());
+        AtomicInteger rank = rankingCacheService.rankCounter();
 
-        redisTemplate.opsForValue().set(
-                StockRankingRedisKey.FALLING,
-                rankingItems,
-                Duration.ofMinutes(2)
-        );
-    }
-    private void validateResponse(KiwoomPriceRankResponse response) {
-        if (response == null) {
-            throw new RankingException(RankingErrorCode.RANKING_API_ERROR);
-        }
+        List<StockRankingCacheItem> rankingItems =
+                rankingCacheService.toCacheItems(response.items(), item ->
+                        new StockRankingCacheItem(
+                                rank.getAndIncrement(),
+                                item.stockCode(),
+                                item.stockName(),
+                                rankingCacheService.parseLongAbs(item.currentPrice()),
+                                rankingCacheService.parseLong(item.priceChange()),
+                                rankingCacheService.parseDouble(item.priceChangeRate()),
+                                item.priceChangeSign(),
+                                rankingCacheService.parseLong(item.tradingVolume())
+                        )
+                );
 
-        if (response.returnCode() != 0) {
-            System.out.println("Ranking API returnCode = " + response.returnCode());
-            System.out.println("Ranking API returnMsg = " + response.returnMsg());
-
-            throw new RankingException(RankingErrorCode.RANKING_API_ERROR);
-        }
-
-        if (response.items() == null || response.items().isEmpty()) {
-            throw new RankingException(RankingErrorCode.EMPTY_RANKING_DATA);
-        }
-    }
-
-    private List<StockRankingCacheItem> toCacheItems(List<KiwoomPriceRankItem> items) {
-        AtomicInteger rank = new AtomicInteger(1);
-
-        return items.stream()
-                .map(item -> new StockRankingCacheItem(
-                        rank.getAndIncrement(),
-                        item.stockCode(),
-                        item.stockName(),
-                        parseLongAbs(item.currentPrice()),
-                        parseLong(item.priceChange()),
-                        parseDouble(item.priceChangeRate()),
-                        item.priceChangeSign(),
-                        parseLong(item.tradingVolume())
-                ))
-                .toList();
-    }
-    private long parseLongAbs(String value) {
-        return Math.abs(parseLong(value));
-    }
-
-    private long parseLong(String value) {
-        if (value == null || value.isBlank()) {
-            return 0L;
-        }
-
-        return Long.parseLong(
-                value.replace("+", "")
-                        .replace(",", "")
-                        .trim()
-        );
-    }
-
-    private double parseDouble(String value) {
-        if (value == null || value.isBlank()) {
-            return 0.0;
-        }
-
-        return Double.parseDouble(
-                value.replace("+", "")
-                        .replace("%", "")
-                        .replace(",", "")
-                        .trim()
-        );
+        rankingCacheService.save(StockRankingRedisKey.FALLING, rankingItems);
     }
 
     public void refreshVolumeSpikeRanking() {
         KiwoomVolumeSpikeResponse response = kiwoomRankingClient.getVolumeSpikeStocks();
 
-        if (response == null || response.returnCode() != 0) {
+        validateVolumeSpikeResponse(response);
+
+        AtomicInteger rank = rankingCacheService.rankCounter();
+
+        List<StockRankingCacheItem> rankingItems =
+                rankingCacheService.toCacheItems(response.items(), item ->
+                        new StockRankingCacheItem(
+                                rank.getAndIncrement(),
+                                item.stockCode(),
+                                item.stockName(),
+                                rankingCacheService.parseLongAbs(item.currentPrice()),
+                                rankingCacheService.parseLong(item.priceChange()),
+                                rankingCacheService.parseDouble(item.priceChangeRate()),
+                                item.priceChangeSign(),
+                                rankingCacheService.parseLong(item.tradingVolume())
+                        )
+                );
+
+        rankingCacheService.save(StockRankingRedisKey.VOLUME_SPIKE, rankingItems);
+    }
+
+    private void validatePriceRankResponse(KiwoomPriceRankResponse response) {
+        if (response == null) {
             throw new RankingException(RankingErrorCode.RANKING_API_ERROR);
         }
 
-        if (response.items() == null || response.items().isEmpty()) {
-            throw new RankingException(RankingErrorCode.EMPTY_RANKING_DATA);
+        rankingCacheService.validateResponse(
+                response.items(),
+                response.returnCode()
+        );
+    }
+
+    private void validateVolumeSpikeResponse(KiwoomVolumeSpikeResponse response) {
+        if (response == null) {
+            throw new RankingException(RankingErrorCode.RANKING_API_ERROR);
         }
 
-        AtomicInteger rank = new AtomicInteger(1);
-
-        List<StockRankingCacheItem> rankingItems = response.items().stream()
-                .map(item -> new StockRankingCacheItem(
-                        rank.getAndIncrement(),
-                        item.stockCode(),
-                        item.stockName(),
-                        parseLongAbs(item.currentPrice()),
-                        parseLong(item.priceChange()),
-                        parseDouble(item.priceChangeRate()),
-                        item.priceChangeSign(),
-                        parseLong(item.tradingVolume())
-                ))
-                .toList();
-
-        redisTemplate.opsForValue().set(
-                StockRankingRedisKey.VOLUME_SPIKE,
-                rankingItems,
-                Duration.ofMinutes(2)
+        rankingCacheService.validateResponse(
+                response.items(),
+                response.returnCode()
         );
     }
 
