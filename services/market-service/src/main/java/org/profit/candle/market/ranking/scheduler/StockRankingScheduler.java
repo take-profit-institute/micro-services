@@ -19,4 +19,7 @@ public class StockRankingScheduler {
     public void refreshFallingRanking() {
         stockRankingService.refreshFallingRanking();
     }
+
+    @Scheduled(fixedDelay = 60000)
+    public void refreshVolumeSpikeRanking() { stockRankingService.refreshVolumeSpikeRanking();}
 }

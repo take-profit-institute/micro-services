@@ -6,6 +6,7 @@ import org.profit.candle.market.ranking.constant.StockRankingRedisKey;
 import org.profit.candle.market.ranking.dto.cache.StockRankingCacheItem;
 import org.profit.candle.market.ranking.dto.response.KiwoomPriceRankItem;
 import org.profit.candle.market.ranking.dto.response.KiwoomPriceRankResponse;
+import org.profit.candle.market.ranking.dto.response.KiwoomVolumeSpikeResponse;
 import org.profit.candle.market.ranking.exception.RankingErrorCode;
 import org.profit.candle.market.ranking.exception.RankingException;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -107,6 +108,42 @@ public class StockRankingService {
                         .replace("%", "")
                         .replace(",", "")
                         .trim()
+        );
+    }
+
+    public void refreshVolumeSpikeRanking() {
+        KiwoomVolumeSpikeResponse response = kiwoomRankingClient.getVolumeSpikeStocks();
+
+        if (response == null) {
+            throw new RankingException(RankingErrorCode.RANKING_API_ERROR);
+        }
+
+        if (response.returnCode() != 0) {
+            System.out.println("Volume Spike API returnCode = " + response.returnCode());
+            System.out.println("Volume Spike API returnMsg = " + response.returnMsg());
+
+            throw new RankingException(RankingErrorCode.RANKING_API_ERROR);
+        }
+
+        AtomicInteger rank = new AtomicInteger(1);
+
+        List<StockRankingCacheItem> rankingItems = response.items().stream()
+                .map(item -> new StockRankingCacheItem(
+                        rank.getAndIncrement(),
+                        item.stockCode(),
+                        item.stockName(),
+                        parseLongAbs(item.currentPrice()),
+                        parseLong(item.priceChange()),
+                        parseDouble(item.priceChangeRate()),
+                        item.priceChangeSign(),
+                        parseLong(item.tradingVolume())
+                ))
+                .toList();
+
+        redisTemplate.opsForValue().set(
+                StockRankingRedisKey.VOLUME_SPIKE,
+                rankingItems,
+                Duration.ofMinutes(2)
         );
     }
 
