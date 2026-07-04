@@ -85,7 +85,7 @@ message ProcessOpenLimitReservationsResponse {
 
 // 08:30 배치 트리거 — PREV_CLOSE 예약을 전일 종가로 즉시 체결
 message ProcessPrevCloseReservationsRequest {
-  string scheduled_date = 1; // YYYY-MM-DD (체결 대상 예약의 scheduled_date)
+  string scheduled_date = 1; // YYYY-MM-DD
 }
 message ProcessPrevCloseReservationsResponse {
   int32 processed_count = 1;
@@ -94,7 +94,7 @@ message ProcessPrevCloseReservationsResponse {
 // 15:40 배치 트리거 — TODAY_CLOSE 예약을 당일 종가로 즉시 체결
 // 반드시 ChartService.CloseDailyCandles 완료 후 호출해야 한다.
 message ProcessTodayCloseReservationsRequest {
-  string scheduled_date = 1; // YYYY-MM-DD (체결 대상 예약의 scheduled_date)
+  string scheduled_date = 1; // YYYY-MM-DD
 }
 message ProcessTodayCloseReservationsResponse {
   int32 processed_count = 1;
@@ -110,15 +110,70 @@ message MarkReservationConvertedResponse {
   Reservation reservation = 1;
 }
 
+// 15:30 배치 트리거 — 당일 CONVERTING 상태로 남은 예약을 FAILED 처리.
+// ReservationDue 유실 또는 order_svc 처리 실패 케이스를 정리한다.
+// ExpirePendingOrders와 같은 시점에 호출한다.
+message ListStaleConvertingReservationsRequest {
+  string scheduled_date = 1; // YYYY-MM-DD
+}
+message ListStaleConvertingReservationsResponse {
+  repeated string reservation_ids = 1;
+}
+message FailStaleConvertingReservationRequest {
+  string reservation_id = 1;
+}
+message FailStaleConvertingReservationResponse {
+  bool failed = 1; // false면 이미 CONVERTING 아님 (skip)
+}
+
+// 건별 처리 — order의 ExpirePendingOrders/cancelExpiredPendingOrder 패턴과 동일.
+// 배치가 ListOpenLimitReservations로 대상 목록을 조회한 뒤 건별로 이 RPC를 호출한다.
+message ListOpenLimitReservationsRequest {
+  string scheduled_date = 1; // YYYY-MM-DD
+}
+message ListOpenLimitReservationsResponse {
+  repeated string reservation_ids = 1;
+}
+message ProcessSingleOpenLimitReservationRequest {
+  string reservation_id = 1;
+}
+message ProcessSingleOpenLimitReservationResponse {
+  bool processed = 1; // false면 이미 RESERVED 아님 (skip)
+}
+
+// EXPIRED 처리 — 배치가 ListExpirableReservations로 대상 목록을 조회한 뒤 건별로 호출.
+// scheduled_date가 오늘이고 아직 RESERVED인 예약을 EXPIRED로 전이하고 잔고를 반환한다.
+// 15:40 이후 (ProcessTodayCloseReservations 완료 후) 배치가 호출해야 한다.
+message ListExpirableReservationsRequest {
+  string scheduled_date = 1; // YYYY-MM-DD
+}
+message ListExpirableReservationsResponse {
+  repeated string reservation_ids = 1;
+}
+message ExpireReservationRequest {
+  string reservation_id = 1;
+}
+message ExpireReservationResponse {
+  bool expired = 1; // false면 이미 RESERVED 아님 (skip)
+}
+
 service ReservationService {
   rpc ListReservations(ListReservationsRequest) returns (ListReservationsResponse);
   rpc PlaceReservation(PlaceReservationRequest) returns (PlaceReservationResponse);
   rpc CancelReservation(CancelReservationRequest) returns (CancelReservationResponse);
   rpc AmendReservation(AmendReservationRequest) returns (AmendReservationResponse);
 
-  // 배치 전용
+  // 배치 전용 — 일별
   rpc ProcessOpenLimitReservations(ProcessOpenLimitReservationsRequest) returns (ProcessOpenLimitReservationsResponse);
   rpc ProcessPrevCloseReservations(ProcessPrevCloseReservationsRequest) returns (ProcessPrevCloseReservationsResponse);
   rpc ProcessTodayCloseReservations(ProcessTodayCloseReservationsRequest) returns (ProcessTodayCloseReservationsResponse);
   rpc MarkReservationConverted(MarkReservationConvertedRequest) returns (MarkReservationConvertedResponse);
+
+  // 배치 전용 — 건별 (order의 ExpirePendingOrders 패턴과 동일)
+  rpc ListOpenLimitReservations(ListOpenLimitReservationsRequest) returns (ListOpenLimitReservationsResponse);
+  rpc ProcessSingleOpenLimitReservation(ProcessSingleOpenLimitReservationRequest) returns (ProcessSingleOpenLimitReservationResponse);
+  rpc ListStaleConvertingReservations(ListStaleConvertingReservationsRequest) returns (ListStaleConvertingReservationsResponse);
+  rpc FailStaleConvertingReservation(FailStaleConvertingReservationRequest) returns (FailStaleConvertingReservationResponse);
+  rpc ListExpirableReservations(ListExpirableReservationsRequest) returns (ListExpirableReservationsResponse);
+  rpc ExpireReservation(ExpireReservationRequest) returns (ExpireReservationResponse);
 }
