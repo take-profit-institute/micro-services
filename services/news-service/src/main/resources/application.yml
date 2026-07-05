@@ -2,6 +2,8 @@ spring:
   application:
     name: news-service
   grpc:
+    server:
+      port: ${NEWS_GRPC_PORT:50064}
     client:
       # Spring Boot 4.1 spring-boot-grpc-client 규격: `channel`(단수) + `target`.
       channel:
