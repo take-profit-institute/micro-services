@@ -73,6 +73,12 @@ class GrpcPortfolioSnapshotClientTest {
                     .isEqualTo(command.idempotencyKey());
             assertThat(capturedRequest.get().getIdempotencyKey())
                     .isEqualTo(command.idempotencyKey());
+            assertThat(capturedRequest.get().getUserId()).isEqualTo(command.userId());
+            assertThat(capturedRequest.get().getSnapshotDate())
+                    .isEqualTo(command.businessDate().toString());
+            assertThat(capturedRequest.get().getTotalAsset()).isEqualTo(command.totalAsset());
+            assertThat(capturedRequest.get().getStockValue()).isEqualTo(command.stockValue());
+            assertThat(capturedRequest.get().getSeedCapital()).isEqualTo(command.seedCapital());
         } finally {
             channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
             server.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
