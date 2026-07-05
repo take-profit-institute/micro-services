@@ -41,6 +41,7 @@ import org.springframework.test.context.ActiveProfiles;
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
+        "spring.grpc.server.port=0",
         "spring.flyway.locations=classpath:migration,classpath:local-migration",
         "spring.batch.job.enabled=false",
         "batch.schedule.smoke.enabled=false",
