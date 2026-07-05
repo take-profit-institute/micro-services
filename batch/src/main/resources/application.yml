@@ -29,6 +29,10 @@ spring:
           target: ${BATCH_MARKET_GRPC_TARGET:static://localhost:50060}
           ssl:
             enabled: false
+        stock:
+          target: ${BATCH_STOCK_GRPC_TARGET:static://localhost:50060}
+          ssl:
+            enabled: false
         trading:
           target: ${BATCH_TRADING_GRPC_TARGET:static://localhost:50054}
           ssl:
@@ -51,10 +55,12 @@ batch:
       symbol-batch-size: ${BATCH_PORTFOLIO_EOD_SYMBOL_BATCH_SIZE:500}
   grpc:
     market-target: market
+    stock-target: stock
     trading-target: trading
     portfolio-target: portfolio
     read-deadline-millis: ${BATCH_GRPC_READ_DEADLINE_MILLIS:300}
     write-deadline-millis: ${BATCH_GRPC_WRITE_DEADLINE_MILLIS:1000}
+    stock-sync-deadline-millis: ${BATCH_STOCK_SYNC_DEADLINE_MILLIS:120000}
 
 logging:
   level:

@@ -141,7 +141,15 @@ class GrpcPortfolioSnapshotClientTest {
                         new BatchProperties.Smoke(false, "0 0 * * * *"),
                         new BatchProperties.PortfolioEod(false, "0 0 16 * * MON-FRI", 100, 500)
                 ),
-                new BatchProperties.Grpc("market", "trading", "portfolio", 300, 1_000)
+                new BatchProperties.Grpc(
+                        "market",
+                        "stock",
+                        "trading",
+                        "portfolio",
+                        300,
+                        1_000,
+                        120_000
+                )
         );
     }
 
