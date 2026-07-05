@@ -2,9 +2,13 @@ package org.profit.candle.market.ranking.client;
 
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.market.client.KiwoomAuthClient;
+import org.profit.candle.market.ranking.dto.request.KiwoomPopularRankRequest;
 import org.profit.candle.market.ranking.dto.request.KiwoomPriceRankRequest;
+import org.profit.candle.market.ranking.dto.request.KiwoomRateRankRequest;
 import org.profit.candle.market.ranking.dto.request.KiwoomVolumeSpikeRequest;
+import org.profit.candle.market.ranking.dto.response.KiwoomPopularRankResponse;
 import org.profit.candle.market.ranking.dto.response.KiwoomPriceRankResponse;
+import org.profit.candle.market.ranking.dto.response.KiwoomRateRankResponse;
 import org.profit.candle.market.ranking.dto.response.KiwoomVolumeSpikeResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -53,6 +57,42 @@ public class KiwoomRankingClient {
                 .bodyValue(KiwoomVolumeSpikeRequest.volumeSpike())
                 .retrieve()
                 .bodyToMono(KiwoomVolumeSpikeResponse.class)
+                .block();
+    }
+
+    public KiwoomPopularRankResponse getPopularStocks() {
+        String token = kiwoomAuthClient.issueToken().token();
+
+        return kiwoomWebClient.post()
+                .uri("/api/dostk/stkinfo")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
+                .header("api-id", "ka00198")
+                .header("authorization", "Bearer " + token)
+                .bodyValue(KiwoomPopularRankRequest.popular())
+                .retrieve()
+                .bodyToMono(KiwoomPopularRankResponse.class)
+                .block();
+    }
+
+    public KiwoomRateRankResponse getRateUpStocks() {
+        return requestRateRank(KiwoomRateRankRequest.rateUp());
+    }
+
+    public KiwoomRateRankResponse getRateDownStocks() {
+        return requestRateRank(KiwoomRateRankRequest.rateDown());
+    }
+
+    private KiwoomRateRankResponse requestRateRank(KiwoomRateRankRequest request) {
+        String token = kiwoomAuthClient.issueToken().token();
+
+        return kiwoomWebClient.post()
+                .uri("/api/dostk/rkinfo")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
+                .header("api-id", "ka10027")
+                .header("authorization", "Bearer " + token)
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(KiwoomRateRankResponse.class)
                 .block();
     }
 
