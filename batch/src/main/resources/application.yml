@@ -53,6 +53,9 @@ batch:
       cron: "${BATCH_PORTFOLIO_EOD_CRON:0 0 16 * * MON-FRI}"
       chunk-size: ${BATCH_PORTFOLIO_EOD_CHUNK_SIZE:100}
       symbol-batch-size: ${BATCH_PORTFOLIO_EOD_SYMBOL_BATCH_SIZE:500}
+    stock-sync:
+      enabled: ${BATCH_STOCK_SYNC_ENABLED:false}
+      cron: "${BATCH_STOCK_SYNC_CRON:0 30 16 * * MON-FRI}"
   grpc:
     market-target: market
     stock-target: stock

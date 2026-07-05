@@ -11,7 +11,8 @@ public record BatchProperties(
     public record Schedule(
             String zoneId,
             Smoke smoke,
-            PortfolioEod portfolioEod
+            PortfolioEod portfolioEod,
+            StockSync stockSync
     ) {
     }
 
@@ -26,6 +27,12 @@ public record BatchProperties(
             String cron,
             int chunkSize,
             int symbolBatchSize
+    ) {
+    }
+
+    public record StockSync(
+            boolean enabled,
+            String cron
     ) {
     }
 
