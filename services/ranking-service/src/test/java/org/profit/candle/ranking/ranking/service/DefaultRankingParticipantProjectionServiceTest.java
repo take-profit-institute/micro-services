@@ -19,6 +19,7 @@ import org.profit.candle.ranking.ranking.entity.ConsumedEventId;
 import org.profit.candle.ranking.ranking.entity.ParticipantStatus;
 import org.profit.candle.ranking.ranking.entity.RankingParticipant;
 import org.profit.candle.ranking.ranking.event.OrderFilledEvent;
+import org.profit.candle.ranking.ranking.event.UserCreatedEvent;
 import org.profit.candle.ranking.ranking.event.UserProfileUpdatedEvent;
 import org.profit.candle.ranking.ranking.repository.ConsumedEventRepository;
 import org.profit.candle.ranking.ranking.repository.RankingParticipantRepository;
@@ -65,9 +66,9 @@ class DefaultRankingParticipantProjectionServiceTest {
         verify(consumedEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
-    /** 최초 프로필 이벤트가 비대상 상태의 참가자와 소비 이력을 생성하는지 검증한다. */
+    /** 최초 프로필 이벤트도 현재 정책에 따라 활성 참가자와 소비 이력을 생성하는지 검증한다. */
     @Test
-    void projectProfileCreatesAnIneligibleParticipantAndRecordsTheEvent() {
+    void projectProfileCreatesAnActiveParticipantAndRecordsTheEvent() {
         UUID eventId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         Instant occurredAt = Instant.parse("2026-07-03T06:30:00Z");
@@ -82,9 +83,28 @@ class DefaultRankingParticipantProjectionServiceTest {
         RankingParticipant participant = participantCaptor.getValue();
         assertThat(participant.nickname()).isEqualTo("chanmi");
         assertThat(participant.tradeCount()).isZero();
-        assertThat(participant.userStatus()).isEqualTo(ParticipantStatus.UNKNOWN);
-        assertThat(participant.accountStatus()).isEqualTo(ParticipantStatus.UNKNOWN);
+        assertThat(participant.userStatus()).isEqualTo(ParticipantStatus.ACTIVE);
+        assertThat(participant.accountStatus()).isEqualTo(ParticipantStatus.ACTIVE);
         verify(consumedEventRepository).save(org.mockito.ArgumentMatchers.any(ConsumedEvent.class));
+    }
+
+    /** UserCreated가 먼저 도착하면 사용자와 계좌를 모두 활성 상태로 생성하는지 검증한다. */
+    @Test
+    void registerParticipantCreatesActiveStatuses() {
+        UUID eventId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UserCreatedEvent event = createdEvent(eventId, userId);
+        when(consumedEventRepository.existsById(
+                        new ConsumedEventId("auth-service", eventId)))
+                .thenReturn(false);
+        when(participantRepository.findById(userId)).thenReturn(Optional.empty());
+
+        service.registerParticipant(event);
+
+        ArgumentCaptor<RankingParticipant> participantCaptor = ArgumentCaptor.forClass(RankingParticipant.class);
+        verify(participantRepository).save(participantCaptor.capture());
+        assertThat(participantCaptor.getValue().userStatus()).isEqualTo(ParticipantStatus.ACTIVE);
+        assertThat(participantCaptor.getValue().accountStatus()).isEqualTo(ParticipantStatus.ACTIVE);
     }
 
     /** 같은 이벤트를 다시 받았을 때 참가자 상태가 중복 변경되지 않는지 검증한다. */
@@ -113,4 +133,12 @@ class DefaultRankingParticipantProjectionServiceTest {
                 orderId.toString(), userId.toString(), "005930", "BUY",
                 80_000L, 1L, 10L, 0L, 80_010L);
     }
+
+    /** 테스트용 UserCreated 이벤트를 만든다. */
+    private UserCreatedEvent createdEvent(UUID eventId, UUID userId) {
+        return new UserCreatedEvent(
+                eventId, "UserCreated", 1, userId, "chanmi@example.com",
+                Instant.parse("2026-07-03T06:30:00Z"));
+    }
+
 }

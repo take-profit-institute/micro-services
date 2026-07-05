@@ -72,10 +72,11 @@ public class DefaultRankingParticipantProjectionService implements RankingPartic
         }
 
         UUID userId = event.userId();
-        if (participantRepository.findById(userId).isEmpty()) {
-            participantRepository.save(
-                    RankingParticipant.forNewUser(userId, defaultNickname(event), event.occurredAt()));
-        }
+        RankingParticipant participant = participantRepository.findById(userId)
+                .orElseGet(() -> RankingParticipant.forNewUser(
+                        userId, defaultNickname(event), event.occurredAt()));
+        participant.initializeActiveStatuses();
+        participantRepository.save(participant);
         consumedEventRepository.save(new ConsumedEvent(
                 AUTH_SOURCE_SERVICE, event.eventId(), event.eventType()));
     }

@@ -53,14 +53,22 @@ public class RankingParticipant {
 
     /** 프로필 정보로 새로운 랭킹 참가자를 생성한다. */
     public static RankingParticipant fromProfile(UUID userId, String nickname, Instant occurredAt) {
-        return new RankingParticipant(userId, nickname, occurredAt);
+        RankingParticipant participant = new RankingParticipant(userId, nickname, occurredAt);
+        participant.initializeActiveStatuses();
+        return participant;
     }
 
-    /** 신규 가입 사용자를 랭킹 명단에 등록한다. 사용자는 활성, 계좌 상태는 아직 미확정이다. */
+    /** 신규 가입 사용자를 현재 1차 정책의 활성 상태로 랭킹 명단에 등록한다. */
     public static RankingParticipant forNewUser(UUID userId, String nickname, Instant occurredAt) {
         RankingParticipant participant = new RankingParticipant(userId, nickname, occurredAt);
-        participant.userStatus = ParticipantStatus.ACTIVE;
+        participant.initializeActiveStatuses();
         return participant;
+    }
+
+    /** 상태 변경 이벤트 도입 전 정책에 따라 사용자와 신규 계좌를 활성 상태로 초기화한다. */
+    public void initializeActiveStatuses() {
+        this.userStatus = ParticipantStatus.ACTIVE;
+        this.accountStatus = ParticipantStatus.ACTIVE;
     }
 
     /** 현재 정보보다 오래되지 않은 이벤트일 때 닉네임을 갱신한다. */
