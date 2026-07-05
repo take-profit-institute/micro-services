@@ -39,7 +39,7 @@ import org.springframework.batch.core.job.parameters.JobParameter;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobOperator;
-import org.springframework.batch.core.repository.explore.JobExplorer;
+import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -54,7 +54,7 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
     );
 
     private final JobOperator jobOperator;
-    private final JobExplorer jobExplorer;
+    private final JobRepository jobRepository;
     private final JobRegistry jobRegistry;
     private final Clock clock;
 
@@ -112,7 +112,7 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
 
     @Override
     public void getJobExecution(GetJobExecutionRequest request, StreamObserver<GetJobExecutionResponse> observer) {
-        JobExecution execution = jobExplorer.getJobExecution(request.getExecutionId());
+        JobExecution execution = jobRepository.getJobExecution(request.getExecutionId());
         if (execution == null) {
             observer.onError(Status.NOT_FOUND.withDescription("BATCH_EXECUTION_NOT_FOUND").asRuntimeException());
             return;
@@ -132,8 +132,8 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
             String jobName = requireAllowedJob(request.getJobName());
             int limit = request.getLimit() > 0 ? Math.min(request.getLimit(), 100) : 20;
 
-            List<JobExecutionResponse> executions = jobExplorer.getJobInstances(jobName, 0, limit).stream()
-                    .flatMap(instance -> jobExplorer.getJobExecutions(instance).stream())
+            List<JobExecutionResponse> executions = jobRepository.getJobInstances(jobName, 0, limit).stream()
+                    .flatMap(instance -> jobRepository.getJobExecutions(instance).stream())
                     .sorted(Comparator.comparing(JobExecution::getCreateTime).reversed())
                     .limit(limit)
                     .map(this::toResponse)
