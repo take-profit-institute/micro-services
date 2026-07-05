@@ -84,17 +84,32 @@ log_file() {
   printf '%s/%s.log' "$LOG_DIR" "$1"
 }
 
+service_pids() {
+  local service="$1"
+  pgrep -f "gradle-wrapper.jar :services:$service:bootRun" 2>/dev/null || true
+}
+
 running_pid() {
   local service="$1"
   local file
+  local fallback_pid
   file="$(pid_file "$service")"
 
-  [[ -f "$file" ]] || return 1
+  if [[ ! -f "$file" ]]; then
+    fallback_pid="$(service_pids "$service" | head -n 1)"
+    [[ -n "$fallback_pid" ]] || return 1
+    printf '%s' "$fallback_pid"
+    return 0
+  fi
 
   local pid
   pid="$(cat "$file")"
-  [[ -n "$pid" ]] || return 1
-  kill -0 "$pid" 2>/dev/null || return 1
+  if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+    fallback_pid="$(service_pids "$service" | head -n 1)"
+    [[ -n "$fallback_pid" ]] || return 1
+    printf '%s' "$fallback_pid"
+    return 0
+  fi
   printf '%s' "$pid"
 }
 
@@ -113,6 +128,8 @@ start_one() {
 
   (
     cd "$ROOT_DIR"
+    export SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE="${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:-2}"
+    export SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE="${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:-0}"
     gradle_command=(./gradlew ":services:$service:bootRun")
     if [[ -n "${CANDLE_SERVICES_BOOT_ARGS:-}" ]]; then
       gradle_command+=(--args="$CANDLE_SERVICES_BOOT_ARGS")
@@ -135,11 +152,27 @@ stop_one() {
     return
   fi
 
-  kill "$pid" 2>/dev/null || true
+  local pids=()
+  local found_pid
+  while IFS= read -r found_pid; do
+    [[ -n "$found_pid" ]] && pids+=("$found_pid")
+  done < <(service_pids "$service")
+  if [[ "${#pids[@]}" -eq 0 ]]; then
+    pids=("$pid")
+  fi
+
+  kill "${pids[@]}" 2>/dev/null || true
 
   local attempt
   for attempt in {1..20}; do
-    if ! kill -0 "$pid" 2>/dev/null; then
+    local still_running=false
+    for found_pid in "${pids[@]}"; do
+      if kill -0 "$found_pid" 2>/dev/null; then
+        still_running=true
+        break
+      fi
+    done
+    if [[ "$still_running" == false ]]; then
       rm -f "$(pid_file "$service")"
       echo "$service stopped"
       return
@@ -147,7 +180,7 @@ stop_one() {
     sleep 0.5
   done
 
-  kill -9 "$pid" 2>/dev/null || true
+  kill -9 "${pids[@]}" 2>/dev/null || true
   rm -f "$(pid_file "$service")"
   echo "$service killed"
 }
