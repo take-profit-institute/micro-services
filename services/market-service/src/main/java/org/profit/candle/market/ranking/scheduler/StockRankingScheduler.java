@@ -1,9 +1,7 @@
 package org.profit.candle.market.ranking.scheduler;
 
 import lombok.RequiredArgsConstructor;
-import org.profit.candle.market.ranking.service.FallingRankingService;
-import org.profit.candle.market.ranking.service.RisingRankingService;
-import org.profit.candle.market.ranking.service.VolumeSpikeRankingService;
+import org.profit.candle.market.ranking.service.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +11,8 @@ public class StockRankingScheduler { ;
     private final RisingRankingService risingRankingService;
     private final FallingRankingService fallingRankingService;
     private final VolumeSpikeRankingService volumeSpikeRankingService;
+    private final PopularRankingService popularRankingService;
+    private final RateRankingService rateRankingService;
 
     @Scheduled(fixedDelay = 60000)
     public void refreshRisingRanking() {
@@ -27,5 +27,20 @@ public class StockRankingScheduler { ;
     @Scheduled(fixedDelay = 60000)
     public void refreshVolumeSpikeRanking() {
         volumeSpikeRankingService.refresh();
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void refreshPopularRanking() {
+        popularRankingService.refresh();
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void refreshRateUpRanking() {
+        rateRankingService.refreshRateUp();
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void refreshRateDownRanking() {
+        rateRankingService.refreshRateDown();
     }
 }
