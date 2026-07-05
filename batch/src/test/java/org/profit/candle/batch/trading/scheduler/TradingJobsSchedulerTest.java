@@ -1,6 +1,7 @@
 package org.profit.candle.batch.trading.scheduler;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -60,60 +61,57 @@ class TradingJobsSchedulerTest {
     /** 오전 두 스케줄이 각자의 Job만 시작하는지 검증한다. */
     @Test
     void startsMorningJobsIndependently() throws Exception {
-        when(jobOperator.start(any(Job.class), any())).thenReturn(completedExecution());
+        JobExecution completedExecution = execution(BatchStatus.COMPLETED);
+        when(jobOperator.start(any(Job.class), any())).thenReturn(completedExecution);
 
         scheduler.runPreviousCloseJob();
         scheduler.runOpenLimitJob();
 
-        verify(jobOperator).start(org.mockito.ArgumentMatchers.eq(previousCloseJob), any());
-        verify(jobOperator).start(org.mockito.ArgumentMatchers.eq(openLimitJob), any());
+        verify(jobOperator).start(eq(previousCloseJob), any());
+        verify(jobOperator).start(eq(openLimitJob), any());
     }
 
     /** 15:30 선행 Job 성공 후 stale 정리 Job이 순서대로 실행되는지 검증한다. */
     @Test
     void runsMarketCloseJobsInOrder() throws Exception {
-        when(jobOperator.start(any(Job.class), any())).thenReturn(completedExecution());
+        JobExecution completedExecution = execution(BatchStatus.COMPLETED);
+        when(jobOperator.start(any(Job.class), any())).thenReturn(completedExecution);
 
         scheduler.runMarketCloseJobs();
 
         InOrder order = inOrder(jobOperator);
-        order.verify(jobOperator).start(org.mockito.ArgumentMatchers.eq(expirePendingOrdersJob), any());
-        order.verify(jobOperator).start(org.mockito.ArgumentMatchers.eq(failStaleConvertingJob), any());
+        order.verify(jobOperator).start(eq(expirePendingOrdersJob), any());
+        order.verify(jobOperator).start(eq(failStaleConvertingJob), any());
     }
 
     /** 15:40 선행 Job 성공 후 남은 예약 만료 Job이 순서대로 실행되는지 검증한다. */
     @Test
     void runsTodayCloseJobsInOrder() throws Exception {
-        when(jobOperator.start(any(Job.class), any())).thenReturn(completedExecution());
+        JobExecution completedExecution = execution(BatchStatus.COMPLETED);
+        when(jobOperator.start(any(Job.class), any())).thenReturn(completedExecution);
 
         scheduler.runTodayCloseJobs();
 
         InOrder order = inOrder(jobOperator);
-        order.verify(jobOperator).start(org.mockito.ArgumentMatchers.eq(todayCloseJob), any());
-        order.verify(jobOperator).start(org.mockito.ArgumentMatchers.eq(expireReservationsJob), any());
+        order.verify(jobOperator).start(eq(todayCloseJob), any());
+        order.verify(jobOperator).start(eq(expireReservationsJob), any());
     }
 
     /** 선행 Job 실패 시 의존하는 후행 Job을 시작하지 않는지 검증한다. */
     @Test
     void doesNotStartDependentJobWhenPreviousJobFails() throws Exception {
-        when(jobOperator.start(expirePendingOrdersJob, any())).thenReturn(failedExecution());
+        JobExecution failedExecution = execution(BatchStatus.FAILED);
+        when(jobOperator.start(eq(expirePendingOrdersJob), any())).thenReturn(failedExecution);
 
         scheduler.runMarketCloseJobs();
 
-        verify(jobOperator, never()).start(org.mockito.ArgumentMatchers.eq(failStaleConvertingJob), any());
+        verify(jobOperator, never()).start(eq(failStaleConvertingJob), any());
     }
 
-    /** 완료 상태의 Job 실행 결과를 생성한다. */
-    private JobExecution completedExecution() {
+    /** 지정한 상태의 Job 실행 결과를 생성한다. */
+    private JobExecution execution(BatchStatus status) {
         JobExecution execution = mock(JobExecution.class);
-        when(execution.getStatus()).thenReturn(BatchStatus.COMPLETED);
-        return execution;
-    }
-
-    /** 실패 상태의 Job 실행 결과를 생성한다. */
-    private JobExecution failedExecution() {
-        JobExecution execution = mock(JobExecution.class);
-        when(execution.getStatus()).thenReturn(BatchStatus.FAILED);
+        when(execution.getStatus()).thenReturn(status);
         return execution;
     }
 }
