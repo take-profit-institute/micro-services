@@ -4,13 +4,17 @@ import com.google.protobuf.Timestamp;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
-import org.profit.candle.learning.content.entity.Content;
+import org.profit.candle.learning.content.dto.ContentResult;
+import org.profit.candle.learning.content.dto.CreateContentCommand;
+import org.profit.candle.learning.content.dto.UpdateContentCommand;
 import org.profit.candle.learning.content.entity.ContentLevel;
 import org.profit.candle.learning.content.service.ContentService;
 import org.profit.candle.learning.exception.LearningErrorCode;
 import org.profit.candle.learning.exception.LearningException;
+import org.profit.candle.learning.idempotency.service.IdempotencyExecutor;
 import org.profit.candle.learning.proto.*;
-import org.profit.candle.learning.state.entity.UserContentState;
+import org.profit.candle.learning.state.dto.ContentStateResult;
+import org.profit.candle.learning.state.dto.LearningStatsResult;
 import org.profit.candle.learning.state.service.UserContentStateService;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
@@ -25,20 +29,25 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
 
     private final ContentService contentService;
     private final UserContentStateService stateService;
+    private final IdempotencyExecutor idempotencyExecutor;
 
-    // ─── 콘텐츠 CRUD (관리자) ───
+    // ─── 쓰기 RPC (idempotency 적용) ───
 
     @Override
     public void createContent(CreateContentRequest req, StreamObserver<ContentResponse> observer) {
         try {
-            Content content = contentService.create(
-                    req.getTitle(), req.getDescription(), req.getCategory(),
-                    toContentLevel(req.getLevel()), req.getBody(),
-                    (short) req.getDurationMin(), req.getXpReward(),
-                    req.getKeywordsList().toArray(String[]::new), req.getIsPublished());
-            observer.onNext(toContentResponse(content));
+            // 관리자 RPC — userId 대신 고정값 사용. 추후 관리자 인증 연동 시 교체.
+            UUID adminId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+            String requestHash = hashOf(req.getTitle(), req.getCategory(), req.getLevel().name());
+
+            ContentResult result = idempotencyExecutor.execute(
+                    adminId, "CreateContent", req.getIdempotencyKey(),
+                    requestHash, ContentResult.class,
+                    () -> contentService.create(toCreateCommand(req)));
+
+            observer.onNext(toContentResponse(result));
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
@@ -46,20 +55,17 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
     @Override
     public void updateContent(UpdateContentRequest req, StreamObserver<ContentResponse> observer) {
         try {
-            Content content = contentService.update(
-                    UUID.fromString(req.getContentId()),
-                    req.hasTitle() ? req.getTitle() : null,
-                    req.hasDescription() ? req.getDescription() : null,
-                    req.hasCategory() ? req.getCategory() : null,
-                    req.hasLevel() ? toContentLevel(req.getLevel()) : null,
-                    req.hasBody() ? req.getBody() : null,
-                    req.hasDurationMin() ? (short) req.getDurationMin() : null,
-                    req.hasXpReward() ? req.getXpReward() : null,
-                    req.getKeywordsList().isEmpty() ? null : req.getKeywordsList().toArray(String[]::new),
-                    req.hasIsPublished() ? req.getIsPublished() : null);
-            observer.onNext(toContentResponse(content));
+            UUID adminId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+            String requestHash = hashOf(req.getContentId(), req.getIdempotencyKey());
+
+            ContentResult result = idempotencyExecutor.execute(
+                    adminId, "UpdateContent", req.getIdempotencyKey(),
+                    requestHash, ContentResult.class,
+                    () -> contentService.update(toUpdateCommand(req)));
+
+            observer.onNext(toContentResponse(result));
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
@@ -67,14 +73,22 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
     @Override
     public void deleteContent(DeleteContentRequest req, StreamObserver<DeleteContentResponse> observer) {
         try {
-            contentService.softDelete(UUID.fromString(req.getContentId()));
+            UUID adminId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+            String requestHash = hashOf(req.getContentId());
+
+            idempotencyExecutor.execute(
+                    adminId, "DeleteContent", req.getIdempotencyKey(),
+                    requestHash, Boolean.class,
+                    () -> { contentService.softDelete(UUID.fromString(req.getContentId())); return true; });
+
             observer.onNext(DeleteContentResponse.newBuilder().setSuccess(true).build());
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
 
+    // ─── 조회 RPC ───
     @Override
     public void listAdminContents(ListAdminContentsRequest req, StreamObserver<ListAdminContentsResponse> observer) {
         try {
@@ -103,7 +117,7 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
         try {
             UUID userId = UUID.fromString(req.getUserId());
             UUID contentId = UUID.fromString(req.getContentId());
-            Content content = contentService.getAndIncrementReadCount(contentId);
+            ContentResult content = contentService.getAndIncrementReadCount(contentId);
 
             ContentDetailResponse.Builder builder = toContentDetailBuilder(content);
             stateService.findState(userId, contentId)
@@ -111,7 +125,7 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
 
             observer.onNext(builder.build());
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
@@ -124,10 +138,10 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
             ContentLevel level = req.hasLevel() ? toContentLevel(req.getLevel()) : null;
             String sortBy = req.getSortBy().name().replace("CONTENT_SORT_BY_", "");
 
-            Page<Content> page = contentService.list(category, level, sortBy, req.getPage(), req.getSize());
+            Page<ContentResult> page = contentService.list(category, level, sortBy, req.getPage(), req.getSize());
             observer.onNext(toListResponse(page, userId));
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
@@ -139,10 +153,10 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
             String category = req.hasCategory() ? req.getCategory() : null;
             ContentLevel level = req.hasLevel() ? toContentLevel(req.getLevel()) : null;
 
-            Page<Content> page = contentService.search(req.getQuery(), category, level, req.getPage(), req.getSize());
+            Page<ContentResult> page = contentService.search(req.getQuery(), category, level, req.getPage(), req.getSize());
             observer.onNext(toListResponse(page, userId));
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
@@ -155,7 +169,7 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
 
             List<ContentWithStateResponse> items = stateService.getRecommendedContentIds(userId, limit).stream()
                     .map(id -> {
-                        Content c = contentService.getById(id);
+                        ContentResult c = contentService.getById(id);
                         ContentWithStateResponse.Builder b = ContentWithStateResponse.newBuilder()
                                 .setContent(toContentResponse(c));
                         stateService.findState(userId, id)
@@ -168,22 +182,27 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
                     .setTotalCount(items.size())
                     .setPage(0).setSize(limit).build());
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
 
-    // ─── 사용자 학습 상태 ───
+    // ─── 사용자 액션 (idempotency 적용) ───
 
     @Override
     public void updateProgress(UpdateProgressRequest req, StreamObserver<UserContentStateResponse> observer) {
         try {
-            UserContentState state = stateService.updateProgress(
-                    UUID.fromString(req.getUserId()), UUID.fromString(req.getContentId()),
-                    (short) req.getProgressPct());
-            observer.onNext(toStateResponse(state));
+            UUID userId = UUID.fromString(req.getUserId());
+            String requestHash = hashOf(req.getUserId(), req.getContentId(), String.valueOf(req.getProgressPct()));
+
+            ContentStateResult result = idempotencyExecutor.execute(
+                    userId, "UpdateProgress", req.getIdempotencyKey(),
+                    requestHash, ContentStateResult.class,
+                    () -> stateService.updateProgress(userId, UUID.fromString(req.getContentId()), (short) req.getProgressPct()));
+
+            observer.onNext(toStateResponse(result));
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
@@ -191,11 +210,17 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
     @Override
     public void completeContent(CompleteContentRequest req, StreamObserver<UserContentStateResponse> observer) {
         try {
-            UserContentState state = stateService.completeContent(
-                    UUID.fromString(req.getUserId()), UUID.fromString(req.getContentId()));
-            observer.onNext(toStateResponse(state));
+            UUID userId = UUID.fromString(req.getUserId());
+            String requestHash = hashOf(req.getUserId(), req.getContentId());
+
+            ContentStateResult result = idempotencyExecutor.execute(
+                    userId, "CompleteContent", req.getIdempotencyKey(),
+                    requestHash, ContentStateResult.class,
+                    () -> stateService.completeContent(userId, UUID.fromString(req.getContentId())));
+
+            observer.onNext(toStateResponse(result));
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
@@ -203,11 +228,17 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
     @Override
     public void toggleFavorite(ToggleFavoriteRequest req, StreamObserver<UserContentStateResponse> observer) {
         try {
-            UserContentState state = stateService.toggleFavorite(
-                    UUID.fromString(req.getUserId()), UUID.fromString(req.getContentId()));
-            observer.onNext(toStateResponse(state));
+            UUID userId = UUID.fromString(req.getUserId());
+            String requestHash = hashOf(req.getUserId(), req.getContentId());
+
+            ContentStateResult result = idempotencyExecutor.execute(
+                    userId, "ToggleFavorite", req.getIdempotencyKey(),
+                    requestHash, ContentStateResult.class,
+                    () -> stateService.toggleFavorite(userId, UUID.fromString(req.getContentId())));
+
+            observer.onNext(toStateResponse(result));
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
@@ -218,24 +249,23 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
     public void getUserLearningStats(GetUserLearningStatsRequest req, StreamObserver<UserLearningStatsResponse> observer) {
         try {
             UUID userId = UUID.fromString(req.getUserId());
-            UserContentStateService.LearningStats stats = stateService.getUserStats(userId);
+            LearningStatsResult stats = stateService.getUserStats(userId);
 
             UserLearningStatsResponse.Builder builder = UserLearningStatsResponse.newBuilder()
                     .setTotalContents((int) stats.totalContents())
                     .setCompletedContents((int) stats.completedContents())
                     .setOverallProgressPct(stats.overallProgressPct());
 
-            stats.completedByCategory().forEach((category, completed) -> {
-                long total = contentService.countByCategory(category);
-                int pct = total == 0 ? 0 : (int) (completed * 100 / total);
-                builder.addCategoryStats(CategoryProgress.newBuilder()
-                        .setCategory(category).setTotal((int) total)
-                        .setCompleted(completed.intValue()).setProgressPct(pct).build());
-            });
+            stats.categoryStats().forEach(cat ->
+                    builder.addCategoryStats(CategoryProgress.newBuilder()
+                            .setCategory(cat.category())
+                            .setTotal(cat.total())
+                            .setCompleted(cat.completed())
+                            .setProgressPct(cat.progressPct()).build()));
 
             observer.onNext(builder.build());
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
@@ -244,38 +274,71 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
     public void listFavorites(ListFavoritesRequest req, StreamObserver<ListContentsResponse> observer) {
         try {
             UUID userId = UUID.fromString(req.getUserId());
-            Page<UserContentState> page = stateService.listFavorites(userId, req.getPage(), req.getSize());
+            Page<ContentStateResult> page = stateService.listFavorites(userId, req.getPage(), req.getSize());
 
             List<ContentWithStateResponse> items = page.getContent().stream()
-                    .map(state -> ContentWithStateResponse.newBuilder()
-                            .setContent(toContentResponse(state.getContent()))
-                            .setUserState(toStateResponse(state)).build())
-                    .toList();
+                    .map(state -> {
+                        ContentResult c = contentService.getById(state.contentId());
+                        return ContentWithStateResponse.newBuilder()
+                                .setContent(toContentResponse(c))
+                                .setUserState(toStateResponse(state)).build();
+                    }).toList();
 
             observer.onNext(ListContentsResponse.newBuilder()
                     .addAllContents(items)
                     .setTotalCount((int) page.getTotalElements())
                     .setPage(req.getPage()).setSize(req.getSize()).build());
             observer.onCompleted();
-        } catch (LearningException e) {
+        } catch (Exception e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
         }
     }
 
     // ─── 에러 매핑 ───
 
-    private Status toGrpcStatus(LearningException e) {
-        String code = e.errorCode().code();
-        if (code.equals(LearningErrorCode.CONTENT_NOT_FOUND.code())) {
-            return Status.NOT_FOUND.withDescription(code);
+    private Status toGrpcStatus(Exception e) {
+        if (e instanceof LearningException le) {
+            String code = le.errorCode().code();
+            if (code.equals(LearningErrorCode.CONTENT_NOT_FOUND.code())) {
+                return Status.NOT_FOUND.withDescription(code);
+            }
+            if (code.equals(LearningErrorCode.IDEMPOTENCY_KEY_REQUIRED.code())) {
+                return Status.INVALID_ARGUMENT.withDescription(code);
+            }
+            if (code.equals(LearningErrorCode.IDEMPOTENCY_REQUEST_MISMATCH.code())) {
+                return Status.ALREADY_EXISTS.withDescription(code);
+            }
+            return Status.INTERNAL.withDescription(code);
         }
-        if (code.equals(LearningErrorCode.INVALID_PROGRESS.code())) {
-            return Status.INVALID_ARGUMENT.withDescription(code);
+        if (e instanceof IllegalArgumentException) {
+            return Status.INVALID_ARGUMENT.withDescription(e.getMessage());
         }
-        return Status.INTERNAL.withDescription(code);
+        return Status.INTERNAL.withDescription("Internal server error");
     }
 
     // ─── 매핑 헬퍼 ───
+
+    private CreateContentCommand toCreateCommand(CreateContentRequest req) {
+        return new CreateContentCommand(
+                req.getTitle(), req.getDescription(), req.getCategory(),
+                toContentLevel(req.getLevel()), req.getBody(),
+                (short) req.getDurationMin(), req.getXpReward(),
+                req.getKeywordsList().toArray(String[]::new), req.getIsPublished());
+    }
+
+    private UpdateContentCommand toUpdateCommand(UpdateContentRequest req) {
+        return new UpdateContentCommand(
+                UUID.fromString(req.getContentId()),
+                req.hasTitle() ? req.getTitle() : null,
+                req.hasDescription() ? req.getDescription() : null,
+                req.hasCategory() ? req.getCategory() : null,
+                req.hasLevel() ? toContentLevel(req.getLevel()) : null,
+                req.hasBody() ? req.getBody() : null,
+                req.hasDurationMin() ? (short) req.getDurationMin() : null,
+                req.hasXpReward() ? req.getXpReward() : null,
+                req.getKeywordsList().isEmpty() ? null : req.getKeywordsList().toArray(String[]::new),
+                req.hasIsPublished() ? req.getIsPublished() : null);
+    }
 
     private ContentLevel toContentLevel(org.profit.candle.learning.proto.ContentLevel protoLevel) {
         return switch (protoLevel) {
@@ -294,50 +357,50 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
         };
     }
 
-    private ContentResponse toContentResponse(Content c) {
+    private ContentResponse toContentResponse(ContentResult c) {
         ContentResponse.Builder builder = ContentResponse.newBuilder()
-                .setId(c.getId().toString())
-                .setTitle(c.getTitle())
-                .setCategory(c.getCategory())
-                .setLevel(toProtoLevel(c.getLevel()))
-                .setDurationMin(c.getDurationMin())
-                .setXpReward(c.getXpReward())
-                .setIsPublished(c.isPublished())
-                .setReadCount(c.getReadCount())
-                .setCreatedAt(toTimestamp(c.getCreatedAt()))
-                .setUpdatedAt(toTimestamp(c.getUpdatedAt()));
-        if (c.getDescription() != null) builder.setDescription(c.getDescription());
-        if (c.getKeywords() != null) builder.addAllKeywords(List.of(c.getKeywords()));
+                .setId(c.id().toString())
+                .setTitle(c.title())
+                .setCategory(c.category())
+                .setLevel(toProtoLevel(c.level()))
+                .setDurationMin(c.durationMin())
+                .setXpReward(c.xpReward())
+                .setIsPublished(c.published())
+                .setReadCount(c.readCount())
+                .setCreatedAt(toTimestamp(c.createdAt()))
+                .setUpdatedAt(toTimestamp(c.updatedAt()));
+        if (c.description() != null) builder.setDescription(c.description());
+        if (c.keywords() != null) builder.addAllKeywords(List.of(c.keywords()));
         return builder.build();
     }
 
-    private ContentDetailResponse.Builder toContentDetailBuilder(Content c) {
+    private ContentDetailResponse.Builder toContentDetailBuilder(ContentResult c) {
         ContentDetailResponse.Builder builder = ContentDetailResponse.newBuilder()
-                .setId(c.getId().toString())
-                .setTitle(c.getTitle())
-                .setCategory(c.getCategory())
-                .setLevel(toProtoLevel(c.getLevel()))
-                .setDurationMin(c.getDurationMin())
-                .setXpReward(c.getXpReward())
-                .setIsPublished(c.isPublished())
-                .setReadCount(c.getReadCount())
-                .setCreatedAt(toTimestamp(c.getCreatedAt()))
-                .setUpdatedAt(toTimestamp(c.getUpdatedAt()));
-        if (c.getDescription() != null) builder.setDescription(c.getDescription());
-        if (c.getBody() != null) builder.setBody(c.getBody());
-        if (c.getKeywords() != null) builder.addAllKeywords(List.of(c.getKeywords()));
+                .setId(c.id().toString())
+                .setTitle(c.title())
+                .setCategory(c.category())
+                .setLevel(toProtoLevel(c.level()))
+                .setDurationMin(c.durationMin())
+                .setXpReward(c.xpReward())
+                .setIsPublished(c.published())
+                .setReadCount(c.readCount())
+                .setCreatedAt(toTimestamp(c.createdAt()))
+                .setUpdatedAt(toTimestamp(c.updatedAt()));
+        if (c.description() != null) builder.setDescription(c.description());
+        if (c.body() != null) builder.setBody(c.body());
+        if (c.keywords() != null) builder.addAllKeywords(List.of(c.keywords()));
         return builder;
     }
 
-    private UserContentStateResponse toStateResponse(UserContentState s) {
+    private UserContentStateResponse toStateResponse(ContentStateResult s) {
         UserContentStateResponse.Builder builder = UserContentStateResponse.newBuilder()
-                .setId(s.getId().toString())
-                .setContentId(s.getContent().getId().toString())
-                .setProgressPct(s.getProgressPct())
-                .setIsCompleted(s.isCompleted())
-                .setIsFavorite(s.isFavorite());
-        if (s.getCompletedAt() != null) builder.setCompletedAt(toTimestamp(s.getCompletedAt()));
-        if (s.getLastReadAt() != null) builder.setLastReadAt(toTimestamp(s.getLastReadAt()));
+                .setId(s.id().toString())
+                .setContentId(s.contentId().toString())
+                .setProgressPct(s.progressPct())
+                .setIsCompleted(s.completed())
+                .setIsFavorite(s.favorite());
+        if (s.completedAt() != null) builder.setCompletedAt(toTimestamp(s.completedAt()));
+        if (s.lastReadAt() != null) builder.setLastReadAt(toTimestamp(s.lastReadAt()));
         return builder.build();
     }
 
@@ -348,12 +411,12 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
                 .build();
     }
 
-    private ListContentsResponse toListResponse(Page<Content> page, UUID userId) {
+    private ListContentsResponse toListResponse(Page<ContentResult> page, UUID userId) {
         List<ContentWithStateResponse> items = page.getContent().stream()
                 .map(c -> {
                     ContentWithStateResponse.Builder b = ContentWithStateResponse.newBuilder()
                             .setContent(toContentResponse(c));
-                    stateService.findState(userId, c.getId())
+                    stateService.findState(userId, c.id())
                             .ifPresent(s -> b.setUserState(toStateResponse(s)));
                     return b.build();
                 }).toList();
@@ -365,4 +428,9 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
                 .setSize(page.getSize())
                 .build();
     }
+
+    private String hashOf(String... parts) {
+        return String.join("|", parts);
+    }
+}
 }

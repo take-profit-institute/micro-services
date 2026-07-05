@@ -44,6 +44,7 @@ public class Content {
     @Column(name = "keywords", columnDefinition = "text[]")
     private String[] keywords = {};
 
+    @Getter(AccessLevel.NONE)
     @Column(name = "is_published", nullable = false)
     private boolean published;
 
@@ -59,6 +60,8 @@ public class Content {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    public boolean published() { return published; }
+
     @PrePersist
     protected void onCreate() {
         Instant now = Instant.now();
@@ -71,7 +74,6 @@ public class Content {
         this.updatedAt = Instant.now();
     }
 
-    // === 생성 ===
     public static Content create(String title, String description, String category,
                                  ContentLevel level, String body, short durationMin,
                                  long xpReward, String[] keywords, boolean published) {
@@ -89,7 +91,6 @@ public class Content {
         return c;
     }
 
-    // === 수정 ===
     public void update(String title, String description, String category,
                        ContentLevel level, String body, Short durationMin,
                        Long xpReward, String[] keywords, Boolean published) {
@@ -104,10 +105,7 @@ public class Content {
         if (published != null) this.published = published;
     }
 
-    // === Soft Delete ===
     public void softDelete() {
         this.deletedAt = Instant.now();
     }
-
-    // === 조회수 증가: Repository에서 atomic query로 처리 ===
 }

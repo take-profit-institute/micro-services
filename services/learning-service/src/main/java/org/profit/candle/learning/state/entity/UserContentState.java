@@ -27,9 +27,11 @@ public class UserContentState {
     @Column(name = "progress_pct", nullable = false)
     private short progressPct;
 
+    @Getter(AccessLevel.NONE)
     @Column(name = "is_completed", nullable = false)
     private boolean completed;
 
+    @Getter(AccessLevel.NONE)
     @Column(name = "is_favorite", nullable = false)
     private boolean favorite;
 
@@ -45,6 +47,9 @@ public class UserContentState {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    public boolean completed() { return completed; }
+    public boolean favorite() { return favorite; }
+
     @PrePersist
     protected void onCreate() {
         Instant now = Instant.now();
@@ -57,7 +62,6 @@ public class UserContentState {
         this.updatedAt = Instant.now();
     }
 
-    // === 생성 ===
     public static UserContentState create(UUID userId, Content content) {
         UserContentState s = new UserContentState();
         s.userId = userId;
@@ -68,21 +72,17 @@ public class UserContentState {
         return s;
     }
 
-    // === 진도 업데이트 ===
     public void updateProgress(short progressPct) {
         if (progressPct < 0 || progressPct > 100) {
             throw new IllegalArgumentException("progress_pct must be 0~100");
         }
         this.progressPct = progressPct;
         this.lastReadAt = Instant.now();
-
-        // 100% 도달 시 자동 완료 처리
         if (progressPct == 100 && !this.completed) {
             markCompleted();
         }
     }
 
-    // === 학습 완료 ===
     public void markCompleted() {
         this.completed = true;
         this.progressPct = 100;
@@ -90,7 +90,6 @@ public class UserContentState {
         this.lastReadAt = Instant.now();
     }
 
-    // === 즐겨찾기 토글 ===
     public void toggleFavorite() {
         this.favorite = !this.favorite;
     }
