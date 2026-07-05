@@ -24,6 +24,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
+        "spring.grpc.server.port=0",
         "spring.batch.job.enabled=false",
         "batch.schedule.smoke.enabled=false",
         "batch.schedule.portfolio-eod.enabled=false",
