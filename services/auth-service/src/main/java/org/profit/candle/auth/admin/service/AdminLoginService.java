@@ -24,7 +24,7 @@ public class AdminLoginService {
     private final AuthProperties properties;
 
     @Transactional
-    public IssuedTokens login(String username, String rawPassword) {
+    public AdminLoginResult login(String username, String rawPassword) {
         Instant now = Instant.now();
         // 계정 미존재/비밀번호 불일치는 동일한 에러로 응답해 아이디 존재 여부 노출을 막는다.
         AdminAccount admin = adminAccountRepository.findByUsername(username)
@@ -40,6 +40,7 @@ public class AdminLoginService {
             throw new AuthException(AuthErrorCode.INVALID_ADMIN_CREDENTIALS);
         }
         admin.recordLoginSuccess(now);
-        return tokenIssuer.issue(admin.id(), "", admin.role().name(), PrincipalType.ADMIN);
+        IssuedTokens tokens = tokenIssuer.issue(admin.id(), "", admin.role().name(), PrincipalType.ADMIN);
+        return AdminLoginResult.of(tokens, admin);
     }
 }

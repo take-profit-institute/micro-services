@@ -26,7 +26,8 @@ public class AdminAuthController {
         if (request == null || isBlank(request.username()) || isBlank(request.password())) {
             throw new AuthException(AuthErrorCode.INVALID_ADMIN_REQUEST);
         }
-        return tokenResponder.tokenResponse(adminLoginService.login(request.username(), request.password()), false);
+        return tokenResponder.tokenResponse(
+                adminLoginService.login(request.username(), request.password()).tokens(), false);
     }
 
     private boolean isBlank(String value) {
