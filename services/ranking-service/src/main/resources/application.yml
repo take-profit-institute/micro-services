@@ -39,5 +39,8 @@ server:
   port: ${RANKING_SERVER_PORT:8086}
 
 ranking:
+  kafka:
+    # Debezium CDC topic이 확정되면 환경변수만 교체한다.
+    order-filled-topic: ${RANKING_ORDER_FILLED_TOPIC:orderFilled}
   grpc:
     portfolio-deadline: ${RANKING_PORTFOLIO_GRPC_DEADLINE:3s}

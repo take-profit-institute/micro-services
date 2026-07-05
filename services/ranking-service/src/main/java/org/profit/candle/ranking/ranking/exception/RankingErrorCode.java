@@ -12,6 +12,9 @@ public enum RankingErrorCode implements ErrorCode {
     RANKING_NOT_FOUND(
             "RANKING_NOT_FOUND",
             "완료된 랭킹 결과를 찾을 수 없습니다."),
+    PARTICIPANT_NOT_REGISTERED(
+            "RANKING_PARTICIPANT_NOT_REGISTERED",
+            "랭킹 참가자 정보를 찾을 수 없습니다."),
     INVALID_PAGE_TOKEN(
             "RANKING_INVALID_PAGE_TOKEN",
             "랭킹 페이지 토큰이 올바르지 않습니다.");

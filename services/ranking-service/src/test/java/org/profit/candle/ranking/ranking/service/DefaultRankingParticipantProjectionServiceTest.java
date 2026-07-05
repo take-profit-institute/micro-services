@@ -18,6 +18,7 @@ import org.profit.candle.ranking.ranking.entity.ConsumedEvent;
 import org.profit.candle.ranking.ranking.entity.ConsumedEventId;
 import org.profit.candle.ranking.ranking.entity.ParticipantStatus;
 import org.profit.candle.ranking.ranking.entity.RankingParticipant;
+import org.profit.candle.ranking.ranking.event.OrderFilledEvent;
 import org.profit.candle.ranking.ranking.event.UserProfileUpdatedEvent;
 import org.profit.candle.ranking.ranking.repository.ConsumedEventRepository;
 import org.profit.candle.ranking.ranking.repository.RankingParticipantRepository;
@@ -33,6 +34,36 @@ class DefaultRankingParticipantProjectionServiceTest {
 
     @InjectMocks
     DefaultRankingParticipantProjectionService service;
+
+    /** 최초 체결은 거래 횟수와 Trading 소비 이력을 각각 한 번 반영하는지 검증한다. */
+    @Test
+    void projectFilledOrderIncrementsTradeCountAndRecordsTheEvent() {
+        UUID orderId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        OrderFilledEvent event = filledOrder(orderId, userId);
+        when(consumedEventRepository.existsById(
+                        new ConsumedEventId("trading-service", orderId)))
+                .thenReturn(false);
+        when(participantRepository.incrementTradeCount(userId)).thenReturn(1);
+
+        service.projectFilledOrder(event);
+
+        verify(participantRepository).incrementTradeCount(userId);
+        verify(consumedEventRepository).save(org.mockito.ArgumentMatchers.any(ConsumedEvent.class));
+    }
+
+    /** 같은 orderId를 재수신하면 거래 횟수를 다시 증가시키지 않는지 검증한다. */
+    @Test
+    void projectFilledOrderIgnoresAnAlreadyConsumedOrder() {
+        UUID orderId = UUID.randomUUID();
+        ConsumedEventId consumedEventId = new ConsumedEventId("trading-service", orderId);
+        when(consumedEventRepository.existsById(consumedEventId)).thenReturn(true);
+
+        service.projectFilledOrder(filledOrder(orderId, UUID.randomUUID()));
+
+        verify(participantRepository, never()).incrementTradeCount(org.mockito.ArgumentMatchers.any());
+        verify(consumedEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
 
     /** 최초 프로필 이벤트가 비대상 상태의 참가자와 소비 이력을 생성하는지 검증한다. */
     @Test
@@ -74,5 +105,12 @@ class DefaultRankingParticipantProjectionServiceTest {
     private UserProfileUpdatedEvent event(UUID eventId, UUID userId, String nickname, Instant occurredAt) {
         return new UserProfileUpdatedEvent(
                 eventId, "UserProfileUpdated", 1, userId.toString(), nickname, "", occurredAt);
+    }
+
+    /** 현재 Trading OrderFilled 계약과 같은 테스트 이벤트를 만든다. */
+    private OrderFilledEvent filledOrder(UUID orderId, UUID userId) {
+        return new OrderFilledEvent(
+                orderId.toString(), userId.toString(), "005930", "BUY",
+                80_000L, 1L, 10L, 0L, 80_010L);
     }
 }
