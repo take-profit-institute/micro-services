@@ -5,7 +5,7 @@ spring:
     server:
       port: ${AUTH_GRPC_PORT:50051}
   datasource:
-    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/candle_auth}
+    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=auth,public}
     username: ${AUTH_DB_USERNAME:candle}
     password: ${AUTH_DB_PASSWORD:candle}
   jpa:
