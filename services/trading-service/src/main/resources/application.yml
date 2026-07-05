@@ -13,7 +13,7 @@ spring:
         market-service:
           target: ${MARKET_SERVICE_GRPC_ADDRESS:static://localhost:50063}
   datasource:
-    url: ${TRADING_DB_URL:jdbc:postgresql://localhost:5432/candle_trading}
+    url: ${TRADING_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=trading,account,order_svc,reservation,public}
     username: ${TRADING_DB_USERNAME:candle}
     password: ${TRADING_DB_PASSWORD:candle}
   jpa:

@@ -29,7 +29,7 @@ class DailyRankingLocalIntegrationTest {
     @BeforeEach
     void setUp() {
         DriverManagerDataSource dataSource = new DriverManagerDataSource(
-                environment("RANKING_DB_URL", "jdbc:postgresql://localhost:5432/candle_ranking"),
+                environment("RANKING_DB_URL", "jdbc:postgresql://localhost:5432/candle?currentSchema=ranking,public"),
                 environment("RANKING_DB_USERNAME", "candle"),
                 environment("RANKING_DB_PASSWORD", "candle"));
         jdbcTemplate = new JdbcTemplate(dataSource);

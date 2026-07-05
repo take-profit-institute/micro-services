@@ -17,8 +17,13 @@ ARG SERVICE_MODULE
 # 산출 jar 는 마운트 밖 경로(/app.jar)로 복사해야 레이어에 남는다.
 RUN --mount=type=bind,target=/workspace,rw \
     --mount=type=cache,target=/root/.gradle \
-    sh ./gradlew :services:${SERVICE_MODULE}:bootJar --no-daemon -x test \
- && cp services/${SERVICE_MODULE}/build/libs/*.jar /app.jar
+    if [ "$SERVICE_MODULE" = "batch" ]; then \
+      sh ./gradlew :batch:bootJar --no-daemon -x test \
+      && cp batch/build/libs/*.jar /app.jar; \
+    else \
+      sh ./gradlew :services:${SERVICE_MODULE}:bootJar --no-daemon -x test \
+      && cp services/${SERVICE_MODULE}/build/libs/*.jar /app.jar; \
+    fi
 
 # ── 2단계: 런타임 이미지 ────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-jammy

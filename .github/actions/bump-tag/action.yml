@@ -1,0 +1,64 @@
+# candle-k8s ApplicationSet image tag bump. ArgoCD syncs from that repo.
+name: bump-tag
+description: Update a service image tag in candle-k8s
+inputs:
+  service:
+    required: true
+    description: Service name in the ApplicationSet element. Use "*" for all elements.
+  tag:
+    required: true
+    description: Image tag to write.
+  env:
+    required: true
+    default: dev
+    description: dev or prod.
+  appset:
+    required: false
+    default: services
+    description: services or batch.
+  token:
+    required: true
+    description: PAT or GitHub App token with push access to candle-k8s.
+runs:
+  using: composite
+  steps:
+    - name: Checkout candle-k8s
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository_owner }}/candle-k8s
+        token: ${{ inputs.token }}
+        path: _candle-k8s
+    - name: Bump and push
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd _candle-k8s
+        FILE="platform/applications/${{ inputs.appset }}-${{ inputs.env }}.yaml"
+        SVC='${{ inputs.service }}'
+        TAG='${{ inputs.tag }}'
+
+        if [ ! -f "$FILE" ]; then
+          echo "missing $FILE" >&2
+          exit 1
+        fi
+
+        if [ "$SVC" = "*" ]; then
+          perl -0pi -e 's/(-\s*\{\s*name:\s*[^}\n]*tag:\s*)[^,}\n]+/${1}'"$TAG"'/g' "$FILE"
+        else
+          perl -0pi -e 's/(\{\s*name:\s*'"$SVC"'\b[^}\n]*tag:\s*)[^,}\n]+/${1}'"$TAG"'/g' "$FILE"
+        fi
+
+        git config user.name "candle-ci"
+        git config user.email "ci@candle.local"
+        git add "$FILE"
+        git diff --cached --quiet && { echo "no change"; exit 0; }
+        git commit -m "deploy(${{ inputs.env }}): ${{ inputs.appset }}/${{ inputs.service }} -> $TAG"
+
+        for attempt in 1 2 3; do
+          git pull --rebase origin main || true
+          if git push; then
+            exit 0
+          fi
+          sleep $((attempt * 2))
+        done
+        exit 1

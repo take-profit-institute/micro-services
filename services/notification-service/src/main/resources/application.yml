@@ -5,7 +5,7 @@ spring:
     server:
       port: ${NOTIFICATION_GRPC_PORT:50057}
   datasource:
-    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5432/candle_notification}
+    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=notification,public}
     username: ${NOTIFICATION_DB_USERNAME:candle}
     password: ${NOTIFICATION_DB_PASSWORD:candle}
   jpa:
