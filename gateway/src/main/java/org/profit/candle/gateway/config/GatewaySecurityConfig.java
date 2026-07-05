@@ -58,7 +58,9 @@ public class GatewaySecurityConfig {
                                 "/api/auth/providers",
                                 "/api/auth/oauth/**",
                                 "/api/auth/token/refresh",
-                                "/api/auth/logout"
+                                "/api/auth/logout",
+                                // admin 로그인은 토큰 발급 경로이므로 JWT 검증 없이 통과시킨다.
+                                "/api/admin/login"
                         ),
                         ServerWebExchangeMatchers.pathMatchers("/api/v1/auth/**")
                 ))
