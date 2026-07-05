@@ -56,6 +56,13 @@ public class RankingParticipant {
         return new RankingParticipant(userId, nickname, occurredAt);
     }
 
+    /** 신규 가입 사용자를 랭킹 명단에 등록한다. 사용자는 활성, 계좌 상태는 아직 미확정이다. */
+    public static RankingParticipant forNewUser(UUID userId, String nickname, Instant occurredAt) {
+        RankingParticipant participant = new RankingParticipant(userId, nickname, occurredAt);
+        participant.userStatus = ParticipantStatus.ACTIVE;
+        return participant;
+    }
+
     /** 현재 정보보다 오래되지 않은 이벤트일 때 닉네임을 갱신한다. */
     public void updateNickname(String nickname, Instant occurredAt) {
         if (occurredAt.isBefore(updatedAt)) {

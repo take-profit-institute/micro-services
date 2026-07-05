@@ -55,6 +55,10 @@ public class ProxyWebFilter implements WebFilter, Ordered {
             // /api/v1/auth/** → auth-service, 경로 유지
             targetBase = authServiceUri;
             targetPath = path;
+        } else if (path.startsWith("/api/v1/admin/")) {
+            // /api/v1/admin/** (관리자 계정 관리) → auth-service, 경로 유지
+            targetBase = authServiceUri;
+            targetPath = path;
         } else if (isAuthServicePath(path)) {
             // /api/auth/{providers|oauth/**|token/refresh|logout} → auth-service, /api/v1/auth/** 재작성
             targetBase = authServiceUri;

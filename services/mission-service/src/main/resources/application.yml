@@ -1,5 +1,8 @@
 spring:
   application:
     name: mission-service
+  grpc:
+    server:
+      port: ${MISSION_GRPC_PORT:50058}
 server:
-  port: 8087
+  port: ${MISSION_SERVER_PORT:8087}

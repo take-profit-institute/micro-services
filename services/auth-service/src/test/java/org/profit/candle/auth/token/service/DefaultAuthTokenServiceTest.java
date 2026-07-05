@@ -14,8 +14,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
+import org.profit.candle.auth.admin.repository.AdminAccountRepository;
 import org.profit.candle.auth.identity.entity.OAuthAccount;
 import org.profit.candle.auth.identity.repository.OAuthAccountRepository;
+import org.profit.candle.auth.token.entity.PrincipalType;
 import org.profit.candle.auth.token.entity.RefreshToken;
 import org.profit.candle.auth.token.repository.RefreshTokenRepository;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -37,6 +39,7 @@ class DefaultAuthTokenServiceTest {
     @Mock JwtEncoder jwtEncoder;
     @Mock RefreshTokenRepository refreshTokenRepository;
     @Mock OAuthAccountRepository oAuthAccountRepository;
+    @Mock AdminAccountRepository adminAccountRepository;
     @InjectMocks DefaultAuthTokenService service;
 
     static final UUID USER_ID = UUID.randomUUID();
@@ -58,32 +61,32 @@ class DefaultAuthTokenServiceTest {
 
     @Test
     void issue_returnsAccessTokenFromEncoder() {
-        IssuedTokens tokens = service.issue(USER_ID, EMAIL);
+        IssuedTokens tokens = service.issue(USER_ID, EMAIL, "USER", PrincipalType.USER);
         assertThat(tokens.accessToken()).isEqualTo("stub.jwt.token");
     }
 
     @Test
     void issue_returnsNonBlankRefreshToken() {
-        IssuedTokens tokens = service.issue(USER_ID, EMAIL);
+        IssuedTokens tokens = service.issue(USER_ID, EMAIL, "USER", PrincipalType.USER);
         assertThat(tokens.refreshToken()).isNotBlank();
     }
 
     @Test
     void issue_accessTokenTtlMatchesProperty() {
-        IssuedTokens tokens = service.issue(USER_ID, EMAIL);
+        IssuedTokens tokens = service.issue(USER_ID, EMAIL, "USER", PrincipalType.USER);
         assertThat(tokens.expiresInSeconds()).isEqualTo(ACCESS_TTL.toSeconds());
     }
 
     @Test
     void issue_savesRefreshTokenToRepository() {
-        service.issue(USER_ID, EMAIL);
+        service.issue(USER_ID, EMAIL, "USER", PrincipalType.USER);
         verify(refreshTokenRepository).save(any(RefreshToken.class));
     }
 
     @Test
     void issue_encodesUserIdAsSubject() {
         ArgumentCaptor<JwtEncoderParameters> captor = ArgumentCaptor.forClass(JwtEncoderParameters.class);
-        service.issue(USER_ID, EMAIL);
+        service.issue(USER_ID, EMAIL, "USER", PrincipalType.USER);
 
         verify(jwtEncoder).encode(captor.capture());
         assertThat(captor.getValue().getClaims().getSubject()).isEqualTo(USER_ID.toString());
@@ -92,7 +95,7 @@ class DefaultAuthTokenServiceTest {
     @Test
     void issue_encodesEmailClaim() {
         ArgumentCaptor<JwtEncoderParameters> captor = ArgumentCaptor.forClass(JwtEncoderParameters.class);
-        service.issue(USER_ID, EMAIL);
+        service.issue(USER_ID, EMAIL, "USER", PrincipalType.USER);
 
         verify(jwtEncoder).encode(captor.capture());
         assertThat((String) captor.getValue().getClaims().getClaim("email")).isEqualTo(EMAIL);
@@ -100,7 +103,7 @@ class DefaultAuthTokenServiceTest {
 
     @Test
     void rotate_validToken_returnsNewTokens() {
-        RefreshToken stored = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash",
+        RefreshToken stored = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash", PrincipalType.USER,
                 Instant.now().plus(REFRESH_TTL));
         when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(stored));
         when(oAuthAccountRepository.findById(USER_ID)).thenReturn(
@@ -113,7 +116,7 @@ class DefaultAuthTokenServiceTest {
 
     @Test
     void rotate_validToken_revokesOldToken() {
-        RefreshToken stored = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash",
+        RefreshToken stored = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash", PrincipalType.USER,
                 Instant.now().plus(REFRESH_TTL));
         when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(stored));
         when(oAuthAccountRepository.findById(USER_ID)).thenReturn(Optional.empty());
@@ -125,7 +128,7 @@ class DefaultAuthTokenServiceTest {
 
     @Test
     void rotate_expiredToken_throwsInvalidRefreshToken() {
-        RefreshToken expired = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash",
+        RefreshToken expired = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash", PrincipalType.USER,
                 Instant.now().minusSeconds(1));
         when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(expired));
 
@@ -135,7 +138,7 @@ class DefaultAuthTokenServiceTest {
 
     @Test
     void rotate_revokedToken_throwsInvalidRefreshToken() {
-        RefreshToken revoked = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash",
+        RefreshToken revoked = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash", PrincipalType.USER,
                 Instant.now().plus(REFRESH_TTL));
         revoked.revoke(Instant.now());
         when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(revoked));
@@ -154,7 +157,7 @@ class DefaultAuthTokenServiceTest {
 
     @Test
     void revoke_existingToken_revokesIt() {
-        RefreshToken token = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash",
+        RefreshToken token = new RefreshToken(UUID.randomUUID(), USER_ID, "any-hash", PrincipalType.USER,
                 Instant.now().plus(REFRESH_TTL));
         when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
 

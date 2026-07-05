@@ -10,6 +10,7 @@ import org.profit.candle.auth.identity.entity.OAuthAccount;
 import org.profit.candle.auth.identity.repository.OAuthAccountRepository;
 import org.profit.candle.auth.oauth.OAuthClientRegistry;
 import org.profit.candle.auth.oauth.OAuthProfile;
+import org.profit.candle.auth.token.entity.PrincipalType;
 import org.profit.candle.auth.token.service.AuthTokenIssuer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,7 @@ public class DefaultOAuthLoginService implements OAuthLoginService {
             outboxWriter.recordUserCreated(created.userId(), created.email());
             return created;
         });
-        return new LoginResult(tokenIssuer.issue(account.userId(), account.email()), isNewUser);
+        return new LoginResult(
+                tokenIssuer.issue(account.userId(), account.email(), "USER", PrincipalType.USER), isNewUser);
     }
 }

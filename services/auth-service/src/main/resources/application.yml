@@ -47,5 +47,13 @@ auth:
     domain: ${AUTH_COOKIE_DOMAIN:}
     secure: ${AUTH_COOKIE_SECURE:false}
     same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
+  admin:
+    # 최초 SUPER_ADMIN 부트스트랩. username/password 미설정 시 생성하지 않는다.
+    bootstrap:
+      username: ${AUTH_ADMIN_BOOTSTRAP_USERNAME:}
+      password: ${AUTH_ADMIN_BOOTSTRAP_PASSWORD:}
+      display-name: ${AUTH_ADMIN_BOOTSTRAP_DISPLAY_NAME:Super Admin}
+    max-failed-attempts: ${AUTH_ADMIN_MAX_FAILED_ATTEMPTS:5}
+    lock-duration: ${AUTH_ADMIN_LOCK_DURATION:PT15M}
   outbox:
     publish-interval-ms: ${AUTH_OUTBOX_PUBLISH_INTERVAL_MS:5000}

@@ -61,43 +61,6 @@ services:
       - "1025:1025" # SMTP (notification-service가 발송)
       - "8025:8025" # 웹 UI (받은 메일 확인)
 
-  # ── 옵션: Spring 서비스 컨테이너 ──────────────────────────────────────
-  user-service:
-    image: ${USER_SERVICE_IMAGE:-yyubin/candle-user-service:dev}
-    profiles: ["services"]
-    environment:
-      USER_DB_URL: jdbc:postgresql://postgres:5432/candle_users
-      USER_DB_USERNAME: ${POSTGRES_USER:-postgres}
-      USER_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-      USER_GRPC_PORT: "50052"
-      USER_SERVER_PORT: "8082"
-    ports:
-      - "50052:50052"
-      - "8082:8082"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redpanda:
-        condition: service_started
-    restart: on-failure
-
-  # ── 옵션: 종목 실시간 채팅 WS 게이트웨이 (stateless, Redis Pub/Sub 팬아웃) ──
-  # WS는 /chat/ws(8090), 방 배정 REST는 /chat/rooms. 상태는 전부 redis에 위임.
-  chatting-service:
-    image: ${CHATTING_SERVICE_IMAGE:-yyubin/candle-chatting-service:dev}
-    profiles: ["services"]
-    environment:
-      REDIS_URL: redis://redis:6379
-      AUTH_JWT_HMAC_SECRET: ${AUTH_JWT_HMAC_SECRET:?AUTH_JWT_HMAC_SECRET must be set in .env}
-      CHAT_SERVER_PORT: "8090"
-    ports:
-      - "8090:8090"
-    depends_on:
-      redis:
-        condition: service_started
-    restart: on-failure
-
   # ── 옵션: redpanda console (Kafka UI) ──
   redpanda-console:
     image: redpandadata/console:v2.7.2
@@ -116,6 +79,9 @@ services:
       HOST: "0.0.0.0"
       NODE_OPTIONS: "--dns-result-order=ipv4first"
       REDIS_URL: redis://redis:6379
+      # admin 토큰 검증용 JWT 시크릿 — auth-service/gateway와 반드시 동일해야 한다.
+      # 누락되면 BFF가 코드 기본값으로 검증해 모든 admin 토큰을 401로 거부한다.
+      AUTH_JWT_HMAC_SECRET: ${AUTH_JWT_HMAC_SECRET:-local-dev-secret-change-me}
       # 실제 마이크로서비스로 gRPC 라우팅 (mock 아님)
       DATA_SOURCE: grpc
       # gRPC 서비스는 호스트에서 로컬 실행 (50051~50060)
@@ -130,6 +96,8 @@ services:
       GRPC_LEARN_ADDR:        host.docker.internal:50059
       GRPC_STOCK_ADDR:        host.docker.internal:50060
       GRPC_WISHLIST_ADDR:     host.docker.internal:50061
+      GRPC_BATCH_ADDR:        host.docker.internal:50062
+      GRPC_NEWS_ADDR:         host.docker.internal:50064
     ports: ["8080:8080"]
     extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:

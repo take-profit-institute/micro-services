@@ -7,7 +7,6 @@ import org.profit.candle.notification.device.entity.DeviceToken;
 import org.profit.candle.notification.fcm.client.FcmClient;
 import org.profit.candle.notification.notification.entity.Notification;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -18,7 +17,7 @@ public class FcmNotificationDeliveryService implements NotificationDeliveryServi
     private final NotificationDeliveryWriter notificationDeliveryWriter;
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void deliver(Notification notification, DeviceToken deviceToken) {
         NotificationDelivery delivery = notificationDeliveryWriter.save(
                 NotificationDelivery.pending(notification.getId(), deviceToken.getId())

@@ -11,8 +11,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.profit.candle.auth.admin.service.AdminLoginService;
 import org.profit.candle.auth.api.dto.ProviderResponse;
 import org.profit.candle.auth.api.dto.ProvidersResponse;
+import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.identity.service.AuthMeService;
@@ -31,6 +33,8 @@ class AuthGrpcServiceTest {
 
     @Mock OAuthProvidersService oAuthProvidersService;
     @Mock AuthMeService authMeService;
+    @Mock AdminLoginService adminLoginService;
+    @Mock AuthProperties authProperties;
     @InjectMocks AuthGrpcService authGrpcService;
 
     @Test
