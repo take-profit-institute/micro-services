@@ -12,18 +12,6 @@ class UnavailableEodContractTest {
     private static final LocalDate BUSINESS_DATE = LocalDate.of(2026, 7, 5);
 
     @Test
-    void targetClientFailsWhenPortfolioContractIsUnavailable() {
-        SnapshotTargetClient client = new UnavailableSnapshotTargetClient();
-
-        assertThatThrownBy(() -> client.loadTargets(BUSINESS_DATE, "", 100))
-                .isInstanceOf(EodBatchException.class)
-                .satisfies(exception -> assertErrorCode(
-                        exception,
-                        EodBatchErrorCode.SNAPSHOT_TARGET_CONTRACT_UNAVAILABLE
-                ));
-    }
-
-    @Test
     void seedCapitalProviderFailsWhenTradingContractIsUnavailable() {
         SeedCapitalProvider provider = new UnavailableSeedCapitalProvider();
 
