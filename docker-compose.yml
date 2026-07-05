@@ -96,6 +96,7 @@ services:
       GRPC_LEARN_ADDR:        host.docker.internal:50059
       GRPC_STOCK_ADDR:        host.docker.internal:50060
       GRPC_WISHLIST_ADDR:     host.docker.internal:50061
+      GRPC_BATCH_ADDR:        host.docker.internal:50062
       GRPC_NEWS_ADDR:         host.docker.internal:50064
     ports: ["8080:8080"]
     extra_hosts: ["host.docker.internal:host-gateway"]
