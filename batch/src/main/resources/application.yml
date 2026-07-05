@@ -41,8 +41,15 @@ spring:
           target: ${BATCH_PORTFOLIO_GRPC_TARGET:static://localhost:50055}
           ssl:
             enabled: false
+        ranking:
+          target: ${BATCH_RANKING_GRPC_TARGET:static://localhost:50056}
+          ssl:
+            enabled: false
 
 batch:
+  ranking:
+    grpc-target: ranking
+    deadline-millis: ${BATCH_RANKING_DEADLINE_MILLIS:120000}
   schedule:
     zone-id: Asia/Seoul
     smoke:
