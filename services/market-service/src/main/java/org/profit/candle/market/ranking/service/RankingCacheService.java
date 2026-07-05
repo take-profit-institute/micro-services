@@ -1,6 +1,7 @@
 package org.profit.candle.market.ranking.service;
 
 import lombok.RequiredArgsConstructor;
+import org.profit.candle.market.ranking.dto.cache.RankingSnapshot;
 import org.profit.candle.market.ranking.dto.cache.StockRankingCacheItem;
 import org.profit.candle.market.ranking.exception.RankingErrorCode;
 import org.profit.candle.market.ranking.exception.RankingException;
@@ -8,6 +9,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -39,9 +41,17 @@ public class RankingCacheService {
     public void save(String redisKey, List<StockRankingCacheItem> items) {
         redisTemplate.opsForValue().set(
                 redisKey,
-                items,
+                new RankingSnapshot(items, Instant.now()),
                 Duration.ofMinutes(2)
         );
+    }
+
+    public RankingSnapshot read(String redisKey) {
+        Object cached = redisTemplate.opsForValue().get(redisKey);
+        if (cached instanceof RankingSnapshot snapshot) {
+            return snapshot;
+        }
+        return null;
     }
 
     public AtomicInteger rankCounter() {

@@ -5,7 +5,7 @@ spring:
     server:
       port: ${WISHLIST_GRPC_PORT:50061}
   datasource:
-    url: ${WISHLIST_DB_URL:jdbc:postgresql://localhost:5432/candle_wishlist}
+    url: ${WISHLIST_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=wishlist,public}
     username: ${WISHLIST_DB_USERNAME:candle}
     password: ${WISHLIST_DB_PASSWORD:candle}
   jpa:

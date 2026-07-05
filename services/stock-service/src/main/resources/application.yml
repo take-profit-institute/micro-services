@@ -5,7 +5,7 @@ spring:
     server:
       port: ${STOCK_GRPC_PORT:50060}
   datasource:
-    url: ${STOCK_DB_URL:jdbc:postgresql://localhost:5432/candle_stock}
+    url: ${STOCK_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=stock,public}
     username: ${STOCK_DB_USERNAME:candle}
     password: ${STOCK_DB_PASSWORD:candle}
   jpa:

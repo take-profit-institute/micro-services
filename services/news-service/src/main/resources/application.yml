@@ -10,7 +10,7 @@ spring:
         stock-service:
           target: ${STOCK_SERVICE_GRPC_ADDRESS:static://localhost:50060}
   datasource:
-    url: ${NEWS_DB_URL:jdbc:postgresql://localhost:5432/candle_news}
+    url: ${NEWS_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=news,public}
     username: ${NEWS_DB_USERNAME:candle}
     password: ${NEWS_DB_PASSWORD:candle}
   jpa:
