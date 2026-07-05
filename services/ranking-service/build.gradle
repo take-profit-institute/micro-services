@@ -18,6 +18,7 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
 
     testImplementation 'io.grpc:grpc-inprocess'
+    testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
 }
 
 sourceSets {
