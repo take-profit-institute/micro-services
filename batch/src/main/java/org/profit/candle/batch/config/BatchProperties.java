@@ -30,7 +30,7 @@ public record BatchProperties(
     }
 
     public record Grpc(
-            String marketTarget,
+            String stockTarget,
             String tradingTarget,
             String portfolioTarget,
             long readDeadlineMillis,

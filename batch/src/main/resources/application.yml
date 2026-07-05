@@ -25,8 +25,8 @@ spring:
       port: ${BATCH_GRPC_PORT:50062}
     client:
       channel:
-        market:
-          target: ${BATCH_MARKET_GRPC_TARGET:static://localhost:50060}
+        stock:
+          target: ${BATCH_STOCK_GRPC_TARGET:static://localhost:50060}
           ssl:
             enabled: false
         trading:
@@ -50,7 +50,7 @@ batch:
       chunk-size: ${BATCH_PORTFOLIO_EOD_CHUNK_SIZE:100}
       symbol-batch-size: ${BATCH_PORTFOLIO_EOD_SYMBOL_BATCH_SIZE:500}
   grpc:
-    market-target: market
+    stock-target: stock
     trading-target: trading
     portfolio-target: portfolio
     read-deadline-millis: ${BATCH_GRPC_READ_DEADLINE_MILLIS:300}
