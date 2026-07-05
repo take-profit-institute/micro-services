@@ -46,7 +46,10 @@ public class GrpcCashBalanceClient implements CashBalanceClient {
             if (!response.hasBalance()) {
                 throw new EodBatchException(EodBatchErrorCode.TRADING_BALANCE_MISSING);
             }
-            return response.getBalance().getCash();
+            return Math.addExact(
+                    response.getBalance().getAvailableCash(),
+                    response.getBalance().getReservedBalance()
+            );
         } catch (StatusRuntimeException exception) {
             throw GrpcClientSupport.mapException(exception);
         }
