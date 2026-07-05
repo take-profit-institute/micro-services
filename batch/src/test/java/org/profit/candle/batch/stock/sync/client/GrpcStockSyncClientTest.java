@@ -97,7 +97,8 @@ class GrpcStockSyncClientTest {
                                 100,
                                 500
                         ),
-                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI")
+                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI"),
+                        new BatchProperties.Trading(false, "", "", "", "")
                 ),
                 new BatchProperties.Grpc(
                         "market",

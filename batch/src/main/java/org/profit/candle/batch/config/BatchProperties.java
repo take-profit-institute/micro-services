@@ -12,7 +12,8 @@ public record BatchProperties(
             String zoneId,
             Smoke smoke,
             PortfolioEod portfolioEod,
-            StockSync stockSync
+            StockSync stockSync,
+            Trading trading
     ) {
     }
 
@@ -33,6 +34,15 @@ public record BatchProperties(
     public record StockSync(
             boolean enabled,
             String cron
+    ) {
+    }
+
+    public record Trading(
+            boolean enabled,
+            String previousCloseCron,
+            String openLimitCron,
+            String marketCloseCron,
+            String todayCloseCron
     ) {
     }
 

@@ -56,6 +56,12 @@ batch:
     stock-sync:
       enabled: ${BATCH_STOCK_SYNC_ENABLED:false}
       cron: "${BATCH_STOCK_SYNC_CRON:0 30 16 * * MON-FRI}"
+    trading:
+      enabled: ${BATCH_TRADING_ENABLED:false}
+      previous-close-cron: "${BATCH_TRADING_PREVIOUS_CLOSE_CRON:0 30 8 * * MON-FRI}"
+      open-limit-cron: "${BATCH_TRADING_OPEN_LIMIT_CRON:0 0 9 * * MON-FRI}"
+      market-close-cron: "${BATCH_TRADING_MARKET_CLOSE_CRON:0 30 15 * * MON-FRI}"
+      today-close-cron: "${BATCH_TRADING_TODAY_CLOSE_CRON:0 40 15 * * MON-FRI}"
   grpc:
     market-target: market
     stock-target: stock

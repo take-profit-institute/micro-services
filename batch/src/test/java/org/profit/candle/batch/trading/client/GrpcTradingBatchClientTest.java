@@ -160,7 +160,8 @@ class GrpcTradingBatchClientTest {
                         "Asia/Seoul",
                         new BatchProperties.Smoke(false, "0 0 * * * *"),
                         new BatchProperties.PortfolioEod(false, "0 0 16 * * MON-FRI", 100, 500),
-                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI")
+                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI"),
+                        disabledTradingSchedule()
                 ),
                 new BatchProperties.Grpc(
                         "market",
@@ -173,6 +174,10 @@ class GrpcTradingBatchClientTest {
                         120_000
                 )
         );
+    }
+
+    private BatchProperties.Trading disabledTradingSchedule() {
+        return new BatchProperties.Trading(false, "", "", "", "");
     }
 
     private static final class RecordingReservationService

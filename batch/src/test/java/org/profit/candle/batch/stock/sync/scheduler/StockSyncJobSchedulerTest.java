@@ -73,7 +73,8 @@ class StockSyncJobSchedulerTest {
                         new BatchProperties.StockSync(
                                 enabled,
                                 "0 30 16 * * MON-FRI"
-                        )
+                        ),
+                        new BatchProperties.Trading(false, "", "", "", "")
                 ),
                 new BatchProperties.Grpc(
                         "market",
