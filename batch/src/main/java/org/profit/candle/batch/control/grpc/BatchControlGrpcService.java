@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.batch.portfolio.eod.job.PortfolioEodJobConfiguration;
 import org.profit.candle.batch.smoke.job.BatchSmokeJobConfiguration;
+import org.profit.candle.batch.stock.sync.job.StockSyncJobConfiguration;
 import org.profit.candle.proto.batch.v1.BatchControlServiceGrpc;
 import org.profit.candle.proto.batch.v1.BatchJob;
 import org.profit.candle.proto.batch.v1.GetJobExecutionRequest;
@@ -48,7 +49,8 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
     private static final Pattern IDEMPOTENCY_KEY_PATTERN = Pattern.compile("^[A-Za-z0-9._:-]{8,128}$");
     private static final Set<String> ALLOWED_JOBS = Set.of(
             BatchSmokeJobConfiguration.JOB_NAME,
-            PortfolioEodJobConfiguration.JOB_NAME
+            PortfolioEodJobConfiguration.JOB_NAME,
+            StockSyncJobConfiguration.JOB_NAME
     );
 
     private final JobOperator jobOperator;
@@ -70,6 +72,12 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
                         .setDescription("Portfolio end-of-day snapshot generation")
                         .addSupportedParameters("businessDate")
                         .setTriggerable(isRegistered(PortfolioEodJobConfiguration.JOB_NAME))
+                        .build())
+                .addJobs(BatchJob.newBuilder()
+                        .setName(StockSyncJobConfiguration.JOB_NAME)
+                        .setDescription("Synchronize KOSPI and KOSDAQ stock catalogs")
+                        .addSupportedParameters("runId")
+                        .setTriggerable(isRegistered(StockSyncJobConfiguration.JOB_NAME))
                         .build())
                 .build();
         observer.onNext(response);
@@ -160,7 +168,8 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
             return builder.toJobParameters();
         }
 
-        if (BatchSmokeJobConfiguration.JOB_NAME.equals(jobName)) {
+        if (BatchSmokeJobConfiguration.JOB_NAME.equals(jobName)
+                || StockSyncJobConfiguration.JOB_NAME.equals(jobName)) {
             builder.addString("businessDate", input.getOrDefault("businessDate", LocalDate.now(clock).toString()));
             builder.addLong("runId", input.containsKey("runId")
                     ? parseLong(input.get("runId"), "runId")

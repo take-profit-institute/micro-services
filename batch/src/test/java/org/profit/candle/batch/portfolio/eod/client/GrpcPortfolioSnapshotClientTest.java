@@ -139,9 +139,23 @@ class GrpcPortfolioSnapshotClientTest {
                 new BatchProperties.Schedule(
                         "Asia/Seoul",
                         new BatchProperties.Smoke(false, "0 0 * * * *"),
-                        new BatchProperties.PortfolioEod(false, "0 0 16 * * MON-FRI", 100, 500)
+                        new BatchProperties.PortfolioEod(
+                                false,
+                                "0 0 16 * * MON-FRI",
+                                100,
+                                500
+                        ),
+                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI")
                 ),
-                new BatchProperties.Grpc("market", "trading", "portfolio", 300, 1_000)
+                new BatchProperties.Grpc(
+                        "market",
+                        "stock",
+                        "trading",
+                        "portfolio",
+                        300,
+                        1_000,
+                        120_000
+                )
         );
     }
 
