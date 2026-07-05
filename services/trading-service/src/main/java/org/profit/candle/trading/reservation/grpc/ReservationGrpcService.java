@@ -44,11 +44,6 @@ import java.util.UUID;
  * 각 GrpcService가 따로 갖는다. support/ 공통 변환 계층(인터셉터/AOP)이 생기면 이 중복은
  * 해소된다 — 관련 제안 이슈 #{이슈번호}.</p>
  *
- * <p>proto {@code ReservationStatus}는 RESERVED/EXECUTED/CANCELLED 3종만 정의되어 있어
- * 도메인 enum의 CONVERTING/FAILED/EXPIRED는 toProtoStatus()에서 별도 처리가 필요하다.
- * 우선 CONVERTING은 RESERVED로, FAILED/EXPIRED는 CANCELLED로 잠정 매핑했다 — proto에
- * 해당 값을 추가하는 게 맞는 방향이며, 이는 후속 확인이 필요하다.</p>
- *
  * <p>배치 전용 RPC(ProcessOpenLimitReservations/MarkReservationConverted)는 requireActor()를
  * 호출하지 않는다 — 배치 서비스는 시스템 권한으로 호출하며, order의 ExpirePendingOrders와
  * 동일한 컨벤션을 따른다. 네트워크 경계(내부망)로 보호한다.</p>
@@ -211,6 +206,122 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
     }
 
     @Override
+    public void listOpenLimitReservations(ListOpenLimitReservationsRequest request,
+                                          StreamObserver<ListOpenLimitReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            var ids = reservationBatchService.listOpenLimitReservationIds(targetDate)
+                    .stream().map(UUID::toString).toList();
+            observer.onNext(ListOpenLimitReservationsResponse.newBuilder()
+                    .addAllReservationIds(ids)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void processSingleOpenLimitReservation(ProcessSingleOpenLimitReservationRequest request,
+                                                  StreamObserver<ProcessSingleOpenLimitReservationResponse> observer) {
+        try {
+            boolean processed = reservationBatchService.processSingleOpenLimitReservation(
+                    UUID.fromString(request.getReservationId()));
+            observer.onNext(ProcessSingleOpenLimitReservationResponse.newBuilder()
+                    .setProcessed(processed)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
+        }
+    }
+
+    @Override
+    public void listStaleConvertingReservations(ListStaleConvertingReservationsRequest request,
+                                                StreamObserver<ListStaleConvertingReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            var ids = reservationBatchService.listStaleConvertingReservationIds(targetDate)
+                    .stream().map(UUID::toString).toList();
+            observer.onNext(ListStaleConvertingReservationsResponse.newBuilder()
+                    .addAllReservationIds(ids)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void failStaleConvertingReservation(FailStaleConvertingReservationRequest request,
+                                               StreamObserver<FailStaleConvertingReservationResponse> observer) {
+        try {
+            boolean failed = reservationBatchService.failStaleConvertingReservation(
+                    UUID.fromString(request.getReservationId()));
+            observer.onNext(FailStaleConvertingReservationResponse.newBuilder()
+                    .setFailed(failed)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
+        }
+    }
+
+    @Override
+    public void listExpirableReservations(ListExpirableReservationsRequest request, StreamObserver<ListExpirableReservationsResponse> observer) {
+        try {
+            if (request.getScheduledDate().isBlank()) {
+                observer.onError(toGrpcException(ReservationErrorCode.MISSING_SCHEDULED_DATE));
+                return;
+            }
+            LocalDate targetDate = parseScheduledDate(request.getScheduledDate(), observer);
+            if (targetDate == null) return;
+
+            var ids = reservationBatchService.listExpirableReservationIds(targetDate)
+                    .stream().map(UUID::toString).toList();
+            observer.onNext(ListExpirableReservationsResponse.newBuilder()
+                    .addAllReservationIds(ids)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        }
+    }
+
+    @Override
+    public void expireReservation(ExpireReservationRequest request,
+                                  StreamObserver<ExpireReservationResponse> observer) {
+        try {
+            boolean expired = reservationBatchService.expireReservation(
+                    UUID.fromString(request.getReservationId()));
+            observer.onNext(ExpireReservationResponse.newBuilder()
+                    .setExpired(expired)
+                    .build());
+            observer.onCompleted();
+        } catch (ReservationException e) {
+            observer.onError(toGrpcException((ReservationErrorCode) e.errorCode()));
+        } catch (IllegalArgumentException e) {
+            observer.onError(toGrpcException(ReservationErrorCode.INVALID_ID_FORMAT));
+        }
+    }
+
+    @Override
     public void processPrevCloseReservations(ProcessPrevCloseReservationsRequest request,
                                              StreamObserver<ProcessPrevCloseReservationsResponse> observer) {
         try {
@@ -277,8 +388,9 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
         Status status = switch (errorCode) {
             case INVALID_QUANTITY, INVALID_PRICE, LIMIT_RESERVATION_REQUIRES_PRICE,
                  NON_LIMIT_RESERVATION_MUST_NOT_HAVE_PRICE, TIMING_ORDER_KIND_MISMATCH,
-                 INVALID_SCHEDULED_DATE, INVALID_SCHEDULED_DATE_FORMAT, MISSING_SCHEDULED_DATE,
-                 INVALID_ID_FORMAT, INVALID_SIDE, INVALID_TIMING, INVALID_KIND, INVALID_STATUS ->
+                 INVALID_SCHEDULED_DATE, SCHEDULED_DATE_NOT_TRADING_DAY, INVALID_SCHEDULED_DATE_FORMAT,
+                 MISSING_SCHEDULED_DATE, INVALID_ID_FORMAT, INVALID_SIDE, INVALID_TIMING,
+                 INVALID_KIND, INVALID_STATUS ->
                     Status.INVALID_ARGUMENT;
             case RESERVATION_NOT_FOUND ->
                     Status.NOT_FOUND;
@@ -392,8 +504,11 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
     private ReservationStatusValue toStatus(ReservationStatus status) {
         return switch (status) {
             case RESERVATION_STATUS_RESERVED -> ReservationStatusValue.RESERVED;
+            case RESERVATION_STATUS_CONVERTING -> ReservationStatusValue.CONVERTING;
             case RESERVATION_STATUS_EXECUTED -> ReservationStatusValue.EXECUTED;
             case RESERVATION_STATUS_CANCELLED -> ReservationStatusValue.CANCELLED;
+            case RESERVATION_STATUS_FAILED -> ReservationStatusValue.FAILED;
+            case RESERVATION_STATUS_EXPIRED -> ReservationStatusValue.EXPIRED;
             default -> throw toGrpcException(ReservationErrorCode.INVALID_STATUS);
         };
     }
@@ -420,9 +535,12 @@ public class ReservationGrpcService extends ReservationServiceGrpc.ReservationSe
 
     private ReservationStatus toProtoStatus(ReservationStatusValue status) {
         return switch (status) {
-            case RESERVED, CONVERTING -> ReservationStatus.RESERVATION_STATUS_RESERVED;
+            case RESERVED -> ReservationStatus.RESERVATION_STATUS_RESERVED;
+            case CONVERTING -> ReservationStatus.RESERVATION_STATUS_CONVERTING;
             case EXECUTED -> ReservationStatus.RESERVATION_STATUS_EXECUTED;
-            case CANCELLED, FAILED, EXPIRED -> ReservationStatus.RESERVATION_STATUS_CANCELLED;
+            case CANCELLED -> ReservationStatus.RESERVATION_STATUS_CANCELLED;
+            case FAILED -> ReservationStatus.RESERVATION_STATUS_FAILED;
+            case EXPIRED -> ReservationStatus.RESERVATION_STATUS_EXPIRED;
         };
     }
 }

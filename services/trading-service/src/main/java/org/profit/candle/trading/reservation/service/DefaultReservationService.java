@@ -3,6 +3,7 @@ package org.profit.candle.trading.reservation.service;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.trading.account.entity.AccountEntity;
 import org.profit.candle.trading.account.service.AccountService;
+import org.profit.candle.trading.client.MarketSessionClient;
 import org.profit.candle.trading.reservation.dto.AmendReservationCommand;
 import org.profit.candle.trading.reservation.dto.PlaceReservationCommand;
 import org.profit.candle.trading.reservation.dto.ReservationCancelResult;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 /**
@@ -46,6 +48,7 @@ public class DefaultReservationService implements ReservationService {
     private final OutboxWriter outboxWriter;
     private final ReservationOutboxOperations outboxOperations;
     private final ReservationDeadlineValidator deadlineValidator;
+    private final MarketSessionClient marketSessionClient;
     private final Clock clock;
 
     @Override
@@ -55,10 +58,14 @@ public class DefaultReservationService implements ReservationService {
             throw new ReservationException(ReservationErrorCode.INVALID_QUANTITY);
         }
 
-        // RSV-006~008: timing별 접수 마감 시간 검증 (KST 기준)
-        deadlineValidator.requireBeforeDeadline(command.timing());
-
         LocalDate scheduledDate = resolveAndValidateScheduledDate(command.timing(), command.scheduledDate());
+
+        // RSV-006~008: scheduled_date가 오늘인 예약만 배치 마감 시간 검증 (cancelReservation과 동일 규칙).
+        // 예약은 항상 내일 이후로 예정되므로(resolveAndValidateScheduledDate), 미래 예약은 오늘 시각과
+        // 무관하게 접수 가능해야 한다 — 과거엔 미래 예약도 오늘 마감시간으로 잘못 거부됐다(예: 15:30 이후 종가예약).
+        if (scheduledDate.equals(LocalDate.now(clock))) {
+            deadlineValidator.requireBeforeDeadline(command.timing());
+        }
 
         // account_id는 reservation이 자체 보유하지 않는 값이라 매 호출 조회한다.
         // (크로스 스키마 FK 금지 — reservations.account_id는 이 시점에 받아온 값을 그대로 저장)
@@ -107,6 +114,14 @@ public class DefaultReservationService implements ReservationService {
         ReservationEntity reservation = reservationRepository.findByIdAndUserIdForUpdate(reservationId, userId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
+        // RSV-006~008: scheduled_date가 오늘인 예약만 배치 마감 시간 검증.
+        // 미래 날짜 예약은 오늘 배치와 무관하므로 시간 무관하게 취소 가능.
+        // KST 기준으로 오늘 날짜를 계산한다 — deadlineValidator도 KST 기준이라 일관성 유지.
+        LocalDate todayKst = LocalDate.now(clock.withZone(ZoneId.of("Asia/Seoul")));
+        if (reservation.getScheduledDate().equals(todayKst)) {
+            deadlineValidator.requireBeforeDeadline(reservation.getTiming());
+        }
+
         return doCancel(reservation, userId);
     }
 
@@ -127,11 +142,13 @@ public class DefaultReservationService implements ReservationService {
         long quantity = command.quantity() != null ? command.quantity() : original.getQuantity();
         Long price = command.price() != null ? command.price() : original.getPriceKrw();
 
-        // RSV-006~008: 정정 후 적용될 timing 기준으로 마감 시간 검증.
-        // timing을 바꾸는 경우 새 timing, 그대로면 원래 timing 기준으로 검증한다.
-        deadlineValidator.requireBeforeDeadline(timing);
         LocalDate scheduledDate = resolveAndValidateScheduledDate(
                 timing, command.scheduledDate() != null ? command.scheduledDate() : original.getScheduledDate());
+        // RSV-006~008: scheduled_date가 오늘인 예약만 마감 시간 검증 (place/cancelReservation과 동일 규칙).
+        // 정정 후 적용될 timing 기준으로 검증한다(timing 변경 시 새 timing).
+        if (scheduledDate.equals(LocalDate.now(clock))) {
+            deadlineValidator.requireBeforeDeadline(timing);
+        }
 
         AccountEntity account = accountService.getAccount(userId);
 
@@ -187,17 +204,25 @@ public class DefaultReservationService implements ReservationService {
         LocalDate today = LocalDate.now(clock);
         LocalDate tomorrow = today.plusDays(1);
 
+        LocalDate resolved;
         if (timing == ReservationTimingValue.PREV_CLOSE) {
-            return tomorrow;
+            resolved = tomorrow;
+        } else {
+            if (requested == null) {
+                throw new ReservationException(ReservationErrorCode.INVALID_SCHEDULED_DATE);
+            }
+            LocalDate maxDate = tomorrow.plusDays(MAX_SCHEDULED_DAYS_AHEAD - 1);
+            if (requested.isBefore(tomorrow) || requested.isAfter(maxDate)) {
+                throw new ReservationException(ReservationErrorCode.INVALID_SCHEDULED_DATE);
+            }
+            resolved = requested;
         }
 
-        if (requested == null) {
-            throw new ReservationException(ReservationErrorCode.INVALID_SCHEDULED_DATE);
+        // RSV: 실행 예정일이 거래일이어야 한다 — 주말·휴장일 예약을 막는다.
+        // 판정은 권위 소스(market-service MarketSession, 공휴일 캘린더 포함)에 위임한다.
+        if (!marketSessionClient.isTradingDay(resolved)) {
+            throw new ReservationException(ReservationErrorCode.SCHEDULED_DATE_NOT_TRADING_DAY);
         }
-        LocalDate maxDate = tomorrow.plusDays(MAX_SCHEDULED_DAYS_AHEAD - 1);
-        if (requested.isBefore(tomorrow) || requested.isAfter(maxDate)) {
-            throw new ReservationException(ReservationErrorCode.INVALID_SCHEDULED_DATE);
-        }
-        return requested;
+        return resolved;
     }
 }

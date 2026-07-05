@@ -21,6 +21,8 @@ spring:
       initialize-schema: never
 
   grpc:
+    server:
+      port: ${BATCH_GRPC_PORT:50062}
     client:
       channel:
         market:
@@ -32,7 +34,7 @@ spring:
           ssl:
             enabled: false
         portfolio:
-          target: ${BATCH_PORTFOLIO_GRPC_TARGET:static://localhost:50053}
+          target: ${BATCH_PORTFOLIO_GRPC_TARGET:static://localhost:50055}
           ssl:
             enabled: false
 

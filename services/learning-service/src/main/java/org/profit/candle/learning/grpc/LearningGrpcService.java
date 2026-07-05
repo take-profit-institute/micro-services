@@ -89,6 +89,28 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
     }
 
     // ─── 조회 RPC ───
+    @Override
+    public void listAdminContents(ListAdminContentsRequest req, StreamObserver<ListAdminContentsResponse> observer) {
+        try {
+            Boolean published = req.hasPublished() ? req.getPublished() : null;
+            int page = Math.max(req.getPage(), 0);
+            int size = req.getSize() > 0 ? Math.min(req.getSize(), 100) : 20;
+            Page<Content> contents = contentService.adminList(published, page, size);
+
+            ListAdminContentsResponse.Builder response = ListAdminContentsResponse.newBuilder()
+                    .setTotalCount((int) contents.getTotalElements())
+                    .setPage(contents.getNumber())
+                    .setSize(contents.getSize());
+            contents.getContent().forEach(content -> response.addContents(toContentResponse(content)));
+
+            observer.onNext(response.build());
+            observer.onCompleted();
+        } catch (LearningException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        }
+    }
+
+    // ─── 콘텐츠 조회 ───
 
     @Override
     public void getContent(GetContentRequest req, StreamObserver<ContentDetailResponse> observer) {
@@ -410,4 +432,5 @@ public class LearningGrpcService extends LearningServiceGrpc.LearningServiceImpl
     private String hashOf(String... parts) {
         return String.join("|", parts);
     }
+}
 }

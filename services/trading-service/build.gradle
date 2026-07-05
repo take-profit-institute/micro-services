@@ -4,7 +4,8 @@ apply plugin: 'com.google.protobuf'
 
 dependencies {
     // gRPC 서버 (Spring Boot 4.1 BOM이 spring-grpc 1.1.0 / grpc-java 1.80.0 관리)
-    implementation 'org.springframework.boot:spring-boot-grpc-server'
+    // starter 를 써야 netty 전송이 함께 들어온다(다른 서비스와 동일).
+    implementation 'org.springframework.boot:spring-boot-starter-grpc-server'
     implementation 'com.google.protobuf:protobuf-java'
     implementation 'io.grpc:grpc-stub'
     implementation 'io.grpc:grpc-protobuf'
@@ -21,8 +22,11 @@ dependencies {
     // 도메인 이벤트 발행 (outbox → Kafka)
     implementation 'org.springframework.kafka:spring-kafka'
 
-    // gRPC 클라이언트
-    implementation 'org.springframework.boot:spring-boot-grpc-client'
+    // gRPC 클라이언트 (ChartService 호출). starter 가 netty 전송 + GrpcChannelFactory 오토컨피그 제공.
+    implementation 'org.springframework.boot:spring-boot-starter-grpc-client'
+
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'org.springframework.boot:spring-boot-kafka'
 }
 
 // 공용 proto 디렉터리(리포 루트 /proto)에서 stub 생성
