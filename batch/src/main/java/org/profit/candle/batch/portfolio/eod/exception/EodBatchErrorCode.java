@@ -9,10 +9,6 @@ public enum EodBatchErrorCode implements ErrorCode {
     CLOSING_PRICE_INVALID("BATCH_EOD_CLOSING_PRICE_INVALID", "종가가 없거나 올바르지 않습니다."),
     QUOTE_DATE_MISMATCH("BATCH_EOD_QUOTE_DATE_MISMATCH", "시세 기준일이 거래일과 다릅니다."),
     TRADING_BALANCE_MISSING("BATCH_EOD_TRADING_BALANCE_MISSING", "거래 잔고 응답이 없습니다."),
-    SEED_CAPITAL_CONTRACT_UNAVAILABLE(
-            "BATCH_EOD_SEED_CAPITAL_CONTRACT_UNAVAILABLE",
-            "누적 수익률 기준 원금 조회 계약이 아직 제공되지 않습니다."
-    ),
     EXTERNAL_CLIENT_FAILED("BATCH_EOD_EXTERNAL_CLIENT_FAILED", "외부 서비스 호출에 실패했습니다."),
     EXTERNAL_CLIENT_RETRYABLE(
             "BATCH_EOD_EXTERNAL_CLIENT_RETRYABLE",
