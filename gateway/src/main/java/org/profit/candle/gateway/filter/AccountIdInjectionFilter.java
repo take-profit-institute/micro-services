@@ -22,8 +22,15 @@ public class AccountIdInjectionFilter implements WebFilter, Ordered {
                 .flatMap(auth -> {
                     String accountId = auth.getToken().getSubject();
                     if (accountId == null) return chain.filter(exchange);
+                    String role = auth.getToken().getClaimAsString("role");
                     ServerWebExchange mutated = exchange.mutate()
-                            .request(r -> r.header("X-Account-Id", accountId))
+                            .request(r -> {
+                                // header(name, value)는 클라이언트가 위조한 값을 덮어써 스푸핑을 막는다.
+                                r.header("X-Account-Id", accountId);
+                                if (role != null && !role.isBlank()) {
+                                    r.header("X-Account-Role", role);
+                                }
+                            })
                             .build();
                     return chain.filter(mutated);
                 })

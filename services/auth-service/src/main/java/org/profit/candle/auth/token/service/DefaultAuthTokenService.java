@@ -8,10 +8,13 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.profit.candle.auth.admin.entity.AdminAccount;
+import org.profit.candle.auth.admin.repository.AdminAccountRepository;
 import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.identity.repository.OAuthAccountRepository;
+import org.profit.candle.auth.token.entity.PrincipalType;
 import org.profit.candle.auth.token.entity.RefreshToken;
 import org.profit.candle.auth.token.repository.RefreshTokenRepository;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -30,28 +33,29 @@ public class DefaultAuthTokenService implements AuthTokenIssuer, RefreshTokenSer
     private final JwtEncoder jwtEncoder;
     private final RefreshTokenRepository refreshTokenRepository;
     private final OAuthAccountRepository oAuthAccountRepository;
+    private final AdminAccountRepository adminAccountRepository;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Override
     @Transactional
-    public IssuedTokens issue(UUID userId, String email) {
+    public IssuedTokens issue(UUID subject, String email, String role, PrincipalType type) {
         Instant now = Instant.now();
         Instant accessExpiresAt = now.plus(properties.jwt().accessTokenTtl());
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(MacAlgorithm.HS256).build(),
                 JwtClaimsSet.builder()
                         .issuer(properties.jwt().issuer())
-                        .subject(userId.toString())
+                        .subject(subject.toString())
                         .issuedAt(now)
                         .expiresAt(accessExpiresAt)
                         .id(UUID.randomUUID().toString())
-                        .claim("role", "USER")
+                        .claim("role", role)
                         .claim("email", email)
                         .build()))
                 .getTokenValue();
         String refreshToken = newRefreshToken();
-        refreshTokenRepository.save(new RefreshToken(UUID.randomUUID(), userId, hash(refreshToken),
-                now.plus(properties.jwt().refreshTokenTtl())));
+        refreshTokenRepository.save(new RefreshToken(UUID.randomUUID(), subject, hash(refreshToken),
+                type, now.plus(properties.jwt().refreshTokenTtl())));
         return new IssuedTokens(accessToken, refreshToken, properties.jwt().accessTokenTtl().toSeconds());
     }
 
@@ -62,10 +66,16 @@ public class DefaultAuthTokenService implements AuthTokenIssuer, RefreshTokenSer
                 .filter(token -> token.usableAt(Instant.now()))
                 .orElseThrow(() -> new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN));
         stored.revoke(Instant.now());
+        if (stored.principalType() == PrincipalType.ADMIN) {
+            AdminAccount admin = adminAccountRepository.findById(stored.userId())
+                    .filter(AdminAccount::isActive)
+                    .orElseThrow(() -> new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+            return issue(admin.id(), "", admin.role().name(), PrincipalType.ADMIN);
+        }
         String email = oAuthAccountRepository.findById(stored.userId())
                 .map(account -> account.email())
                 .orElse("");
-        return issue(stored.userId(), email);
+        return issue(stored.userId(), email, "USER", PrincipalType.USER);
     }
 
     @Override
