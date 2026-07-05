@@ -4,6 +4,12 @@ spring:
   grpc:
     server:
       port: ${RANKING_GRPC_PORT:50056}
+    client:
+      channel:
+        portfolio:
+          target: ${RANKING_PORTFOLIO_GRPC_TARGET:static://localhost:50055}
+          ssl:
+            enabled: false
   datasource:
     url: ${RANKING_DB_URL:jdbc:postgresql://localhost:5432/candle_ranking}
     username: ${RANKING_DB_USERNAME:candle}
@@ -31,3 +37,7 @@ spring:
 
 server:
   port: ${RANKING_SERVER_PORT:8086}
+
+ranking:
+  grpc:
+    portfolio-deadline: ${RANKING_PORTFOLIO_GRPC_DEADLINE:3s}

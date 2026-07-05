@@ -2,6 +2,7 @@ package org.profit.candle.ranking;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -11,6 +12,7 @@ import java.time.Clock;
 @EnableKafka
 @EnableScheduling
 @SpringBootApplication
+@ConfigurationPropertiesScan
 public class RankingServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(RankingServiceApplication.class, args);
