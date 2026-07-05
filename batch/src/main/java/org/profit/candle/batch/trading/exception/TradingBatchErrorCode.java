@@ -12,6 +12,16 @@ public enum TradingBatchErrorCode implements ErrorCode {
             "BATCH_TRADING_EXTERNAL_CLIENT_RETRYABLE",
             "재시도 가능한 Trading Service 오류가 발생했습니다.",
             true
+    ),
+    STOCK_CLIENT_FAILED(
+            "BATCH_TRADING_STOCK_CLIENT_FAILED",
+            "Stock Service 일봉 마감 호출에 실패했습니다.",
+            false
+    ),
+    STOCK_CLIENT_RETRYABLE(
+            "BATCH_TRADING_STOCK_CLIENT_RETRYABLE",
+            "재시도 가능한 Stock Service 일봉 마감 오류가 발생했습니다.",
+            true
     );
 
     private final String code;
