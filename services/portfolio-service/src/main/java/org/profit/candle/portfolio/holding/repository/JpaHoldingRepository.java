@@ -23,4 +23,26 @@ public interface JpaHoldingRepository
     @Override
     @Query("SELECT h FROM HoldingEntity h WHERE h.id.userId = :userId AND h.active = true ORDER BY h.id.symbol")
     List<HoldingEntity> findActiveByUserId(@Param("userId") String userId);
+
+    // keyset(user_id > lastUserId)로 활성 유저 id 를 user_id ASC 페이징. limit = pageSize+1 로 hasNext 판정.
+    @Override
+    @Query(value = """
+            SELECT DISTINCT user_id
+            FROM portfolio_holdings
+            WHERE active = true AND quantity > 0
+              AND (:lastUserId IS NULL OR user_id > :lastUserId)
+            ORDER BY user_id ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<String> findActiveUserIdsAfter(
+            @Param("lastUserId") String lastUserId,
+            @Param("limit") int limit);
+
+    @Override
+    @Query("""
+            SELECT h FROM HoldingEntity h
+            WHERE h.active = true AND h.quantity > 0 AND h.id.userId IN :userIds
+            ORDER BY h.id.userId ASC, h.id.symbol ASC
+            """)
+    List<HoldingEntity> findActiveHoldingsByUserIds(@Param("userIds") List<String> userIds);
 }

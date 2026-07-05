@@ -20,6 +20,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -111,6 +114,84 @@ class DefaultHoldingServiceTest {
                 .isInstanceOf(CandleException.class)
                 .satisfies(ex -> assertThat(((CandleException) ex).errorCode())
                         .isEqualTo(HoldingErrorCode.HOLDING_NOT_FOUND));
+    }
+
+    // ─── listActiveHolders (배치 EOD cursor) ────────────────────────────────
+
+    private HoldingEntity holding(String userId, String symbol, long qty, long price) {
+        HoldingEntity h = new HoldingEntity(userId, symbol, "name", "sector", "KOSPI");
+        h.applyBuy(qty, price);
+        return h;
+    }
+
+    @Test
+    void listActiveHolders_groupsPositionsByUser_userIdAscNoNext() {
+        when(holdingReader.findActiveUserIdsAfter(isNull(), eq(101)))
+                .thenReturn(List.of("user-1", "user-2"));
+        when(holdingReader.findActiveHoldingsByUserIds(List.of("user-1", "user-2")))
+                .thenReturn(List.of(
+                        holding("user-1", "000660", 3, 100_000),
+                        holding("user-1", "005930", 10, 75_000),
+                        holding("user-2", "035720", 5, 50_000)));
+
+        var result = service.listActiveHolders(0, "");
+
+        assertThat(result.holders()).hasSize(2);
+        assertThat(result.holders().get(0).userId()).isEqualTo("user-1");
+        assertThat(result.holders().get(0).positions()).extracting("symbol")
+                .containsExactly("000660", "005930");
+        assertThat(result.holders().get(0).positions().get(1).quantity()).isEqualTo(10);
+        assertThat(result.holders().get(0).positions().get(1).averagePrice()).isEqualTo(75_000);
+        assertThat(result.holders().get(1).userId()).isEqualTo("user-2");
+        assertThat(result.holders().get(1).positions()).hasSize(1);
+        assertThat(result.nextPageToken()).isEmpty();
+    }
+
+    @Test
+    void listActiveHolders_hasNext_trimsToPageSizeAndReturnsLastUserIdToken() {
+        // pageSize=2 → pageSize+1=3 조회, 3개 오면 hasNext, 페이지는 앞 2명, 토큰은 2번째 user_id
+        when(holdingReader.findActiveUserIdsAfter(isNull(), eq(3)))
+                .thenReturn(List.of("user-1", "user-2", "user-3"));
+        when(holdingReader.findActiveHoldingsByUserIds(List.of("user-1", "user-2")))
+                .thenReturn(List.of(
+                        holding("user-1", "005930", 1, 70_000),
+                        holding("user-2", "035720", 2, 50_000)));
+
+        var result = service.listActiveHolders(2, "");
+
+        assertThat(result.holders()).extracting("userId").containsExactly("user-1", "user-2");
+        assertThat(result.nextPageToken()).isEqualTo("user-2");
+    }
+
+    @Test
+    void listActiveHolders_usesPageTokenAsLastUserId() {
+        when(holdingReader.findActiveUserIdsAfter(eq("user-100"), eq(3)))
+                .thenReturn(List.of("user-101"));
+        when(holdingReader.findActiveHoldingsByUserIds(List.of("user-101")))
+                .thenReturn(List.of(holding("user-101", "005930", 1, 70_000)));
+
+        var result = service.listActiveHolders(2, "user-100");
+
+        assertThat(result.holders()).extracting("userId").containsExactly("user-101");
+        assertThat(result.nextPageToken()).isEmpty();
+    }
+
+    @Test
+    void listActiveHolders_noActiveUsers_returnsEmptyWithoutSecondQuery() {
+        when(holdingReader.findActiveUserIdsAfter(isNull(), eq(101))).thenReturn(List.of());
+
+        var result = service.listActiveHolders(0, null);
+
+        assertThat(result.holders()).isEmpty();
+        assertThat(result.nextPageToken()).isEmpty();
+        verify(holdingReader, never()).findActiveHoldingsByUserIds(anyList());
+    }
+
+    @Test
+    void listActiveHolders_rejectsPageSizeOverMax() {
+        assertThatThrownBy(() -> service.listActiveHolders(501, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("page_size must be between 1 and 500");
     }
 
     // ─── applyBuyFill ───────────────────────────────────────────────────────
