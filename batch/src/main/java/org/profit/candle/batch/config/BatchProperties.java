@@ -43,7 +43,8 @@ public record BatchProperties(
             String portfolioTarget,
             long readDeadlineMillis,
             long writeDeadlineMillis,
-            long stockSyncDeadlineMillis
+            long stockSyncDeadlineMillis,
+            long tradingBatchDeadlineMillis
     ) {
     }
 }

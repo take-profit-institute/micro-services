@@ -106,6 +106,7 @@ class GrpcStockSyncClientTest {
                         "portfolio",
                         300,
                         1_000,
+                        120_000,
                         120_000
                 )
         );

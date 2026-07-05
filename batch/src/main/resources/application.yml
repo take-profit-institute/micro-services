@@ -64,6 +64,7 @@ batch:
     read-deadline-millis: ${BATCH_GRPC_READ_DEADLINE_MILLIS:300}
     write-deadline-millis: ${BATCH_GRPC_WRITE_DEADLINE_MILLIS:1000}
     stock-sync-deadline-millis: ${BATCH_STOCK_SYNC_DEADLINE_MILLIS:120000}
+    trading-batch-deadline-millis: ${BATCH_TRADING_JOB_DEADLINE_MILLIS:120000}
 
 logging:
   level:
