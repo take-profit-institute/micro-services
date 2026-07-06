@@ -158,6 +158,8 @@ jobs:
           cache-from: type=gha,scope=aws-${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=aws-${{ matrix.service }}
 
+      # batch 포함 모든 서비스가 services-<env>.yaml(단일 ApplicationSet)에서 관리된다.
+      # batch도 이 appset의 Deployment이므로 별도 batch appset bump는 없다(batch-dev.yaml 제거됨).
       - uses: ./.github/actions/bump-tag
         if: github.event_name != 'pull_request'
         with:
@@ -165,13 +167,4 @@ jobs:
           tag: ${{ github.sha }}
           env: ${{ env.DEPLOY_ENV }}
           appset: services
-          token: ${{ secrets.GITOPS_TOKEN }}
-
-      - uses: ./.github/actions/bump-tag
-        if: github.event_name != 'pull_request' && matrix.service == 'batch'
-        with:
-          service: '*'
-          tag: ${{ github.sha }}
-          env: ${{ env.DEPLOY_ENV }}
-          appset: batch
           token: ${{ secrets.GITOPS_TOKEN }}
