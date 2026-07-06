@@ -120,7 +120,9 @@ public class AccountEntity {
      * 한 보통 같지만, 향후 부분 체결/수수료 차이를 대비해 분리해 받는다.
      */
     public void settleBuy(long lockedAmount, long settledAmount) {
-        release(lockedAmount);
+        if (lockedAmount > 0) {
+            release(lockedAmount);
+        }
         if (settledAmount > this.cashKrw) {
             throw new AccountException(AccountErrorCode.INSUFFICIENT_CASH_BALANCE);
         }

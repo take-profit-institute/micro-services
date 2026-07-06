@@ -1,44 +1,35 @@
 package org.profit.candle.trading.order.service;
 
+import org.profit.candle.trading.client.MarketSessionClient;
 import org.profit.candle.trading.order.exception.OrderErrorCode;
 import org.profit.candle.trading.order.exception.OrderException;
 import org.springframework.stereotype.Component;
 
-import java.time.Clock;
-import java.time.LocalTime;
-import java.time.ZoneId;
-
 /**
  * 즉시 주문 거래 시간 검증 (TIM-001/002).
  *
- * 정규장(09:00~15:30, KST) 외 시간에는 즉시 주문을 접수할 수 없다.
- * Entity에 시간 판단을 두지 않고 별도 컴포넌트로 분리해, 시간을 모킹한
- * 단위 테스트가 Clock 주입만으로 가능하게 한다.
- *
- * 공휴일/단축거래일 같은 거래일 캘린더 연동은 범위 밖이다 — 현재는
- * 매일 09:00~15:30을 정규장으로 간주한다.
+ * <p>주말·공휴일·정규장 시간(09:00~15:30 KST) 판정은 market-service의
+ * {@code MarketSession}(권위 소스)이 소유한다. 이 검증기는 자체 시간 계산을 두지
+ * 않고 {@link MarketSessionClient}에 위임한다 — trading·BFF·market이 장 운영
+ * 상태를 각자 다르게 판단하던 불일치를 없앤다.</p>
  */
-
 @Component
 public class TradingHoursValidator {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final LocalTime MARKET_OPEN = LocalTime.of(9, 0);
-    private static final LocalTime MARKET_CLOSE = LocalTime.of(15, 30);
+    private final MarketSessionClient marketSessionClient;
 
-    private final Clock clock;
-
-    public TradingHoursValidator(Clock clock) {
-        this.clock = clock;
+    public TradingHoursValidator(MarketSessionClient marketSessionClient) {
+        this.marketSessionClient = marketSessionClient;
     }
 
-    /** 정규장 시간이 아니면 {@code OrderException(OUTSIDE_TRADING_HOURS)}를 던진다. */
+    /**
+     * 정규장 체결 가능 시간이 아니면 {@code OrderException(OUTSIDE_TRADING_HOURS)}를 던진다.
+     * market-service가 응답하지 않으면 {@code StatusRuntimeException}이 전파돼 주문이
+     * 체결되지 않는다(장 상태 미확인 시 fail-safe).
+     */
     public void requireMarketOpen() {
-        LocalTime now = LocalTime.now(clock.withZone(KST));
-        if (now.isBefore(MARKET_OPEN) || !now.isBefore(MARKET_CLOSE)) {
+        if (!marketSessionClient.isMarketOpen()) {
             throw new OrderException(OrderErrorCode.OUTSIDE_TRADING_HOURS);
         }
     }
-
-
 }

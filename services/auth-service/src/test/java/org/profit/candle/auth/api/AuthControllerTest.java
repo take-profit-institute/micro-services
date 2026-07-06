@@ -6,7 +6,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.profit.candle.auth.api.dto.ProviderResponse;
@@ -40,8 +39,8 @@ class AuthControllerTest {
     @Mock OAuthLoginService oAuthLoginService;
     @Mock RefreshTokenService refreshTokenService;
     @Mock OAuthProvidersService oAuthProvidersService;
-    @InjectMocks AuthController controller;
 
+    AuthController controller;
     MockMvc mockMvc;
 
     static final IssuedTokens STUB_TOKENS = new IssuedTokens("access-token", "refresh-token", 3600L);
@@ -53,6 +52,8 @@ class AuthControllerTest {
         lenient().when(authProperties.cookies()).thenReturn(
                 new AuthProperties.Cookies("", false, "Lax"));
 
+        controller = new AuthController(oAuthLoginService, refreshTokenService, oAuthProvidersService,
+                new AuthTokenResponder(authProperties));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new AuthExceptionHandler())
                 .build();

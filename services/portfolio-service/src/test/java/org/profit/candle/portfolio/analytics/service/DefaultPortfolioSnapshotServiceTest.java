@@ -10,14 +10,19 @@ import org.profit.candle.portfolio.analytics.dto.PortfolioSnapshotResult;
 import org.profit.candle.portfolio.analytics.dto.RecordDailySnapshotCommand;
 import org.profit.candle.portfolio.analytics.entity.PortfolioSnapshotEntity;
 import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotReader;
-import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotWriter;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,7 +30,7 @@ import static org.mockito.Mockito.when;
 class DefaultPortfolioSnapshotServiceTest {
 
     @Mock PortfolioSnapshotReader snapshotReader;
-    @Mock PortfolioSnapshotWriter snapshotWriter;
+    @Mock PortfolioSnapshotInserter snapshotInserter;
     @InjectMocks DefaultPortfolioSnapshotService service;
 
     private static final String USER_ID = "user-1";
@@ -41,7 +46,7 @@ class DefaultPortfolioSnapshotServiceTest {
                 USER_ID, TODAY.minusDays(1), 1_050_000, 800_000, 0, "5.00");
         when(snapshotReader.findByUserIdAndDate(USER_ID, TODAY)).thenReturn(Optional.empty());
         when(snapshotReader.findLatestBefore(USER_ID, TODAY)).thenReturn(Optional.of(prev));
-        when(snapshotWriter.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(snapshotInserter.insert(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // total 1_100_000, seed 1_000_000 → 누적 10.00%, 전일 1_050_000 대비 +50_000
         PortfolioSnapshotResult result = service.recordDailySnapshot(command(1_100_000, 850_000, 1_000_000));
@@ -55,7 +60,7 @@ class DefaultPortfolioSnapshotServiceTest {
     void recordDailySnapshot_noPreviousSnapshot_dailyProfitIsZero() {
         when(snapshotReader.findByUserIdAndDate(USER_ID, TODAY)).thenReturn(Optional.empty());
         when(snapshotReader.findLatestBefore(USER_ID, TODAY)).thenReturn(Optional.empty());
-        when(snapshotWriter.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(snapshotInserter.insert(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PortfolioSnapshotResult result = service.recordDailySnapshot(command(1_000_000, 0, 1_000_000));
 
@@ -73,20 +78,103 @@ class DefaultPortfolioSnapshotServiceTest {
 
         assertThat(result.totalAsset()).isEqualTo(1_200_000); // 기존 값 그대로
         assertThat(result.cumulativeReturnRate()).isEqualTo("20.00");
-        verify(snapshotWriter, never()).save(any());
+        verify(snapshotInserter, never()).insert(any());
         verify(snapshotReader, never()).findLatestBefore(any(), any());
+    }
+
+    @Test
+    void recordDailySnapshot_concurrentInsertLosesRace_reReadsAndReturnsExistingIdempotently() {
+        // 첫 조회는 없음 → 삽입 시도 → UNIQUE 위반(경합 패배) → 재조회로 기존 스냅샷 멱등 반환.
+        PortfolioSnapshotEntity winner = new PortfolioSnapshotEntity(
+                USER_ID, TODAY, 1_234_000, 900_000, 30_000, "23.40");
+        when(snapshotReader.findByUserIdAndDate(USER_ID, TODAY))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(snapshotReader.findLatestBefore(USER_ID, TODAY)).thenReturn(Optional.empty());
+        when(snapshotInserter.insert(any()))
+                .thenThrow(new DataIntegrityViolationException("duplicate (user_id, snapshot_date)"));
+
+        PortfolioSnapshotResult result = service.recordDailySnapshot(command(1_100_000, 850_000, 1_000_000));
+
+        assertThat(result.totalAsset()).isEqualTo(1_234_000); // 경합 승자가 쓴 값
+        assertThat(result.cumulativeReturnRate()).isEqualTo("23.40");
+        verify(snapshotInserter, times(1)).insert(any());
+        verify(snapshotReader, times(2)).findByUserIdAndDate(USER_ID, TODAY);
+    }
+
+    @Test
+    void recordDailySnapshot_uniqueViolationButReReadEmpty_rethrows() {
+        // 위반인데 재조회도 비어있으면(비정상) 원 예외를 던진다.
+        when(snapshotReader.findByUserIdAndDate(USER_ID, TODAY)).thenReturn(Optional.empty());
+        when(snapshotReader.findLatestBefore(USER_ID, TODAY)).thenReturn(Optional.empty());
+        when(snapshotInserter.insert(any()))
+                .thenThrow(new DataIntegrityViolationException("boom"));
+
+        assertThatThrownBy(() -> service.recordDailySnapshot(command(1_100_000, 850_000, 1_000_000)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void recordDailySnapshot_zeroSeedCapital_returnRateIsZero() {
         when(snapshotReader.findByUserIdAndDate(USER_ID, TODAY)).thenReturn(Optional.empty());
         when(snapshotReader.findLatestBefore(USER_ID, TODAY)).thenReturn(Optional.empty());
-        when(snapshotWriter.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(snapshotInserter.insert(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ArgumentCaptor<PortfolioSnapshotEntity> captor = ArgumentCaptor.forClass(PortfolioSnapshotEntity.class);
         service.recordDailySnapshot(command(500_000, 400_000, 0));
 
-        verify(snapshotWriter).save(captor.capture());
+        verify(snapshotInserter).insert(captor.capture());
         assertThat(captor.getValue().cumulativeReturnRate()).isEqualTo("0.00");
+    }
+
+    @Test
+    void listDailySnapshots_defaultPageSize_fetchesOneExtraAndReturnsNextToken() {
+        List<PortfolioSnapshotEntity> rows = snapshots(101);
+        when(snapshotReader.findDailySnapshotsAfterUserId(eq(TODAY), isNull(), eq(101))).thenReturn(rows);
+
+        var result = service.listDailySnapshots(TODAY, 0, "");
+
+        assertThat(result.snapshots()).hasSize(100);
+        assertThat(result.snapshots().get(0).userId()).isEqualTo("user-001");
+        assertThat(result.snapshots().get(0).totalAsset()).isEqualTo(1_000_001);
+        assertThat(result.snapshots().get(0).cumulativeReturnRate()).isEqualTo("1.00");
+        assertThat(result.nextPageToken()).isEqualTo("user-100");
+    }
+
+    @Test
+    void listDailySnapshots_usesPageTokenAsLastUserId() {
+        when(snapshotReader.findDailySnapshotsAfterUserId(TODAY, "user-100", 3))
+                .thenReturn(snapshots(2, 101));
+
+        var result = service.listDailySnapshots(TODAY, 2, "user-100");
+
+        assertThat(result.snapshots()).extracting("userId")
+                .containsExactly("user-101", "user-102");
+        assertThat(result.nextPageToken()).isEmpty();
+    }
+
+    @Test
+    void listDailySnapshots_rejectsPageSizeOverMax() {
+        assertThatThrownBy(() -> service.listDailySnapshots(TODAY, 501, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("page_size must be between 1 and 500");
+    }
+
+    private List<PortfolioSnapshotEntity> snapshots(int count) {
+        return snapshots(count, 1);
+    }
+
+    private List<PortfolioSnapshotEntity> snapshots(int count, int firstUserNumber) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(i -> {
+                    int n = firstUserNumber + i;
+                    return new PortfolioSnapshotEntity(
+                            String.format("user-%03d", n),
+                            TODAY,
+                            1_000_000L + n,
+                            800_000L + n,
+                            n,
+                            String.format("%d.00", n));
+                })
+                .toList();
     }
 }

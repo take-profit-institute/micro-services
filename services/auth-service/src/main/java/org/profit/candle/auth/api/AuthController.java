@@ -1,7 +1,6 @@
 package org.profit.candle.auth.api;
 
 import lombok.RequiredArgsConstructor;
-import org.profit.candle.auth.config.AuthProperties;
 import org.profit.candle.auth.exception.AuthErrorCode;
 import org.profit.candle.auth.exception.AuthException;
 import org.profit.candle.auth.api.dto.OAuthLoginRequest;
@@ -12,10 +11,8 @@ import org.profit.candle.auth.identity.service.OAuthLoginService;
 import org.profit.candle.auth.identity.service.LoginResult;
 import org.profit.candle.auth.identity.service.OAuthProvidersService;
 import org.profit.candle.auth.token.service.RefreshTokenService;
-import org.profit.candle.auth.token.service.IssuedTokens;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,10 +27,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
-    private final AuthProperties properties;
     private final OAuthLoginService oAuthLoginService;
     private final RefreshTokenService refreshTokenService;
     private final OAuthProvidersService oAuthProvidersService;
+    private final AuthTokenResponder tokenResponder;
 
     @GetMapping("/providers")
     public ProvidersResponse listProviders() {
@@ -48,7 +45,7 @@ public class AuthController {
         }
         LoginResult result = oAuthLoginService.login(
                 provider, request.authorizationCode(), request.state(), request.redirectUri());
-        return tokenResponse(result.tokens(), result.isNewUser());
+        return tokenResponder.tokenResponse(result.tokens(), result.isNewUser());
     }
 
     // refresh token은 웹(httpOnly 쿠키)과 모바일/네이티브 앱(요청 body) 양쪽에서 받는다.
@@ -61,7 +58,7 @@ public class AuthController {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
-        return tokenResponse(refreshTokenService.rotate(refreshToken), false);
+        return tokenResponder.tokenResponse(refreshTokenService.rotate(refreshToken), false);
     }
 
     @PostMapping("/logout")
@@ -74,8 +71,9 @@ public class AuthController {
             refreshTokenService.revoke(refreshToken);
         }
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, expiredCookie("access_token", "/").toString())
-                .header(HttpHeaders.SET_COOKIE, expiredCookie("refresh_token", "/api/v1/auth").toString())
+                .header(HttpHeaders.SET_COOKIE, tokenResponder.expiredCookie("access_token", "/").toString())
+                .header(HttpHeaders.SET_COOKIE,
+                        tokenResponder.expiredCookie("refresh_token", "/api/v1/auth").toString())
                 .build();
     }
 
@@ -85,34 +83,6 @@ public class AuthController {
             return body.refreshToken();
         }
         return cookieToken;
-    }
-
-    private ResponseEntity<OAuthLoginResponse> tokenResponse(IssuedTokens tokens, boolean isNewUser) {
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie("access_token", tokens.accessToken(), "/",
-                        properties.jwt().accessTokenTtl()).toString())
-                .header(HttpHeaders.SET_COOKIE, cookie("refresh_token", tokens.refreshToken(), "/api/v1/auth",
-                        properties.jwt().refreshTokenTtl()).toString())
-                .body(new OAuthLoginResponse(
-                        tokens.accessToken(),
-                        tokens.refreshToken(),
-                        properties.jwt().accessTokenTtl().toSeconds(),
-                        properties.jwt().refreshTokenTtl().toSeconds(),
-                        isNewUser));
-    }
-
-    private ResponseCookie cookie(String name, String value, String path, java.time.Duration maxAge) {
-        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value).httpOnly(true)
-                .secure(properties.cookies().secure()).sameSite(properties.cookies().sameSite())
-                .path(path).maxAge(maxAge);
-        if (!properties.cookies().domain().isBlank()) {
-            builder.domain(properties.cookies().domain());
-        }
-        return builder.build();
-    }
-
-    private ResponseCookie expiredCookie(String name, String path) {
-        return cookie(name, "", path, java.time.Duration.ZERO);
     }
 
 }

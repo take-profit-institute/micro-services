@@ -8,12 +8,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.profit.candle.portfolio.holding.dto.ActiveHolderResult;
 import org.profit.candle.portfolio.holding.dto.HoldingResult;
+import org.profit.candle.portfolio.holding.dto.ListActiveHoldersResult;
+import org.profit.candle.portfolio.holding.dto.PositionResult;
 import org.profit.candle.portfolio.holding.exception.HoldingErrorCode;
 import org.profit.candle.portfolio.holding.exception.HoldingException;
 import org.profit.candle.portfolio.holding.service.HoldingService;
+import org.profit.candle.proto.common.v1.PageRequest;
 import org.profit.candle.proto.portfolio.v1.GetHoldingRequest;
 import org.profit.candle.proto.portfolio.v1.GetHoldingResponse;
+import org.profit.candle.proto.portfolio.v1.ListActiveHoldersRequest;
+import org.profit.candle.proto.portfolio.v1.ListActiveHoldersResponse;
 import org.profit.candle.proto.portfolio.v1.ListHoldingsRequest;
 import org.profit.candle.proto.portfolio.v1.ListHoldingsResponse;
 
@@ -115,6 +121,52 @@ class HoldingGrpcServiceTest {
         assertThat(observer.error).isInstanceOf(StatusRuntimeException.class);
         assertThat(((StatusRuntimeException) observer.error).getStatus().getCode())
                 .isEqualTo(Status.Code.NOT_FOUND);
+        assertThat(observer.completed).isFalse();
+    }
+
+    // ─── listActiveHolders ────────────────────────────────────────────────────
+
+    @Test
+    void listActiveHolders_mapsHoldersPositionsAndNextToken() {
+        when(holdingService.listActiveHolders(2, "user-100")).thenReturn(
+                new ListActiveHoldersResult(
+                        List.of(new ActiveHolderResult("user-101", List.of(
+                                new PositionResult("005930", 10, 75_000),
+                                new PositionResult("035720", 5, 50_000)))),
+                        "user-101"));
+        CapturingObserver<ListActiveHoldersResponse> observer = new CapturingObserver<>();
+
+        service.listActiveHolders(
+                ListActiveHoldersRequest.newBuilder()
+                        .setPage(PageRequest.newBuilder().setPageSize(2).setPageToken("user-100").build())
+                        .build(),
+                observer);
+
+        assertThat(observer.completed).isTrue();
+        assertThat(observer.value.getHoldersList()).hasSize(1);
+        assertThat(observer.value.getHolders(0).getUserId()).isEqualTo("user-101");
+        assertThat(observer.value.getHolders(0).getPositionsList()).hasSize(2);
+        assertThat(observer.value.getHolders(0).getPositions(0).getSymbol()).isEqualTo("005930");
+        assertThat(observer.value.getHolders(0).getPositions(0).getQuantity()).isEqualTo(10);
+        assertThat(observer.value.getHolders(0).getPositions(0).getAveragePrice()).isEqualTo(75_000);
+        assertThat(observer.value.getPage().getNextPageToken()).isEqualTo("user-101");
+    }
+
+    @Test
+    void listActiveHolders_invalidPageSize_callsOnErrorWithInvalidArgument() {
+        when(holdingService.listActiveHolders(501, ""))
+                .thenThrow(new IllegalArgumentException("page_size must be between 1 and 500"));
+        CapturingObserver<ListActiveHoldersResponse> observer = new CapturingObserver<>();
+
+        service.listActiveHolders(
+                ListActiveHoldersRequest.newBuilder()
+                        .setPage(PageRequest.newBuilder().setPageSize(501).build())
+                        .build(),
+                observer);
+
+        assertThat(observer.error).isInstanceOf(StatusRuntimeException.class);
+        assertThat(((StatusRuntimeException) observer.error).getStatus().getCode())
+                .isEqualTo(Status.Code.INVALID_ARGUMENT);
         assertThat(observer.completed).isFalse();
     }
 

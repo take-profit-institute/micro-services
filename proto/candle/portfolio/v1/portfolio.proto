@@ -45,6 +45,36 @@ message GetHoldingResponse {
   Holding holding = 1;
 }
 
+// ─── Active Holders (query, batch) ─────────────────────────────────────────
+// EOD 배치가 전체 활성 보유자를 순회하기 위한 조회 RPC. RecordDailySnapshot 대상자 목록을
+// 얻는 입력 소스다. active = true(= quantity > 0)인 보유만, user_id ASC keyset cursor 로 페이징한다.
+// 조회 전용이므로 idempotency_key / CommandMetadata / Outbox 대상이 아니다.
+//
+// 페이징 단위는 "유저"다. 한 유저의 보유종목이 페이지 경계에서 쪼개지지 않도록 유저 단위로 끊어,
+// 배치가 유저별로 전체 포지션을 한 번에 받는다. next_page_token 은 마지막 user_id(opaque).
+// keyset(user_id > lastUserId) 라 동일 실행 중 다른 유저의 매수/청산이 있어도 이미 지나온
+// 커서 앞쪽은 흔들리지 않아 스킵/중복이 없다.
+
+message Position {
+  string symbol        = 1;
+  int64  quantity      = 2;  // 보유 수량 (> 0)
+  int64  average_price = 3;  // 평균 매입단가 (원)
+}
+
+message ActiveHolder {
+  string user_id              = 1;
+  repeated Position positions = 2;  // 유저 내 symbol ASC
+}
+
+message ListActiveHoldersRequest {
+  candle.common.v1.PageRequest page = 1;  // page_size default 100, max 500 (유저 수 기준)
+}
+
+message ListActiveHoldersResponse {
+  repeated ActiveHolder holders      = 1;  // user_id ASC
+  candle.common.v1.PageResponse page = 2;  // next_page_token = 마지막 user_id
+}
+
 // ─── Portfolio Summary ─────────────────────────────────────────────────────
 // GET /api/account 대시보드에서 병렬 호출되는 snapshot.
 // total_stock_value는 마지막으로 캐시된 시세 기준 근사값이다.
@@ -152,12 +182,34 @@ message RecordDailySnapshotRequest {
 }
 message RecordDailySnapshotResponse { PortfolioSnapshot snapshot = 1; }
 
+// ─── Daily Snapshot List (query) ───────────────────────────────────────────
+// RankingService가 EOD 랭킹 산출 시 호출하는 조회 RPC.
+// PortfolioService가 저장 완료한 일별 스냅샷만 user_id ASC cursor pagination으로 반환한다.
+// 조회 전용이므로 idempotency_key, CommandMetadata, Outbox 대상이 아니다.
+
+message DailyPortfolioSnapshot {
+  string user_id                = 1;
+  int64  total_asset            = 2;  // 현금 + 주식 평가금액
+  string cumulative_return_rate = 3;  // PortfolioSnapshot.cumulative_return_rate와 동일한 값
+}
+
+message ListDailyPortfolioSnapshotsRequest {
+  string snapshot_date = 1;  // KST 거래일, "2026-06-29" (YYYY-MM-DD)
+  candle.common.v1.PageRequest page = 2;  // default 100, max 500
+}
+
+message ListDailyPortfolioSnapshotsResponse {
+  repeated DailyPortfolioSnapshot snapshots = 1;
+  candle.common.v1.PageResponse page = 2;
+}
+
 // ─── Services ──────────────────────────────────────────────────────────────
 
 // BFF 테이블의 HoldingService → portfolio-service 가 구현
 service HoldingService {
   rpc ListHoldings(ListHoldingsRequest) returns (ListHoldingsResponse);
   rpc GetHolding(GetHoldingRequest)     returns (GetHoldingResponse);
+  rpc ListActiveHolders(ListActiveHoldersRequest) returns (ListActiveHoldersResponse);
 }
 
 // BFF 테이블의 PortfolioService → portfolio-service 가 구현
@@ -168,4 +220,6 @@ service PortfolioService {
   rpc GetTradingStats(GetTradingStatsRequest)           returns (GetTradingStatsResponse);
   rpc GetMonthlyReturns(GetMonthlyReturnsRequest)       returns (GetMonthlyReturnsResponse);
   rpc RecordDailySnapshot(RecordDailySnapshotRequest)   returns (RecordDailySnapshotResponse);
+  rpc ListDailyPortfolioSnapshots(ListDailyPortfolioSnapshotsRequest)
+      returns (ListDailyPortfolioSnapshotsResponse);
 }

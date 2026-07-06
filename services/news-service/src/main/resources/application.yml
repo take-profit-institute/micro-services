@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: news-service
+  grpc:
+    server:
+      port: ${NEWS_GRPC_PORT:50064}
+    client:
+      # Spring Boot 4.1 spring-boot-grpc-client 규격: `channel`(단수) + `target`.
+      channel:
+        stock-service:
+          target: ${STOCK_SERVICE_GRPC_ADDRESS:static://localhost:50060}
+  datasource:
+    url: ${NEWS_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=news,public}
+    username: ${NEWS_DB_USERNAME:candle}
+    password: ${NEWS_DB_PASSWORD:candle}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    locations: classpath:migration
+
+server:
+  port: ${NEWS_SERVER_PORT:8093}
+
+naver:
+  news:
+    client-id: ${NAVER_NEWS_CLIENT_ID:}
+    client-secret: ${NAVER_NEWS_CLIENT_SECRET:}
+    base-url: ${NAVER_NEWS_BASE_URL:https://openapi.naver.com}
+    connect-timeout: ${NAVER_NEWS_CONNECT_TIMEOUT:3s}
+    read-timeout: ${NAVER_NEWS_READ_TIMEOUT:5s}
+
+stock:
+  grpc:
+    deadline: ${STOCK_GRPC_DEADLINE:3s}

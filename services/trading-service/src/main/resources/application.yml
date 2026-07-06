@@ -5,11 +5,15 @@ spring:
     server:
       port: ${TRADING_GRPC_PORT:50054}
     client:
-      channels:
+      # Spring Boot 4.1 spring-boot-grpc-client 규격: 맵은 `channel`(단수), 주소 키는 `target`.
+      # (구 standalone spring-grpc의 `channels`/`address`는 이 버전에서 바인딩되지 않아 무시됨)
+      channel:
         chart-service:
-          address: ${CHART_SERVICE_GRPC_ADDRESS:static://localhost:50060}
+          target: ${CHART_SERVICE_GRPC_ADDRESS:static://localhost:50060}
+        market-service:
+          target: ${MARKET_SERVICE_GRPC_ADDRESS:static://localhost:50063}
   datasource:
-    url: ${TRADING_DB_URL:jdbc:postgresql://localhost:5432/candle_trading}
+    url: ${TRADING_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=trading,account,order_svc,reservation,public}
     username: ${TRADING_DB_USERNAME:candle}
     password: ${TRADING_DB_PASSWORD:candle}
   jpa:
@@ -20,6 +24,12 @@ spring:
     locations: classpath:migration
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: trading-service
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 server:
   port: ${TRADING_SERVER_PORT:8084}
 
@@ -29,4 +39,4 @@ trading:
 
 candle:
   security:
-    payload-encryption-key: ${PAYLOAD_ENCRYPTION_KEY}
+    payload-encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=

@@ -1,6 +1,7 @@
 package org.profit.candle.gateway.config;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.List;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -9,14 +10,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.ServerAuthenticationConverter;
 import org.springframework.security.web.server.util.matcher.OrServerWebExchangeMatcher;
@@ -35,7 +43,7 @@ public class GatewaySecurityConfig {
     @Value("${gateway.jwt.hmac-secret}")
     private String hmacSecret;
 
-    @Value("${gateway.cors.allowed-origin-patterns:http://localhost:3000}")
+    @Value("${gateway.cors.allowed-origin-patterns:http://localhost:3000,http://localhost:3001}")
     private List<String> allowedOrigins;
 
     // auth 경로 + preflight: JWT 검증 없이 통과
@@ -50,7 +58,9 @@ public class GatewaySecurityConfig {
                                 "/api/auth/providers",
                                 "/api/auth/oauth/**",
                                 "/api/auth/token/refresh",
-                                "/api/auth/logout"
+                                "/api/auth/logout",
+                                // admin 로그인은 토큰 발급 경로이므로 JWT 검증 없이 통과시킨다.
+                                "/api/admin/login"
                         ),
                         ServerWebExchangeMatchers.pathMatchers("/api/v1/auth/**")
                 ))
@@ -65,12 +75,30 @@ public class GatewaySecurityConfig {
     public SecurityWebFilterChain securedFilterChain(ServerHttpSecurity http) {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .authorizeExchange(auth -> auth.anyExchange().authenticated())
+                .authorizeExchange(auth -> auth
+                        // 관리자 계정 CRUD는 SUPER_ADMIN 전용
+                        .pathMatchers("/api/v1/admin/**").hasAuthority("ROLE_SUPER_ADMIN")
+                        .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(withDefaults())
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
                         .bearerTokenConverter(bearerTokenConverter())
                 )
                 .build();
+    }
+
+    // JWT의 role claim(USER|ADMIN|SUPER_ADMIN)을 ROLE_* authority로 매핑한다.
+    @Bean
+    public Converter<Jwt, reactor.core.publisher.Mono<AbstractAuthenticationToken>> jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            String role = jwt.getClaimAsString("role");
+            if (role == null || role.isBlank()) {
+                return List.<GrantedAuthority>of();
+            }
+            Collection<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+            return authorities;
+        });
+        return new ReactiveJwtAuthenticationConverterAdapter(converter);
     }
 
     @Bean

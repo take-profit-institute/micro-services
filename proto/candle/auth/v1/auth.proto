@@ -31,7 +31,24 @@ message GetMeResponse {
   AuthUser user = 1;
 }
 
+message AdminLoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message AdminLoginResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;          // access token TTL (seconds)
+  int64 refresh_expires_in = 4;  // refresh token TTL (seconds)
+  string admin_id = 5;
+  string username = 6;
+  string display_name = 7;
+  string role = 8;               // ADMIN | SUPER_ADMIN
+}
+
 service AuthService {
   rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse);
   rpc GetMe(GetMeRequest) returns (GetMeResponse);
+  rpc AdminLogin(AdminLoginRequest) returns (AdminLoginResponse);
 }

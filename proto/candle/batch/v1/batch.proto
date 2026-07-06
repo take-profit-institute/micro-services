@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package candle.batch.v1;
+
+option java_multiple_files = true;
+option java_package = "org.profit.candle.proto.batch.v1";
+
+import "google/protobuf/timestamp.proto";
+import "candle/common/v1/common.proto";
+
+service BatchControlService {
+  rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
+  rpc TriggerJob(TriggerJobRequest) returns (TriggerJobResponse);
+  rpc GetJobExecution(GetJobExecutionRequest) returns (GetJobExecutionResponse);
+  rpc ListJobExecutions(ListJobExecutionsRequest) returns (ListJobExecutionsResponse);
+}
+
+enum JobExecutionStatus {
+  JOB_EXECUTION_STATUS_UNSPECIFIED = 0;
+  JOB_EXECUTION_STATUS_STARTING = 1;
+  JOB_EXECUTION_STATUS_STARTED = 2;
+  JOB_EXECUTION_STATUS_STOPPING = 3;
+  JOB_EXECUTION_STATUS_STOPPED = 4;
+  JOB_EXECUTION_STATUS_FAILED = 5;
+  JOB_EXECUTION_STATUS_COMPLETED = 6;
+  JOB_EXECUTION_STATUS_ABANDONED = 7;
+  JOB_EXECUTION_STATUS_UNKNOWN = 8;
+}
+
+message ListJobsRequest {}
+
+message ListJobsResponse {
+  repeated BatchJob jobs = 1;
+}
+
+message BatchJob {
+  string name = 1;
+  string description = 2;
+  repeated string supported_parameters = 3;
+  bool triggerable = 4;
+}
+
+message TriggerJobRequest {
+  string job_name = 1;
+  map<string, string> parameters = 2;
+  candle.common.v1.CommandMetadata command_metadata = 3;
+}
+
+message TriggerJobResponse {
+  JobExecutionResponse execution = 1;
+}
+
+message GetJobExecutionRequest {
+  int64 execution_id = 1;
+}
+
+message GetJobExecutionResponse {
+  JobExecutionResponse execution = 1;
+}
+
+message ListJobExecutionsRequest {
+  string job_name = 1;
+  int32 limit = 2;
+}
+
+message ListJobExecutionsResponse {
+  repeated JobExecutionResponse executions = 1;
+}
+
+message JobExecutionResponse {
+  int64 execution_id = 1;
+  int64 instance_id = 2;
+  string job_name = 3;
+  JobExecutionStatus status = 4;
+  map<string, string> parameters = 5;
+  google.protobuf.Timestamp create_time = 6;
+  optional google.protobuf.Timestamp start_time = 7;
+  optional google.protobuf.Timestamp end_time = 8;
+  optional google.protobuf.Timestamp last_updated = 9;
+  string exit_code = 10;
+  string exit_description = 11;
+}

@@ -18,6 +18,7 @@ import org.profit.candle.auth.oauth.OAuthClient;
 import org.profit.candle.auth.oauth.OAuthClientRegistry;
 import org.profit.candle.auth.oauth.OAuthProfile;
 import org.profit.candle.auth.token.service.AuthTokenIssuer;
+import org.profit.candle.auth.token.entity.PrincipalType;
 import org.profit.candle.auth.token.service.IssuedTokens;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,7 +55,7 @@ class DefaultOAuthLoginServiceTest {
         when(oAuthClient.fetch("code", "state", null)).thenReturn(verifiedProfile("sub123", "user@example.com"));
         when(accountRepository.findByProviderAndProviderSubject("google", "sub123")).thenReturn(Optional.empty());
         when(accountRepository.save(any())).thenReturn(saved);
-        when(tokenIssuer.issue(userId, "user@example.com")).thenReturn(STUB_TOKENS);
+        when(tokenIssuer.issue(userId, "user@example.com", "USER", PrincipalType.USER)).thenReturn(STUB_TOKENS);
 
         LoginResult result = service.login("google", "code", "state", null);
 
@@ -70,7 +71,7 @@ class DefaultOAuthLoginServiceTest {
         OAuthAccount existing = account(userId, "google", "sub123", "user@example.com");
         when(oAuthClient.fetch("code", "state", null)).thenReturn(verifiedProfile("sub123", "user@example.com"));
         when(accountRepository.findByProviderAndProviderSubject("google", "sub123")).thenReturn(Optional.of(existing));
-        when(tokenIssuer.issue(userId, "user@example.com")).thenReturn(STUB_TOKENS);
+        when(tokenIssuer.issue(userId, "user@example.com", "USER", PrincipalType.USER)).thenReturn(STUB_TOKENS);
 
         LoginResult result = service.login("google", "code", "state", null);
 
@@ -104,7 +105,7 @@ class DefaultOAuthLoginServiceTest {
         when(kakao.fetch("code", "state", null)).thenReturn(verifiedProfile("sub-kakao", "user@example.com"));
         when(accountRepository.findByProviderAndProviderSubject("kakao", "sub-kakao")).thenReturn(Optional.empty());
         when(accountRepository.save(any())).thenReturn(saved);
-        when(tokenIssuer.issue(userId, "user@example.com")).thenReturn(STUB_TOKENS);
+        when(tokenIssuer.issue(userId, "user@example.com", "USER", PrincipalType.USER)).thenReturn(STUB_TOKENS);
 
         LoginResult result = service.login("kakao", "code", "state", null);
 

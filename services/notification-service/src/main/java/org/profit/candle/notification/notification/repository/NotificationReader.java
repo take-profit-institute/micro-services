@@ -17,5 +17,7 @@ public interface NotificationReader {
 
     Optional<Notification> findById(UUID notificationId);
 
+    List<Notification> listByUserIdAndStatus(UUID userId, NotificationStatus status);
+
     long countByUserIdAndStatus(UUID userId, NotificationStatus status);
 }

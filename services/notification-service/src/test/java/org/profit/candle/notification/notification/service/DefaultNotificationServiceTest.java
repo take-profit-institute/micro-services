@@ -8,7 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -278,9 +278,22 @@ class DefaultNotificationServiceTest {
         }
 
         @Override
+        public List<Notification> listByUserIdAndStatus(UUID userId, NotificationStatus status) {
+            return notifications.stream()
+                    .filter(notification -> notification.getUserId().equals(userId))
+                    .filter(notification -> notification.getStatus() == status)
+                    .toList();
+        }
+
+        @Override
         public Notification save(Notification notification) {
             notifications.add(notification);
             return notification;
+        }
+
+        @Override
+        public void delete(Notification notification) {
+            notifications.removeIf(existing -> existing.getId().equals(notification.getId()));
         }
 
         private List<Notification> sorted(UUID userId) {

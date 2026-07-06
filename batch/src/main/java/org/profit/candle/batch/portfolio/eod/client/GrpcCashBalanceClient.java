@@ -7,7 +7,7 @@ import org.profit.candle.batch.portfolio.eod.exception.EodBatchException;
 import org.profit.candle.batch.portfolio.eod.exception.EodBatchErrorCode;
 import org.profit.candle.proto.trading.v1.GetBalanceRequest;
 import org.profit.candle.proto.trading.v1.GetBalanceResponse;
-import org.profit.candle.proto.trading.v1.TradingServiceGrpc;
+import org.profit.candle.proto.trading.v1.AccountServiceGrpc;
 import org.springframework.grpc.client.GrpcChannelFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 @Profile("!local-eod")
 public class GrpcCashBalanceClient implements CashBalanceClient {
 
-    private final TradingServiceGrpc.TradingServiceBlockingStub stub;
+    private final AccountServiceGrpc.AccountServiceBlockingStub stub;
     private final long readDeadlineMillis;
     private final RequestIdGenerator requestIdGenerator;
 
@@ -25,7 +25,7 @@ public class GrpcCashBalanceClient implements CashBalanceClient {
             BatchProperties batchProperties,
             RequestIdGenerator requestIdGenerator
     ) {
-        this.stub = TradingServiceGrpc.newBlockingStub(
+        this.stub = AccountServiceGrpc.newBlockingStub(
                 channelFactory.createChannel(batchProperties.grpc().tradingTarget())
         );
         this.readDeadlineMillis = batchProperties.grpc().readDeadlineMillis();

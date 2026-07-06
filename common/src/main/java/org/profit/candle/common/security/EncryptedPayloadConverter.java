@@ -62,6 +62,9 @@ public class EncryptedPayloadConverter implements AttributeConverter<byte[], byt
      *                   32바이트(256비트) 키를 Base64로 인코딩한 문자열이어야 한다.
      */
     public static void initKey(String base64Key) {
+        if (base64Key == null) {
+            throw new CandleException(CommonErrorCode.INVALID_ENCRYPTION_KEY);
+        }
         byte[] keyBytes;
         try {
             keyBytes = Base64.getDecoder().decode(base64Key);

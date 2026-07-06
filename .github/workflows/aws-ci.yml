@@ -1,0 +1,177 @@
+name: aws-ci
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Deploy environment
+        default: dev
+        type: choice
+        options: [dev, prod]
+      services:
+        description: Comma-separated services to force. Empty means changed services on push, all on manual.
+        required: false
+        default: ''
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  DEPLOY_ENV: ${{ inputs.env || 'dev' }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      empty: ${{ steps.matrix.outputs.empty }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            auth-service: ['services/auth-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            user-service: ['services/user-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            market-service: ['services/market-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            stock-service: ['services/stock-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            wishlist-service: ['services/wishlist-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            trading-service: ['services/trading-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            portfolio-service: ['services/portfolio-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            ranking-service: ['services/ranking-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            mission-service: ['services/mission-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            learning-service: ['services/learning-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            notification-service: ['services/notification-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            chatting-service: ['services/chatting-service/**', 'common/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            news-service: ['services/news-service/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+            batch: ['batch/**', 'common/**', 'proto/**', 'Dockerfile', '.dockerignore', 'build.gradle', 'settings.gradle']
+
+      - name: Build matrix
+        id: matrix
+        env:
+          DISPATCH_SERVICES: ${{ inputs.services }}
+          F_AUTH: ${{ steps.filter.outputs.auth-service }}
+          F_USER: ${{ steps.filter.outputs.user-service }}
+          F_MARKET: ${{ steps.filter.outputs.market-service }}
+          F_STOCK: ${{ steps.filter.outputs.stock-service }}
+          F_WISHLIST: ${{ steps.filter.outputs.wishlist-service }}
+          F_TRADING: ${{ steps.filter.outputs.trading-service }}
+          F_PORTFOLIO: ${{ steps.filter.outputs.portfolio-service }}
+          F_RANKING: ${{ steps.filter.outputs.ranking-service }}
+          F_MISSION: ${{ steps.filter.outputs.mission-service }}
+          F_LEARNING: ${{ steps.filter.outputs.learning-service }}
+          F_NOTIFICATION: ${{ steps.filter.outputs.notification-service }}
+          F_CHATTING: ${{ steps.filter.outputs.chatting-service }}
+          F_NEWS: ${{ steps.filter.outputs.news-service }}
+          F_BATCH: ${{ steps.filter.outputs.batch }}
+        run: |
+          set -euo pipefail
+          all='["auth-service","user-service","market-service","stock-service","wishlist-service","trading-service","portfolio-service","ranking-service","mission-service","learning-service","notification-service","chatting-service","news-service","batch"]'
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -z "$DISPATCH_SERVICES" ]; then
+              echo "matrix=$all" >> "$GITHUB_OUTPUT"
+              echo "empty=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            json="$(printf '%s' "$DISPATCH_SERVICES" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' | jq -R . | jq -sc .)"
+            echo "matrix=$json" >> "$GITHUB_OUTPUT"
+            echo "empty=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          services=()
+          [ "$F_AUTH" = "true" ] && services+=(auth-service)
+          [ "$F_USER" = "true" ] && services+=(user-service)
+          [ "$F_MARKET" = "true" ] && services+=(market-service)
+          [ "$F_STOCK" = "true" ] && services+=(stock-service)
+          [ "$F_WISHLIST" = "true" ] && services+=(wishlist-service)
+          [ "$F_TRADING" = "true" ] && services+=(trading-service)
+          [ "$F_PORTFOLIO" = "true" ] && services+=(portfolio-service)
+          [ "$F_RANKING" = "true" ] && services+=(ranking-service)
+          [ "$F_MISSION" = "true" ] && services+=(mission-service)
+          [ "$F_LEARNING" = "true" ] && services+=(learning-service)
+          [ "$F_NOTIFICATION" = "true" ] && services+=(notification-service)
+          [ "$F_CHATTING" = "true" ] && services+=(chatting-service)
+          [ "$F_NEWS" = "true" ] && services+=(news-service)
+          [ "$F_BATCH" = "true" ] && services+=(batch)
+
+          if [ "${#services[@]}" -eq 0 ]; then
+            echo 'matrix=[]' >> "$GITHUB_OUTPUT"
+            echo 'empty=true' >> "$GITHUB_OUTPUT"
+          else
+            json="$(printf '%s\n' "${services[@]}" | jq -R . | jq -sc .)"
+            echo "matrix=$json" >> "$GITHUB_OUTPUT"
+            echo 'empty=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  image:
+    needs: detect
+    if: needs.detect.outputs.empty == 'false'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Test
+        run: |
+          if [ "${{ matrix.service }}" = "batch" ]; then
+            ./gradlew :batch:test
+          else
+            ./gradlew :services:${{ matrix.service }}:test
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: github.event_name != 'pull_request'
+        with:
+          role-to-assume: ${{ vars.CI_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        if: github.event_name != 'pull_request'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: SERVICE_MODULE=${{ matrix.service }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.ecr.outputs.registry }}/candle/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha,scope=aws-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=aws-${{ matrix.service }}
+
+      - uses: ./.github/actions/bump-tag
+        if: github.event_name != 'pull_request'
+        with:
+          service: ${{ matrix.service }}
+          tag: ${{ github.sha }}
+          env: ${{ env.DEPLOY_ENV }}
+          appset: services
+          token: ${{ secrets.GITOPS_TOKEN }}
+
+      - uses: ./.github/actions/bump-tag
+        if: github.event_name != 'pull_request' && matrix.service == 'batch'
+        with:
+          service: '*'
+          tag: ${{ github.sha }}
+          env: ${{ env.DEPLOY_ENV }}
+          appset: batch
+          token: ${{ secrets.GITOPS_TOKEN }}

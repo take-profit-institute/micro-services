@@ -1,0 +1,275 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUN_DIR="$ROOT_DIR/build/run-services"
+LOG_DIR="$RUN_DIR/logs"
+PID_DIR="$RUN_DIR/pids"
+
+SERVICES=(
+  auth-service
+  user-service
+  market-service
+  trading-service
+  portfolio-service
+  ranking-service
+  mission-service
+  learning-service
+  notification-service
+  chatting-service
+  stock-service
+  wishlist-service
+  news-service
+)
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scripts/services start [service...]
+  scripts/services stop [service...]
+  scripts/services restart [service...]
+  scripts/services status [service...]
+  scripts/services logs [service...] [-f]
+
+Examples:
+  scripts/services start
+  CANDLE_SERVICES_BOOT_ARGS='--spring.profiles.active=local' scripts/services start
+  scripts/services start auth-service trading-service
+  scripts/services status
+  scripts/services logs -f
+  scripts/services logs auth-service -f
+  scripts/services stop
+
+Logs:
+  build/run-services/logs/<service>.log
+EOF
+}
+
+die() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+ensure_dirs() {
+  mkdir -p "$LOG_DIR" "$PID_DIR"
+}
+
+is_service() {
+  local candidate="$1"
+  local service
+  for service in "${SERVICES[@]}"; do
+    [[ "$service" == "$candidate" ]] && return 0
+  done
+  return 1
+}
+
+selected_services() {
+  if [[ "$#" -eq 0 ]]; then
+    printf '%s\n' "${SERVICES[@]}"
+    return
+  fi
+
+  local service
+  for service in "$@"; do
+    is_service "$service" || die "unknown service '$service'"
+    printf '%s\n' "$service"
+  done
+}
+
+pid_file() {
+  printf '%s/%s.pid' "$PID_DIR" "$1"
+}
+
+log_file() {
+  printf '%s/%s.log' "$LOG_DIR" "$1"
+}
+
+service_pids() {
+  local service="$1"
+  pgrep -f "gradle-wrapper.jar :services:$service:bootRun" 2>/dev/null || true
+}
+
+running_pid() {
+  local service="$1"
+  local file
+  local fallback_pid
+  file="$(pid_file "$service")"
+
+  if [[ ! -f "$file" ]]; then
+    fallback_pid="$(service_pids "$service" | head -n 1)"
+    [[ -n "$fallback_pid" ]] || return 1
+    printf '%s' "$fallback_pid"
+    return 0
+  fi
+
+  local pid
+  pid="$(cat "$file")"
+  if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+    fallback_pid="$(service_pids "$service" | head -n 1)"
+    [[ -n "$fallback_pid" ]] || return 1
+    printf '%s' "$fallback_pid"
+    return 0
+  fi
+  printf '%s' "$pid"
+}
+
+start_one() {
+  local service="$1"
+  ensure_dirs
+
+  if pid="$(running_pid "$service")"; then
+    echo "$service already running (pid $pid)"
+    return
+  fi
+
+  local log
+  log="$(log_file "$service")"
+  : > "$log"
+
+  (
+    cd "$ROOT_DIR"
+    export SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE="${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:-2}"
+    export SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE="${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:-0}"
+    gradle_command=(./gradlew ":services:$service:bootRun")
+    if [[ -n "${CANDLE_SERVICES_BOOT_ARGS:-}" ]]; then
+      gradle_command+=(--args="$CANDLE_SERVICES_BOOT_ARGS")
+    fi
+    exec "${gradle_command[@]}"
+  ) >>"$log" 2>&1 &
+
+  local pid="$!"
+  echo "$pid" > "$(pid_file "$service")"
+  echo "$service started (pid $pid, log $log)"
+}
+
+stop_one() {
+  local service="$1"
+  ensure_dirs
+
+  if ! pid="$(running_pid "$service")"; then
+    rm -f "$(pid_file "$service")"
+    echo "$service not running"
+    return
+  fi
+
+  local pids=()
+  local found_pid
+  while IFS= read -r found_pid; do
+    [[ -n "$found_pid" ]] && pids+=("$found_pid")
+  done < <(service_pids "$service")
+  if [[ "${#pids[@]}" -eq 0 ]]; then
+    pids=("$pid")
+  fi
+
+  kill "${pids[@]}" 2>/dev/null || true
+
+  local attempt
+  for attempt in {1..20}; do
+    local still_running=false
+    for found_pid in "${pids[@]}"; do
+      if kill -0 "$found_pid" 2>/dev/null; then
+        still_running=true
+        break
+      fi
+    done
+    if [[ "$still_running" == false ]]; then
+      rm -f "$(pid_file "$service")"
+      echo "$service stopped"
+      return
+    fi
+    sleep 0.5
+  done
+
+  kill -9 "${pids[@]}" 2>/dev/null || true
+  rm -f "$(pid_file "$service")"
+  echo "$service killed"
+}
+
+status_one() {
+  local service="$1"
+  if pid="$(running_pid "$service")"; then
+    echo "$service running (pid $pid)"
+  else
+    echo "$service stopped"
+  fi
+}
+
+logs_cmd() {
+  local follow=false
+  local args=()
+  local arg
+
+  for arg in "$@"; do
+    case "$arg" in
+      -f|--follow)
+        follow=true
+        ;;
+      *)
+        args+=("$arg")
+        ;;
+    esac
+  done
+
+  ensure_dirs
+
+  local files=()
+  local service
+  while IFS= read -r service; do
+    files+=("$(log_file "$service")")
+  done < <(selected_services "${args[@]}")
+
+  if [[ "${#files[@]}" -eq 0 ]]; then
+    die "no log files selected"
+  fi
+
+  if [[ "$follow" == true ]]; then
+    exec tail -n 200 -f "${files[@]}"
+  fi
+
+  exec tail -n 200 "${files[@]}"
+}
+
+main() {
+  local command="${1:-}"
+  [[ -n "$command" ]] || {
+    usage
+    exit 1
+  }
+  shift || true
+
+  case "$command" in
+    start)
+      while IFS= read -r service; do
+        start_one "$service"
+      done < <(selected_services "$@")
+      ;;
+    stop)
+      while IFS= read -r service; do
+        stop_one "$service"
+      done < <(selected_services "$@")
+      ;;
+    restart)
+      while IFS= read -r service; do
+        stop_one "$service"
+        start_one "$service"
+      done < <(selected_services "$@")
+      ;;
+    status)
+      while IFS= read -r service; do
+        status_one "$service"
+      done < <(selected_services "$@")
+      ;;
+    logs)
+      logs_cmd "$@"
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

@@ -53,6 +53,11 @@ public class JpaNotificationReader implements NotificationReader {
     }
 
     @Override
+    public List<Notification> listByUserIdAndStatus(UUID userId, NotificationStatus status) {
+        return notificationJpaRepository.findByUserIdAndStatus(userId, status);
+    }
+
+    @Override
     public long countByUserIdAndStatus(UUID userId, NotificationStatus status) {
         return notificationJpaRepository.countByUserIdAndStatus(userId, status);
     }

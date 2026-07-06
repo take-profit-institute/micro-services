@@ -3,9 +3,9 @@ spring:
     name: portfolio-service
   grpc:
     server:
-      port: ${PORTFOLIO_GRPC_PORT:50053}
+      port: ${PORTFOLIO_GRPC_PORT:50055}
   datasource:
-    url: ${PORTFOLIO_DB_URL:jdbc:postgresql://localhost:5432/candle_portfolio}
+    url: ${PORTFOLIO_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=portfolio,public}
     username: ${PORTFOLIO_DB_USERNAME:candle}
     password: ${PORTFOLIO_DB_PASSWORD:candle}
   jpa:

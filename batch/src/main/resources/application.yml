@@ -5,7 +5,7 @@ spring:
     web-application-type: none
 
   datasource:
-    url: ${BATCH_DB_URL:jdbc:postgresql://localhost:5432/candle_batch}
+    url: ${BATCH_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=batch,public}
     username: ${BATCH_DB_USERNAME:candle}
     password: ${BATCH_DB_PASSWORD:candle}
     driver-class-name: org.postgresql.Driver
@@ -21,10 +21,16 @@ spring:
       initialize-schema: never
 
   grpc:
+    server:
+      port: ${BATCH_GRPC_PORT:50062}
     client:
       channel:
         market:
           target: ${BATCH_MARKET_GRPC_TARGET:static://localhost:50060}
+          ssl:
+            enabled: false
+        stock:
+          target: ${BATCH_STOCK_GRPC_TARGET:static://localhost:50060}
           ssl:
             enabled: false
         trading:
@@ -32,7 +38,7 @@ spring:
           ssl:
             enabled: false
         portfolio:
-          target: ${BATCH_PORTFOLIO_GRPC_TARGET:static://localhost:50053}
+          target: ${BATCH_PORTFOLIO_GRPC_TARGET:static://localhost:50055}
           ssl:
             enabled: false
 
@@ -47,12 +53,17 @@ batch:
       cron: "${BATCH_PORTFOLIO_EOD_CRON:0 0 16 * * MON-FRI}"
       chunk-size: ${BATCH_PORTFOLIO_EOD_CHUNK_SIZE:100}
       symbol-batch-size: ${BATCH_PORTFOLIO_EOD_SYMBOL_BATCH_SIZE:500}
+    stock-sync:
+      enabled: ${BATCH_STOCK_SYNC_ENABLED:false}
+      cron: "${BATCH_STOCK_SYNC_CRON:0 30 16 * * MON-FRI}"
   grpc:
     market-target: market
+    stock-target: stock
     trading-target: trading
     portfolio-target: portfolio
     read-deadline-millis: ${BATCH_GRPC_READ_DEADLINE_MILLIS:300}
     write-deadline-millis: ${BATCH_GRPC_WRITE_DEADLINE_MILLIS:1000}
+    stock-sync-deadline-millis: ${BATCH_STOCK_SYNC_DEADLINE_MILLIS:120000}
 
 logging:
   level:
