@@ -73,6 +73,12 @@ class GrpcPortfolioSnapshotClientTest {
                     .isEqualTo(command.idempotencyKey());
             assertThat(capturedRequest.get().getIdempotencyKey())
                     .isEqualTo(command.idempotencyKey());
+            assertThat(capturedRequest.get().getUserId()).isEqualTo(command.userId());
+            assertThat(capturedRequest.get().getSnapshotDate())
+                    .isEqualTo(command.businessDate().toString());
+            assertThat(capturedRequest.get().getTotalAsset()).isEqualTo(command.totalAsset());
+            assertThat(capturedRequest.get().getStockValue()).isEqualTo(command.stockValue());
+            assertThat(capturedRequest.get().getSeedCapital()).isEqualTo(command.seedCapital());
         } finally {
             channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
             server.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
@@ -145,7 +151,8 @@ class GrpcPortfolioSnapshotClientTest {
                                 100,
                                 500
                         ),
-                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI")
+                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI"),
+                        new BatchProperties.Trading(false, "", "", "", "")
                 ),
                 new BatchProperties.Grpc(
                         "market",
@@ -154,6 +161,7 @@ class GrpcPortfolioSnapshotClientTest {
                         "portfolio",
                         300,
                         1_000,
+                        120_000,
                         120_000
                 )
         );

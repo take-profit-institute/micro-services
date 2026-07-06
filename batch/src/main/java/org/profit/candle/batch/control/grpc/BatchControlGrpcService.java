@@ -18,6 +18,10 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.batch.portfolio.eod.job.PortfolioEodJobConfiguration;
 import org.profit.candle.batch.smoke.job.BatchSmokeJobConfiguration;
 import org.profit.candle.batch.stock.sync.job.StockSyncJobConfiguration;
+import org.profit.candle.batch.trading.job.TradingExpireReservationsJobConfiguration;
+import org.profit.candle.batch.trading.job.TradingMarketCloseJobsConfiguration;
+import org.profit.candle.batch.trading.job.TradingMorningJobsConfiguration;
+import org.profit.candle.batch.trading.job.TradingTodayCloseJobConfiguration;
 import org.profit.candle.proto.batch.v1.BatchControlServiceGrpc;
 import org.profit.candle.proto.batch.v1.BatchJob;
 import org.profit.candle.proto.batch.v1.GetJobExecutionRequest;
@@ -39,7 +43,7 @@ import org.springframework.batch.core.job.parameters.JobParameter;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobOperator;
-import org.springframework.batch.core.repository.explore.JobExplorer;
+import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -50,11 +54,25 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
     private static final Set<String> ALLOWED_JOBS = Set.of(
             BatchSmokeJobConfiguration.JOB_NAME,
             PortfolioEodJobConfiguration.JOB_NAME,
-            StockSyncJobConfiguration.JOB_NAME
+            StockSyncJobConfiguration.JOB_NAME,
+            TradingMorningJobsConfiguration.PREVIOUS_CLOSE_JOB_NAME,
+            TradingMorningJobsConfiguration.OPEN_LIMIT_JOB_NAME,
+            TradingMarketCloseJobsConfiguration.EXPIRE_PENDING_JOB_NAME,
+            TradingMarketCloseJobsConfiguration.FAIL_STALE_JOB_NAME,
+            TradingTodayCloseJobConfiguration.JOB_NAME,
+            TradingExpireReservationsJobConfiguration.JOB_NAME
+    );
+    private static final Set<String> TRADING_JOBS = Set.of(
+            TradingMorningJobsConfiguration.PREVIOUS_CLOSE_JOB_NAME,
+            TradingMorningJobsConfiguration.OPEN_LIMIT_JOB_NAME,
+            TradingMarketCloseJobsConfiguration.EXPIRE_PENDING_JOB_NAME,
+            TradingMarketCloseJobsConfiguration.FAIL_STALE_JOB_NAME,
+            TradingTodayCloseJobConfiguration.JOB_NAME,
+            TradingExpireReservationsJobConfiguration.JOB_NAME
     );
 
     private final JobOperator jobOperator;
-    private final JobExplorer jobExplorer;
+    private final JobRepository jobRepository;
     private final JobRegistry jobRegistry;
     private final Clock clock;
 
@@ -79,6 +97,30 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
                         .addSupportedParameters("runId")
                         .setTriggerable(isRegistered(StockSyncJobConfiguration.JOB_NAME))
                         .build())
+                .addJobs(tradingJob(
+                        TradingMorningJobsConfiguration.PREVIOUS_CLOSE_JOB_NAME,
+                        "Process previous-close reservations"
+                ))
+                .addJobs(tradingJob(
+                        TradingMorningJobsConfiguration.OPEN_LIMIT_JOB_NAME,
+                        "Process opening limit reservations"
+                ))
+                .addJobs(tradingJob(
+                        TradingMarketCloseJobsConfiguration.EXPIRE_PENDING_JOB_NAME,
+                        "Expire pending orders at market close"
+                ))
+                .addJobs(tradingJob(
+                        TradingMarketCloseJobsConfiguration.FAIL_STALE_JOB_NAME,
+                        "Fail stale converting reservations"
+                ))
+                .addJobs(tradingJob(
+                        TradingTodayCloseJobConfiguration.JOB_NAME,
+                        "Close daily candles and process today-close reservations"
+                ))
+                .addJobs(tradingJob(
+                        TradingExpireReservationsJobConfiguration.JOB_NAME,
+                        "Expire remaining reservations"
+                ))
                 .build();
         observer.onNext(response);
         observer.onCompleted();
@@ -112,7 +154,7 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
 
     @Override
     public void getJobExecution(GetJobExecutionRequest request, StreamObserver<GetJobExecutionResponse> observer) {
-        JobExecution execution = jobExplorer.getJobExecution(request.getExecutionId());
+        JobExecution execution = jobRepository.getJobExecution(request.getExecutionId());
         if (execution == null) {
             observer.onError(Status.NOT_FOUND.withDescription("BATCH_EXECUTION_NOT_FOUND").asRuntimeException());
             return;
@@ -132,8 +174,8 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
             String jobName = requireAllowedJob(request.getJobName());
             int limit = request.getLimit() > 0 ? Math.min(request.getLimit(), 100) : 20;
 
-            List<JobExecutionResponse> executions = jobExplorer.getJobInstances(jobName, 0, limit).stream()
-                    .flatMap(instance -> jobExplorer.getJobExecutions(instance).stream())
+            List<JobExecutionResponse> executions = jobRepository.getJobInstances(jobName, 0, limit).stream()
+                    .flatMap(instance -> jobRepository.getJobExecutions(instance).stream())
                     .sorted(Comparator.comparing(JobExecution::getCreateTime).reversed())
                     .limit(limit)
                     .map(this::toResponse)
@@ -168,6 +210,14 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
             return builder.toJobParameters();
         }
 
+        if (TRADING_JOBS.contains(jobName)) {
+            String businessDate = input.getOrDefault("businessDate", LocalDate.now(clock).toString());
+            validateDate(businessDate);
+            return builder
+                    .addString("businessDate", businessDate)
+                    .toJobParameters();
+        }
+
         if (BatchSmokeJobConfiguration.JOB_NAME.equals(jobName)
                 || StockSyncJobConfiguration.JOB_NAME.equals(jobName)) {
             builder.addString("businessDate", input.getOrDefault("businessDate", LocalDate.now(clock).toString()));
@@ -178,6 +228,16 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
         }
 
         throw new IllegalArgumentException("BATCH_JOB_NOT_ALLOWED");
+    }
+
+    /** 수동 실행 가능한 Trading Job 설명을 생성한다. */
+    private BatchJob tradingJob(String name, String description) {
+        return BatchJob.newBuilder()
+                .setName(name)
+                .setDescription(description)
+                .addSupportedParameters("businessDate")
+                .setTriggerable(isRegistered(name))
+                .build();
     }
 
     private String requireAllowedJob(String jobName) {
