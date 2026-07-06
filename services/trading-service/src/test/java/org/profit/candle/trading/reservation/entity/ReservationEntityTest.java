@@ -188,12 +188,34 @@ class ReservationEntityTest {
         }
 
         @Test
+        void shouldRejectMarkExecutedWhenNotReserved() {
+            ReservationEntity reservation = openLimitReservation();
+            reservation.markCancelled();
+
+            assertThatThrownBy(reservation::markExecuted)
+                    .isInstanceOf(ReservationException.class)
+                    .extracting(e -> ((ReservationException) e).errorCode())
+                    .isEqualTo(ReservationErrorCode.RESERVATION_NOT_RESERVED);
+        }
+
+        @Test
         void shouldMarkCancelledOnlyFromReserved() {
             ReservationEntity reservation = openLimitReservation();
 
             reservation.markCancelled();
 
             assertThat(reservation.getStatus()).isEqualTo(ReservationStatusValue.CANCELLED);
+        }
+
+        @Test
+        void shouldRejectMarkCancelledWhenNotReserved() {
+            ReservationEntity reservation = openLimitReservation();
+            reservation.markExpired();
+
+            assertThatThrownBy(reservation::markCancelled)
+                    .isInstanceOf(ReservationException.class)
+                    .extracting(e -> ((ReservationException) e).errorCode())
+                    .isEqualTo(ReservationErrorCode.RESERVATION_NOT_RESERVED);
         }
 
         @Test
@@ -226,6 +248,17 @@ class ReservationEntityTest {
             reservation.markExpired();
 
             assertThat(reservation.getStatus()).isEqualTo(ReservationStatusValue.EXPIRED);
+        }
+
+        @Test
+        void shouldRejectMarkExpiredWhenNotReserved() {
+            ReservationEntity reservation = openLimitReservation();
+            reservation.markCancelled();
+
+            assertThatThrownBy(reservation::markExpired)
+                    .isInstanceOf(ReservationException.class)
+                    .extracting(e -> ((ReservationException) e).errorCode())
+                    .isEqualTo(ReservationErrorCode.RESERVATION_NOT_RESERVED);
         }
 
         @Test
