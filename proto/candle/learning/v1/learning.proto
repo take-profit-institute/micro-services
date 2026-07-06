@@ -38,37 +38,42 @@ enum ContentSortBy {
 }
 
 message CreateContentRequest {
-  string title = 1;
-  string description = 2;
-  string category = 3;
-  ContentLevel level = 4;
-  string body = 5;
-  int32 duration_min = 6;
-  int64 xp_reward = 7;
-  repeated string keywords = 8;
-  bool is_published = 9;
+  string idempotency_key = 1;
+  string title = 2;
+  string description = 3;
+  string category = 4;
+  ContentLevel level = 5;
+  string body = 6;
+  int32 duration_min = 7;
+  int64 xp_reward = 8;
+  repeated string keywords = 9;
+  bool is_published = 10;
 }
 
 message UpdateContentRequest {
-  string content_id = 1;
-  optional string title = 2;
-  optional string description = 3;
-  optional string category = 4;
-  optional ContentLevel level = 5;
-  optional string body = 6;
-  optional int32 duration_min = 7;
-  optional int64 xp_reward = 8;
-  repeated string keywords = 9;
-  optional bool is_published = 10;
+  string idempotency_key = 1;
+  string content_id = 2;
+  optional string title = 3;
+  optional string description = 4;
+  optional string category = 5;
+  optional ContentLevel level = 6;
+  optional string body = 7;
+  optional int32 duration_min = 8;
+  optional int64 xp_reward = 9;
+  repeated string keywords = 10;
+  optional bool is_published = 11;
 }
 
 message DeleteContentRequest {
-  string content_id = 1;
+  string idempotency_key = 1;
+  string content_id = 2;
 }
 
 message DeleteContentResponse {
   bool success = 1;
 }
+
+// ─── 조회 요청 ───
 
 message ListAdminContentsRequest {
   optional bool published = 1;
@@ -110,6 +115,29 @@ message GetRecommendedContentsRequest {
   string user_id = 1;
   int32 limit = 2;
 }
+
+// ─── 사용자 액션 (idempotency_key 포함) ───
+
+message UpdateProgressRequest {
+  string idempotency_key = 1;
+  string user_id = 2;
+  string content_id = 3;
+  int32 progress_pct = 4;
+}
+
+message CompleteContentRequest {
+  string idempotency_key = 1;
+  string user_id = 2;
+  string content_id = 3;
+}
+
+message ToggleFavoriteRequest {
+  string idempotency_key = 1;
+  string user_id = 2;
+  string content_id = 3;
+}
+
+// ─── 응답 ───
 
 message ContentResponse {
   string id = 1;
@@ -153,22 +181,6 @@ message ListContentsResponse {
 message ContentWithStateResponse {
   ContentResponse content = 1;
   optional UserContentStateResponse user_state = 2;
-}
-
-message UpdateProgressRequest {
-  string user_id = 1;
-  string content_id = 2;
-  int32 progress_pct = 3;
-}
-
-message CompleteContentRequest {
-  string user_id = 1;
-  string content_id = 2;
-}
-
-message ToggleFavoriteRequest {
-  string user_id = 1;
-  string content_id = 2;
 }
 
 message UserContentStateResponse {

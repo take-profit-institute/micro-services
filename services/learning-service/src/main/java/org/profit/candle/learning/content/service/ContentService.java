@@ -1,10 +1,9 @@
 package org.profit.candle.learning.content.service;
 
-import lombok.RequiredArgsConstructor;
-import org.profit.candle.learning.content.entity.Content;
+import org.profit.candle.learning.content.dto.ContentResult;
+import org.profit.candle.learning.content.dto.CreateContentCommand;
+import org.profit.candle.learning.content.dto.UpdateContentCommand;
 import org.profit.candle.learning.content.entity.ContentLevel;
-import org.profit.candle.learning.exception.LearningErrorCode;
-import org.profit.candle.learning.exception.LearningException;
 import org.profit.candle.learning.content.repository.ContentRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -16,77 +15,27 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
-@Service
-@RequiredArgsConstructor
-@Transactional(readOnly = true)
-public class ContentService {
+public interface ContentService {
 
-    private final ContentRepository contentRepository;
+    ContentResult getById(UUID id);
 
-    public Content getById(UUID id) {
-        return contentRepository.findById(id)
-                .orElseThrow(() -> new LearningException(LearningErrorCode.CONTENT_NOT_FOUND));
-    }
+    ContentResult getAndIncrementReadCount(UUID id);
 
-    /**
-     * 콘텐츠 상세 조회 + 조회수 증가.
-     */
-    @Transactional
-    public Content getAndIncrementReadCount(UUID id) {
-        Content content = getById(id);
-        contentRepository.incrementReadCount(id);
-        return content;
-    }
+    ContentResult create(CreateContentCommand command);
 
-    @Transactional
-    public Content create(String title, String description, String category,
-                          ContentLevel level, String body, short durationMin,
-                          long xpReward, String[] keywords, boolean published) {
-        Content content = Content.create(title, description, category, level,
-                body, durationMin, xpReward, keywords, published);
-        return contentRepository.save(content);
-    }
+    ContentResult update(UpdateContentCommand command);
 
-    @Transactional
-    public Content update(UUID id, String title, String description, String category,
-                          ContentLevel level, String body, Short durationMin,
-                          Long xpReward, String[] keywords, Boolean published) {
-        Content content = getById(id);
-        content.update(title, description, category, level, body,
-                durationMin, xpReward, keywords, published);
-        return content; // dirty checking
-    }
+    void softDelete(UUID id);
 
-    @Transactional
-    public void softDelete(UUID id) {
-        Content content = getById(id);
-        content.softDelete();
-    }
+    Page<ContentResult> list(String category, ContentLevel level, String sortBy, int page, int size);
 
-    public Page<Content> list(String category, ContentLevel level,
-                              String sortBy, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, resolveSort(sortBy));
-        return contentRepository.findAll(publishedSpec(category, level, null), pageable);
-    }
+    Page<ContentResult> adminList(Boolean published, int page, int size);
 
-    public Page<Content> adminList(Boolean published, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return contentRepository.findAll(adminSpec(published), pageable);
-    }
+    Page<ContentResult> search(String query, String category, ContentLevel level, int page, int size);
 
-    public Page<Content> search(String query, String category,
-                                ContentLevel level, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return contentRepository.findAll(publishedSpec(category, level, query), pageable);
-    }
+    long countAll();
 
-    public long countAll() {
-        return contentRepository.countByPublishedTrue();
-    }
-
-    public long countByCategory(String category) {
-        return contentRepository.countByCategoryAndPublishedTrue(category);
-    }
+    long countByCategory(String category);
 
     private Sort resolveSort(String sortBy) {
         return switch (sortBy) {
@@ -95,7 +44,7 @@ public class ContentService {
         };
     }
 
-    private Specification<Content> publishedSpec(String category, ContentLevel level, String query) {
+    private Specification<ContentResult> publishedSpec(String category, ContentLevel level, String query) {
         return (root, cq, cb) -> {
             var predicate = cb.isTrue(root.get("published"));
             if (category != null && !category.isBlank()) {
@@ -111,7 +60,7 @@ public class ContentService {
         };
     }
 
-    private Specification<Content> adminSpec(Boolean published) {
+    private Specification<ContentResult> adminSpec(Boolean published) {
         return (root, cq, cb) -> published == null
                 ? cb.conjunction()
                 : cb.equal(root.get("published"), published);
