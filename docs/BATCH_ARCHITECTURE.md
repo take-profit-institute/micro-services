@@ -322,3 +322,82 @@ sequenceDiagram
   종목 동기화 성공을 의미하지 않으므로 운영에서는 `upserted`, `total`, `synced_at`을 함께 본다.
 - 상장폐지 종목을 `DELISTED`로 바꾸는 리컨실 정책은 Stock Service 책임이며 현재 Sync Job의
   호출 범위에는 포함되지 않는다.
+
+## 9. 서비스 영향도와 장애 전파
+
+아래 그림의 실선은 같은 실행 흐름에서 직접 발생하는 영향을, 점선은 저장된 결과가 이후
+조회·이벤트 소비에 미치는 영향을 뜻한다. 한 서비스의 DB 장애가 다른 서비스 DB transaction을
+직접 rollback하지는 않는다. 원격 호출 실패는 해당 Spring Batch Step을 실패시켜 재시작 경계를
+남긴다.
+
+![Batch 서비스 영향도와 장애 전파](assets/batch-service-impact.svg)
+
+<details>
+<summary>Mermaid 원본 보기</summary>
+
+```mermaid
+flowchart LR
+    subgraph JOBS[Batch jobs]
+        TJ[Trading intraday jobs]
+        CJ[CloseDailyCandles]
+        EJ[Portfolio EOD]
+        RJ[Daily Ranking]
+        SJ[Stock Sync]
+    end
+
+    subgraph OWNERS[Service-owned effects]
+        TD[(Trading reservation / order / Outbox)]
+        CD[(Stock candles / Outbox)]
+        PD[(Portfolio snapshots)]
+        RD[(Ranking history / Outbox / idempotency)]
+        SD[(Stock master)]
+        RC[(Redis ranking cache)]
+    end
+
+    TJ --> TD
+    CJ --> CD
+    CJ --> TJ
+    EJ -->|holders + prices + cash| PD
+    PD -->|EOD completed| RJ
+    RJ --> RD
+    RD --> RC
+    SJ --> SD
+
+    TD -. OrderFilled .-> PD
+    PD -. history API .-> RD
+    RD -. TOP / my ranking .-> RC
+```
+
+</details>
+
+### 9.1 Job별 실제 영향
+
+| Job 그룹 | 직접 변경되는 데이터 | 사용자 기능에 나타나는 결과 | 실패 격리 범위 |
+| --- | --- | --- | --- |
+| Trading 예약·주문 | `reservation.reservations`, `order_svc.orders`, 각 Outbox | 예약 전환, 미체결 주문·잔여 예약 만료 | 실패한 Job과 그에 종속된 후속 Job만 중단 |
+| 일봉 마감 | Stock 일봉과 Stock Outbox | 확정 종가 제공, 종가 예약·EOD 평가의 기준 생성 | 일봉 실패 시 종가 예약 미호출; EOD도 유효 종가 없으면 실패 |
+| Portfolio EOD | `portfolio_snapshots` | 포트폴리오 히스토리, 일손익, 누적 수익률 | 사용자 단위 멱등 저장; Job 미완료 시 Ranking 차단 |
+| Ranking 확정 | `ranking_runs`, `ranking_snapshot`, `ranking_history`, Ranking Outbox·멱등성 레코드, Redis | TOP 랭킹과 내 순위 | Ranking transaction 안에서 함께 rollback; EOD 결과는 유지 |
+| Stock Sync | `stocks`의 종목 정보와 `synced_at` | 종목 검색·표시용 최신 마스터 | 다른 일일 Job과 독립; 실패해도 당일 Ranking을 되돌리지 않음 |
+
+### 9.2 실패 지점별 운영 판단
+
+| 실패 지점 | 자동으로 보호되는 것 | 운영자가 확인할 것 | 재실행 기준 |
+| --- | --- | --- | --- |
+| gRPC 연결·deadline | Step이 `FAILED`로 기록되고 성공으로 위장하지 않음 | 대상 서비스 상태, 주소·포트, deadline | 같은 거래일 Job parameter로 재시작 |
+| Trading 선행 Job | 종속 Job 미실행 | 선행 Job의 원격 응답과 서비스 Outbox | 선행 Job 성공 후 종속 Job 실행 |
+| Stock 일봉 마감 | 종가 예약 처리 미호출 | 확정 일봉 수와 거래일 | `tradingTodayCloseJob` 재시작 |
+| Portfolio 일부 사용자 | 완료되지 않은 EOD로 Ranking 생성 방지 | 실패 사용자, 종가·잔고 RPC, Batch Step context | 같은 `businessDate`로 EOD 재시작 |
+| Ranking transaction | 랭킹·Outbox·멱등성 레코드 원자적 rollback | Ranking DB와 Portfolio EOD 완료 여부 | 같은 `rankingDate`·동일 멱등성 키로 재시작 |
+| Redis 갱신 | DB 랭킹은 유지되고 조회 시 DB fallback 가능 | Redis 상태와 latest-date 캐시 | 캐시 복구 또는 다음 조회에서 재생성 |
+| Kiwoom 인증·응답 | 다른 Job과 서비스 데이터는 영향 없음 | 자격 증명, `upserted/total`, `synced_at` | 자격 증명 복구 후 `stockSyncJob` 재실행 |
+
+### 9.3 영향도 해석 원칙
+
+- Batch DB는 실행 이력과 재시작 정보만 저장한다. 도메인 결과의 원본 데이터가 아니다.
+- 원격 서비스가 성공 응답을 보낸 뒤 Batch가 timeout을 경험할 수 있으므로 상태 변경 RPC는
+  같은 멱등성 키로 재시도한다.
+- Outbox 발행 지연은 도메인 transaction 실패와 다르다. `published_at IS NULL` 이벤트는
+  publisher가 다시 발행하며 consumer는 event ID로 중복을 막는다.
+- Portfolio EOD와 Ranking은 의도적인 선후 관계가 있지만, Stock Sync는 독립된 갱신 작업이다.
+  Stock Sync 실패 때문에 이미 생성된 Portfolio·Ranking 결과를 삭제하거나 rollback하지 않는다.
