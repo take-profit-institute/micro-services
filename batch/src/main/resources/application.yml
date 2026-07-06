@@ -48,6 +48,8 @@ spring:
 
 batch:
   ranking:
+    enabled: ${BATCH_RANKING_ENABLED:false}
+    cron: "${BATCH_RANKING_CRON:0 20 16 * * MON-FRI}"
     grpc-target: ranking
     deadline-millis: ${BATCH_RANKING_DEADLINE_MILLIS:120000}
   schedule:
