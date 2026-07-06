@@ -1,10 +1,8 @@
 package org.profit.candle.gateway.config;
 
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,7 +17,13 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
+import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
@@ -40,8 +44,15 @@ import static org.springframework.security.config.Customizer.withDefaults;
 @EnableWebFluxSecurity
 public class GatewaySecurityConfig {
 
-    @Value("${gateway.jwt.hmac-secret}")
-    private String hmacSecret;
+    // auth-service 가 노출하는 JWKS(공개키) URI. RS256 검증. 대칭키 공유 폐지.
+    @Value("${gateway.jwt.jwk-set-uri}")
+    private String jwkSetUri;
+
+    @Value("${gateway.jwt.issuer:}")
+    private String issuer;
+
+    @Value("${gateway.jwt.audience:}")
+    private String audience;
 
     @Value("${gateway.cors.allowed-origin-patterns:http://localhost:3000,http://localhost:3001}")
     private List<String> allowedOrigins;
@@ -121,8 +132,19 @@ public class GatewaySecurityConfig {
 
     @Bean
     public ReactiveJwtDecoder jwtDecoder() {
-        SecretKey key = new SecretKeySpec(hmacSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-        return NimbusReactiveJwtDecoder.withSecretKey(key).build();
+        // RS256 + JWKS. auth-service /.well-known/jwks.json 에서 공개키를 받아 검증(캐시).
+        NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+        validators.add(new JwtTimestampValidator());
+        if (issuer != null && !issuer.isBlank()) {
+            validators.add(new JwtIssuerValidator(issuer));
+        }
+        if (audience != null && !audience.isBlank()) {
+            validators.add(new JwtClaimValidator<List<String>>(
+                    JwtClaimNames.AUD, aud -> aud != null && aud.contains(audience)));
+        }
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
+        return decoder;
     }
 
     @Bean

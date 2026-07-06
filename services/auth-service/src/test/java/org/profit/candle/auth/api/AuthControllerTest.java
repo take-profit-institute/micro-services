@@ -48,7 +48,7 @@ class AuthControllerTest {
     @BeforeEach
     void setUp() {
         lenient().when(authProperties.jwt()).thenReturn(
-                new AuthProperties.Jwt("candle", Duration.ofHours(1), Duration.ofDays(7), "hmac-secret"));
+                new AuthProperties.Jwt("candle", "candle-api", Duration.ofHours(1), Duration.ofDays(7), null));
         lenient().when(authProperties.cookies()).thenReturn(
                 new AuthProperties.Cookies("", false, "Lax"));
 

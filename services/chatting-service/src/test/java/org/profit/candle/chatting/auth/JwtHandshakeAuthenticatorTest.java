@@ -2,7 +2,14 @@ package org.profit.candle.chatting.auth;
 
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.KeyUse;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import java.time.Duration;
@@ -16,16 +23,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtHandshakeAuthenticatorTest {
 
-    static final String SECRET = "12345678901234567890123456789012";
     static final String ISSUER = "candle-auth-test";
+    static final String AUDIENCE = "candle-api";
     static final String ACCOUNT_ID = "account-1";
 
-    final JwtHandshakeAuthenticator authenticator = new JwtHandshakeAuthenticator(properties(SECRET, ISSUER));
+    // auth-service 서명 키(private) + JWKS(public). 다른 키(WRONG)는 서명 위조 테스트용.
+    static final RSAKey SIGNING_KEY = rsaKey();
+    static final RSAKey WRONG_KEY = rsaKey();
+    static final JWKSource<SecurityContext> JWKS =
+            new ImmutableJWKSet<>(new JWKSet(SIGNING_KEY.toPublicJWK()));
+
+    final JwtHandshakeAuthenticator authenticator =
+            new JwtHandshakeAuthenticator(JWKS, properties(ISSUER, AUDIENCE));
 
     @Test
     void authenticate_validToken_returnsSubject() throws Exception {
-        String token = token(SECRET, ACCOUNT_ID, ISSUER, Instant.now().plusSeconds(60));
-
+        String token = token(SIGNING_KEY, ACCOUNT_ID, ISSUER, AUDIENCE, Instant.now().plusSeconds(60));
         assertThat(authenticator.authenticate(token)).contains(ACCOUNT_ID);
     }
 
@@ -37,65 +50,57 @@ class JwtHandshakeAuthenticatorTest {
 
     @Test
     void authenticate_invalidSignature_returnsEmpty() throws Exception {
-        String token = token("abcdefghijklmnopqrstuvwxyz123456", ACCOUNT_ID, ISSUER, Instant.now().plusSeconds(60));
-
+        // JWKS에 없는 키로 서명 → 검증 실패
+        String token = token(WRONG_KEY, ACCOUNT_ID, ISSUER, AUDIENCE, Instant.now().plusSeconds(60));
         assertThat(authenticator.authenticate(token)).isEmpty();
     }
 
     @Test
     void authenticate_expiredToken_returnsEmpty() throws Exception {
-        // 클록 스큐(30s)를 넘겨 확실히 만료
-        String token = token(SECRET, ACCOUNT_ID, ISSUER, Instant.now().minusSeconds(120));
-
+        String token = token(SIGNING_KEY, ACCOUNT_ID, ISSUER, AUDIENCE, Instant.now().minusSeconds(120));
         assertThat(authenticator.authenticate(token)).isEmpty();
     }
 
     @Test
     void authenticate_missingExpiration_returnsEmpty() throws Exception {
-        // exp 누락(영구 토큰)은 거부해야 한다
-        String token = token(SECRET, ACCOUNT_ID, ISSUER, null);
-
+        String token = token(SIGNING_KEY, ACCOUNT_ID, ISSUER, AUDIENCE, null);
         assertThat(authenticator.authenticate(token)).isEmpty();
     }
 
     @Test
     void authenticate_wrongIssuer_returnsEmpty() throws Exception {
-        String token = token(SECRET, ACCOUNT_ID, "evil-issuer", Instant.now().plusSeconds(60));
-
+        String token = token(SIGNING_KEY, ACCOUNT_ID, "evil-issuer", AUDIENCE, Instant.now().plusSeconds(60));
         assertThat(authenticator.authenticate(token)).isEmpty();
     }
 
     @Test
-    void authenticate_missingIssuer_returnsEmpty() throws Exception {
-        String token = token(SECRET, ACCOUNT_ID, null, Instant.now().plusSeconds(60));
-
+    void authenticate_wrongAudience_returnsEmpty() throws Exception {
+        String token = token(SIGNING_KEY, ACCOUNT_ID, ISSUER, "other-api", Instant.now().plusSeconds(60));
         assertThat(authenticator.authenticate(token)).isEmpty();
     }
 
     @Test
     void authenticate_missingSubject_returnsEmpty() throws Exception {
-        String token = token(SECRET, null, ISSUER, Instant.now().plusSeconds(60));
-
+        String token = token(SIGNING_KEY, null, ISSUER, AUDIENCE, Instant.now().plusSeconds(60));
         assertThat(authenticator.authenticate(token)).isEmpty();
     }
 
     @Test
     void authenticate_issuerNotConfigured_skipsIssuerCheck() throws Exception {
-        // issuer 미설정(빈 값)이면 어떤 iss든 통과(escape hatch)
-        JwtHandshakeAuthenticator noIssuer = new JwtHandshakeAuthenticator(properties(SECRET, ""));
-        String token = token(SECRET, ACCOUNT_ID, "anything", Instant.now().plusSeconds(60));
-
+        JwtHandshakeAuthenticator noIssuer = new JwtHandshakeAuthenticator(JWKS, properties("", ""));
+        String token = token(SIGNING_KEY, ACCOUNT_ID, "anything", "anything", Instant.now().plusSeconds(60));
         assertThat(noIssuer.authenticate(token)).contains(ACCOUNT_ID);
     }
 
-    private static ChatProperties properties(String secret, String issuer) {
+    private static ChatProperties properties(String issuer, String audience) {
         return new ChatProperties(
-                new ChatProperties.Jwt(secret, issuer),
+                new ChatProperties.Jwt("http://unused/.well-known/jwks.json", issuer, audience),
                 new ChatProperties.Room(500, Duration.ofHours(2)),
                 new ChatProperties.Cors(List.of()));
     }
 
-    private static String token(String secret, String subject, String issuer, Instant expiresAt) throws Exception {
+    private static String token(RSAKey key, String subject, String issuer, String audience, Instant expiresAt)
+            throws Exception {
         JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder();
         if (subject != null) {
             claims.subject(subject);
@@ -103,11 +108,27 @@ class JwtHandshakeAuthenticatorTest {
         if (issuer != null) {
             claims.issuer(issuer);
         }
+        if (audience != null) {
+            claims.audience(audience);
+        }
         if (expiresAt != null) {
             claims.expirationTime(Date.from(expiresAt));
         }
-        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims.build());
-        jwt.sign(new MACSigner(secret.getBytes()));
+        SignedJWT jwt = new SignedJWT(
+                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(key.getKeyID()).build(),
+                claims.build());
+        jwt.sign(new RSASSASigner(key));
         return jwt.serialize();
+    }
+
+    private static RSAKey rsaKey() {
+        try {
+            return new RSAKeyGenerator(2048)
+                    .keyUse(KeyUse.SIGNATURE)
+                    .keyIDFromThumbprint(true)
+                    .generate();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

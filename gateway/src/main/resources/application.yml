@@ -9,7 +9,10 @@ server:
 
 gateway:
   jwt:
-    hmac-secret: ${AUTH_JWT_HMAC_SECRET:change-me-in-production-change-me-in-production}
+    # RS256/JWKS로 통일. auth-service의 공개키(JWKS)로 검증한다(대칭키 공유 폐지).
+    jwk-set-uri: ${GATEWAY_JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+    issuer: ${GATEWAY_JWT_ISSUER:http://localhost:8081}
+    audience: ${GATEWAY_JWT_AUDIENCE:candle-api}
   route:
     auth-uri: ${GATEWAY_AUTH_URI:http://localhost:8081}
     bff-uri: ${GATEWAY_BFF_URI:http://localhost:8080}

@@ -27,7 +27,7 @@ class RedisRoomRegistryTest {
         when(redis.opsForValue()).thenReturn(values);
 
         registry = new RedisRoomRegistry(redis, new ChatProperties(
-                new ChatProperties.Jwt("12345678901234567890123456789012", "candle-auth-test"),
+                new ChatProperties.Jwt("http://unused/.well-known/jwks.json", "candle-auth-test", "candle-api"),
                 new ChatProperties.Room(2, Duration.ofHours(2)),
                 new ChatProperties.Cors(List.of())));
     }

@@ -1,46 +1,65 @@
 package org.profit.candle.chatting.auth;
 
-import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jose.crypto.MACVerifier;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
+import com.nimbusds.jose.proc.JWSVerificationKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-import java.nio.charset.StandardCharsets;
+import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
+import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import java.net.URI;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.chatting.config.ChatProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * HMAC(HS256) JWT 자체 검증 구현. auth-service와 동일한 시크릿·issuer를 공유한다.
+ * RS256 + JWKS 기반 WS 핸드셰이크 JWT 자체 검증. auth-service의 공개키(JWKS)로 서명을 검증한다.
+ * (WS는 API Gateway를 거치지 않고 ALB로 직결되므로 chatting이 직접 검증해야 한다.)
  *
- * <p>검증 범위를 시스템 표준(auth-service 발급 토큰)에 맞춘다:
+ * <p>검증 범위:
  * <ul>
- *   <li><b>서명</b> — 공유 HMAC 시크릿</li>
- *   <li><b>만료(exp)</b> — <b>필수</b>. exp가 없으면 거부(영구 토큰 차단), 만료 시 거부(소량 클록 스큐 허용)</li>
- *   <li><b>발급자(iss)</b> — 설정된 기대 issuer와 일치해야 함</li>
+ *   <li><b>서명</b> — auth-service JWKS의 공개키(kid로 선택), RS256</li>
+ *   <li><b>만료(exp)</b> — <b>필수</b>. 누락(영구 토큰)·만료 모두 거부(소량 클록 스큐 허용)</li>
+ *   <li><b>발급자(iss)</b> — 설정 시 일치 필수</li>
+ *   <li><b>대상(aud)</b> — 설정 시 포함 필수</li>
  * </ul>
- *
- * <p>accountId는 JWT {@code sub} 클레임에서 추출한다(게이트웨이 {@code X-Account-Id} 주입과 동일 의미).
+ * accountId는 {@code sub} 클레임에서 추출한다(게이트웨이 {@code X-Account-Id} 주입과 동일 의미).
  */
 @Slf4j
 @Component
 public class JwtHandshakeAuthenticator implements HandshakeAuthenticator {
 
-    /** 시계 오차 허용(초) — 만료 직전 토큰이 약간의 드리프트로 거부되는 것을 방지. */
+    /** 시계 오차 허용(초). */
     private static final long CLOCK_SKEW_SECONDS = 30;
 
-    private final JWSVerifier verifier;
+    private final ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
     private final String expectedIssuer;
+    private final String expectedAudience;
 
     public JwtHandshakeAuthenticator(ChatProperties properties) {
-        try {
-            this.verifier = new MACVerifier(properties.jwt().hmacSecret().getBytes(StandardCharsets.UTF_8));
-        } catch (Exception e) {
-            throw new IllegalStateException("HMAC verifier 초기화 실패 (시크릿 길이가 32바이트 미만일 수 있음)", e);
-        }
+        this(remoteJwkSource(properties.jwt().jwkSetUri()), properties);
+    }
+
+    /** 테스트에서 JWKSource(로컬 JWKSet)를 직접 주입하기 위한 생성자. */
+    JwtHandshakeAuthenticator(JWKSource<SecurityContext> jwkSource, ChatProperties properties) {
+        ConfigurableJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
+        processor.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, jwkSource));
+        this.jwtProcessor = processor;
         this.expectedIssuer = properties.jwt().issuer() == null ? "" : properties.jwt().issuer().trim();
+        this.expectedAudience = properties.jwt().audience() == null ? "" : properties.jwt().audience().trim();
+    }
+
+    private static JWKSource<SecurityContext> remoteJwkSource(String jwkSetUri) {
+        try {
+            return JWKSourceBuilder.<SecurityContext>create(URI.create(jwkSetUri).toURL()).build();
+        } catch (Exception e) {
+            throw new IllegalStateException("JWKS source 초기화 실패: " + jwkSetUri, e);
+        }
     }
 
     @Override
@@ -49,20 +68,18 @@ public class JwtHandshakeAuthenticator implements HandshakeAuthenticator {
             return Optional.empty();
         }
         try {
-            SignedJWT jwt = SignedJWT.parse(token);
-            if (!jwt.verify(verifier)) {
-                return Optional.empty();
-            }
-            JWTClaimsSet claims = jwt.getJWTClaimsSet();
+            JWTClaimsSet claims = jwtProcessor.process(token, null);
 
-            // exp 필수: 누락(영구 토큰)·만료 모두 거부
             Date expiration = claims.getExpirationTime();
             if (expiration == null
                     || expiration.toInstant().plusSeconds(CLOCK_SKEW_SECONDS).isBefore(Instant.now())) {
                 return Optional.empty();
             }
-            // issuer 검증: 기대 issuer가 설정돼 있으면 일치해야 함
             if (!expectedIssuer.isEmpty() && !expectedIssuer.equals(claims.getIssuer())) {
+                return Optional.empty();
+            }
+            List<String> audience = claims.getAudience();
+            if (!expectedAudience.isEmpty() && (audience == null || !audience.contains(expectedAudience))) {
                 return Optional.empty();
             }
             return Optional.ofNullable(claims.getSubject());

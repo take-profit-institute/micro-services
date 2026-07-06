@@ -20,7 +20,10 @@ public record AuthProperties(Google google, Kakao kakao, Naver naver, Jwt jwt, C
             List<String> allowedRedirectUris) {
     }
 
-    public record Jwt(String issuer, Duration accessTokenTtl, Duration refreshTokenTtl, String hmacSecret) {
+    // issuer: OIDC issuer (HTTPS URL, 토큰 iss·JWKS 노출 도메인과 일치). audience: 단일 API audience.
+    // privateKey: RS256 서명용 RSA 개인키(PEM PKCS#8). 비면 dev용 임시 키를 기동 시 생성한다.
+    public record Jwt(String issuer, String audience, Duration accessTokenTtl, Duration refreshTokenTtl,
+            String privateKey) {
     }
 
     public record Cookies(String domain, boolean secure, String sameSite) {
