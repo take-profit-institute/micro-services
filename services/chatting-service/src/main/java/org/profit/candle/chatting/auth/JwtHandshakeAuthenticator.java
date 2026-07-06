@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.chatting.config.ChatProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -41,6 +42,7 @@ public class JwtHandshakeAuthenticator implements HandshakeAuthenticator {
     private final String expectedIssuer;
     private final String expectedAudience;
 
+    @Autowired
     public JwtHandshakeAuthenticator(ChatProperties properties) {
         this(remoteJwkSource(properties.jwt().jwkSetUri()), properties);
     }

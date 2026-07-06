@@ -129,6 +129,7 @@ def coverageExcludes = [
     '**/*Application.class',    // Spring Boot 진입점
     '**/config/**',
     '**/dto/**',
+    'batch/**',                 // 배치 모듈은 테스트 커버리지 제외
 ]
 
 // java 플러그인이 적용되는 모든 서브프로젝트(common·gateway·batch·services:*)에
