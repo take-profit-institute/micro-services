@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.batch.portfolio.eod.job.PortfolioEodJobConfiguration;
+import org.profit.candle.batch.ranking.job.RankingFinalizeJobConfiguration;
 import org.profit.candle.batch.smoke.job.BatchSmokeJobConfiguration;
 import org.profit.candle.batch.stock.sync.job.StockSyncJobConfiguration;
 import org.profit.candle.batch.trading.job.TradingExpireReservationsJobConfiguration;
@@ -54,6 +55,7 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
     private static final Set<String> ALLOWED_JOBS = Set.of(
             BatchSmokeJobConfiguration.JOB_NAME,
             PortfolioEodJobConfiguration.JOB_NAME,
+            RankingFinalizeJobConfiguration.JOB_NAME,
             StockSyncJobConfiguration.JOB_NAME,
             TradingMorningJobsConfiguration.PREVIOUS_CLOSE_JOB_NAME,
             TradingMorningJobsConfiguration.OPEN_LIMIT_JOB_NAME,
@@ -96,6 +98,12 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
                         .setDescription("Synchronize KOSPI and KOSDAQ stock catalogs")
                         .addSupportedParameters("runId")
                         .setTriggerable(isRegistered(StockSyncJobConfiguration.JOB_NAME))
+                        .build())
+                .addJobs(BatchJob.newBuilder()
+                        .setName(RankingFinalizeJobConfiguration.JOB_NAME)
+                        .setDescription("Finalize daily ranking after Portfolio EOD")
+                        .addSupportedParameters("rankingDate")
+                        .setTriggerable(isRegistered(RankingFinalizeJobConfiguration.JOB_NAME))
                         .build())
                 .addJobs(tradingJob(
                         TradingMorningJobsConfiguration.PREVIOUS_CLOSE_JOB_NAME,
@@ -208,6 +216,17 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
                 builder.addLong("runId", parseLong(input.get("runId"), "runId"));
             }
             return builder.toJobParameters();
+        }
+
+        if (RankingFinalizeJobConfiguration.JOB_NAME.equals(jobName)) {
+            String rankingDate = input.getOrDefault(
+                    "rankingDate",
+                    LocalDate.now(clock).toString()
+            );
+            validateDate(rankingDate);
+            return builder
+                    .addString("rankingDate", rankingDate)
+                    .toJobParameters();
         }
 
         if (TRADING_JOBS.contains(jobName)) {

@@ -169,7 +169,8 @@ class GrpcCashBalanceClientTest {
                                 100,
                                 500
                         ),
-                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI")
+                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI"),
+                        new BatchProperties.Trading(false, "", "", "", "")
                 ),
                 new BatchProperties.Grpc(
                         "market",
@@ -178,6 +179,7 @@ class GrpcCashBalanceClientTest {
                         "portfolio",
                         300,
                         1_000,
+                        120_000,
                         120_000
                 )
         );
