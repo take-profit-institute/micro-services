@@ -27,6 +27,7 @@ dependencies {
 
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.boot:spring-boot-kafka'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params'
 }
 
 // 공용 proto 디렉터리(리포 루트 /proto)에서 stub 생성
