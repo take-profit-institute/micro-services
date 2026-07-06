@@ -3,6 +3,11 @@ package org.profit.candle.batch.ranking.exception;
 import org.profit.candle.common.error.ErrorCode;
 
 public enum RankingBatchErrorCode implements ErrorCode {
+    PORTFOLIO_EOD_NOT_COMPLETED(
+            "BATCH_RANKING_PORTFOLIO_EOD_NOT_COMPLETED",
+            "동일 거래일의 Portfolio EOD 배치가 완료되지 않았습니다.",
+            false
+    ),
     EXTERNAL_CLIENT_FAILED(
             "BATCH_RANKING_EXTERNAL_CLIENT_FAILED",
             "Ranking Service 호출에 실패했습니다.",
