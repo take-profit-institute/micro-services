@@ -79,9 +79,10 @@ services:
       HOST: "0.0.0.0"
       NODE_OPTIONS: "--dns-result-order=ipv4first"
       REDIS_URL: redis://redis:6379
-      # admin 토큰 검증용 JWT 시크릿 — auth-service/gateway와 반드시 동일해야 한다.
-      # 누락되면 BFF가 코드 기본값으로 검증해 모든 admin 토큰을 401로 거부한다.
-      AUTH_JWT_HMAC_SECRET: ${AUTH_JWT_HMAC_SECRET:-local-dev-secret-change-me}
+      # admin 토큰 검증(JWKS/RS256). JWKS는 컨테이너→호스트 auth-service, issuer는 토큰 iss와 일치.
+      AUTH_JWKS_URI: http://host.docker.internal:8081/.well-known/jwks.json
+      AUTH_JWT_ISSUER: http://localhost:8081
+      AUTH_JWT_AUDIENCE: candle-api
       # 실제 마이크로서비스로 gRPC 라우팅 (mock 아님)
       DATA_SOURCE: grpc
       # gRPC 서비스는 호스트에서 로컬 실행 (50051~50060)
@@ -113,7 +114,10 @@ services:
     image: ${GATEWAY_IMAGE:-yyubin/candle-gateway:dev}
     environment:
       GATEWAY_PORT: "8000"
-      AUTH_JWT_HMAC_SECRET: ${AUTH_JWT_HMAC_SECRET:-local-dev-secret-change-me}
+      # JWT 검증(JWKS/RS256). JWKS는 컨테이너→호스트 auth-service, issuer는 토큰 iss와 일치.
+      GATEWAY_JWT_JWK_SET_URI: http://host.docker.internal:8081/.well-known/jwks.json
+      GATEWAY_JWT_ISSUER: http://localhost:8081
+      GATEWAY_JWT_AUDIENCE: candle-api
       # auth-service 주소: 'services' 프로파일 사용 시 http://auth-service:8081
       GATEWAY_AUTH_URI: ${GATEWAY_AUTH_URI:-http://host.docker.internal:8081}
       GATEWAY_BFF_URI: ${GATEWAY_BFF_URI:-http://bff:8080}

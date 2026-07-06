@@ -17,7 +17,8 @@ import org.profit.candle.auth.identity.repository.OAuthAccountRepository;
 import org.profit.candle.auth.token.entity.PrincipalType;
 import org.profit.candle.auth.token.entity.RefreshToken;
 import org.profit.candle.auth.token.repository.RefreshTokenRepository;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import java.util.List;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
@@ -42,9 +43,10 @@ public class DefaultAuthTokenService implements AuthTokenIssuer, RefreshTokenSer
         Instant now = Instant.now();
         Instant accessExpiresAt = now.plus(properties.jwt().accessTokenTtl());
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(
-                JwsHeader.with(MacAlgorithm.HS256).build(),
+                JwsHeader.with(SignatureAlgorithm.RS256).build(),
                 JwtClaimsSet.builder()
                         .issuer(properties.jwt().issuer())
+                        .audience(List.of(properties.jwt().audience()))
                         .subject(subject.toString())
                         .issuedAt(now)
                         .expiresAt(accessExpiresAt)

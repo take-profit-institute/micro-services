@@ -1,6 +1,7 @@
 package org.profit.candle.batch.portfolio.eod.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,6 +26,7 @@ import org.profit.candle.batch.support.parameter.JobParameterFactory;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.JobExecution;
+import org.springframework.batch.core.launch.JobInstanceAlreadyCompleteException;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -41,6 +43,7 @@ import org.springframework.test.context.ActiveProfiles;
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
+        "spring.grpc.server.port=0",
         "spring.flyway.locations=classpath:migration,classpath:local-migration",
         "spring.batch.job.enabled=false",
         "batch.schedule.smoke.enabled=false",
@@ -78,12 +81,13 @@ class LocalPortfolioEodJobTest {
 
     @Test
     void shouldRunWholeJobAndStoreSnapshotsWithFakeServiceData() throws Exception {
+        var parameters = parameterFactory.createDailyParameters(
+                PortfolioEodJobConfiguration.JOB_NAME,
+                BUSINESS_DATE
+        );
         JobExecution execution = jobOperator.start(
                 portfolioEodJob,
-                parameterFactory.createDailyParameters(
-                        PortfolioEodJobConfiguration.JOB_NAME,
-                        BUSINESS_DATE
-                )
+                parameters
         );
 
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
@@ -116,6 +120,8 @@ class LocalPortfolioEodJobTest {
                 Integer.class
         );
         assertThat(stagedPriceCount).isEqualTo(3);
+        assertThatThrownBy(() -> jobOperator.start(portfolioEodJob, parameters))
+                .isInstanceOf(JobInstanceAlreadyCompleteException.class);
     }
 
     private List<SnapshotRow> loadCurrentSnapshots() {

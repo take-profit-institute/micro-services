@@ -50,7 +50,7 @@ class DefaultAuthTokenServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(properties.jwt()).thenReturn(
-                new AuthProperties.Jwt("candle", ACCESS_TTL, REFRESH_TTL, "secret"));
+                new AuthProperties.Jwt("candle", "candle-api", ACCESS_TTL, REFRESH_TTL, null));
 
         Jwt stubJwt = Jwt.withTokenValue("stub.jwt.token")
                 .header("alg", "HS256")
@@ -99,6 +99,15 @@ class DefaultAuthTokenServiceTest {
 
         verify(jwtEncoder).encode(captor.capture());
         assertThat((String) captor.getValue().getClaims().getClaim("email")).isEqualTo(EMAIL);
+    }
+
+    @Test
+    void issue_encodesAudienceClaim() {
+        ArgumentCaptor<JwtEncoderParameters> captor = ArgumentCaptor.forClass(JwtEncoderParameters.class);
+        service.issue(USER_ID, EMAIL, "USER", PrincipalType.USER);
+
+        verify(jwtEncoder).encode(captor.capture());
+        assertThat(captor.getValue().getClaims().getAudience()).containsExactly("candle-api");
     }
 
     @Test

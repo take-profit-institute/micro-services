@@ -39,10 +39,14 @@ auth:
     redirect-uri: ${NAVER_OAUTH_REDIRECT_URI:}
     allowed-redirect-uris: ${NAVER_OAUTH_ALLOWED_REDIRECT_URIS:}
   jwt:
-    issuer: ${AUTH_JWT_ISSUER:candle-auth}
+    # issuer 는 JWKS 를 노출하는 HTTPS 도메인과 일치해야 한다(APIGW OIDC discovery 대상).
+    # 로컬은 auth-service 직접 주소. 운영은 https://auth.<domain>.
+    issuer: ${AUTH_JWT_ISSUER:http://localhost:8081}
+    audience: ${AUTH_JWT_AUDIENCE:candle-api}
     access-token-ttl: PT15M
     refresh-token-ttl: P30D
-    hmac-secret: ${AUTH_JWT_HMAC_SECRET:change-me-in-production-change-me-in-production}
+    # RS256 서명용 RSA 개인키(PEM PKCS#8). 비우면 dev용 임시 키를 기동 시 생성(운영은 반드시 주입).
+    private-key: ${AUTH_JWT_PRIVATE_KEY:}
   cookies:
     domain: ${AUTH_COOKIE_DOMAIN:}
     secure: ${AUTH_COOKIE_SECURE:false}

@@ -10,10 +10,12 @@ server:
 
 chat:
   jwt:
-    # 게이트웨이/auth-service와 동일한 HMAC 시크릿·issuer를 공유(핸드셰이크 자체 검증)
-    hmac-secret: ${AUTH_JWT_HMAC_SECRET:change-me-in-production-change-me-in-production}
-    # auth-service의 AUTH_JWT_ISSUER와 동일해야 함(불일치 시 핸드셰이크 거부). 로컬은 candle-auth-local.
-    issuer: ${AUTH_JWT_ISSUER:candle-auth}
+    # auth-service JWKS(공개키)로 RS256 서명 검증(핸드셰이크 자체 검증). 대칭키 공유 폐지.
+    jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+    # auth-service의 AUTH_JWT_ISSUER와 동일해야 함(불일치 시 핸드셰이크 거부).
+    issuer: ${AUTH_JWT_ISSUER:http://localhost:8081}
+    # auth-service의 AUTH_JWT_AUDIENCE와 동일. 비우면 audience 검증 생략.
+    audience: ${AUTH_JWT_AUDIENCE:candle-api}
   room:
     capacity: ${CHAT_ROOM_CAPACITY:500}
     # 카운터 누수 안전망 TTL(heartbeat 도입 전까지). ISO-8601 Duration.
