@@ -120,7 +120,14 @@ class GrpcClosingPriceClientTest {
                                 100,
                                 500
                         ),
-                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI")
+                        new BatchProperties.StockSync(false, "0 30 16 * * MON-FRI"),
+                        new BatchProperties.Trading(
+                                false,
+                                "0 0 8 * * MON-FRI",
+                                "0 0 9 * * MON-FRI",
+                                "0 31 15 * * MON-FRI",
+                                "0 40 15 * * MON-FRI"
+                        )
                 ),
                 new BatchProperties.Grpc(
                         "market",
@@ -129,7 +136,8 @@ class GrpcClosingPriceClientTest {
                         "portfolio",
                         300,
                         1_000,
-                        120_000
+                        120_000,
+                        30_000
                 )
         );
     }
