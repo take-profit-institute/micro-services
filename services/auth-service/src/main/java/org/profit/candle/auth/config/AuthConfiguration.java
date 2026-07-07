@@ -18,6 +18,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
 import java.util.Map;
+import org.profit.candle.common.kafka.KafkaIamSupport;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,10 +49,10 @@ public class AuthConfiguration {
 
     @Bean
     ProducerFactory<String, String> producerFactory() {
-        return new DefaultKafkaProducerFactory<>(Map.of(
+        return new DefaultKafkaProducerFactory<>(KafkaIamSupport.withIamIfNeeded(bootstrapServers, Map.of(
                 ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class));
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class)));
     }
 
     @Bean
