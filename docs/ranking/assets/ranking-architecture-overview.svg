@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1080" viewBox="0 0 1800 1080" role="img" aria-labelledby="title desc">
+<svg preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision" xmlns="http://www.w3.org/2000/svg" width="3600" height="2160" viewBox="0 0 1800 1080" role="img" aria-labelledby="title desc">
   <title id="title">Ranking Service architecture overview</title><desc id="desc">Events and Batch commands enter Ranking Service, which calls Portfolio and owns PostgreSQL, Redis and Outbox.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#080F1D"/><stop offset="1" stop-color="#171329"/></linearGradient>
@@ -14,14 +14,14 @@
   <text x="70" y="72" class="title">CANDLE · RANKING SERVICE ARCHITECTURE</text><text x="70" y="106" class="sub">EVENT PROJECTION · DAILY FINALIZE · CACHE-ASIDE QUERY</text>
 
   <text x="70" y="162" class="kicker">01 · INPUT PLANE</text>
-  <g filter="url(#shadow)">
+  <g>
     <rect x="70" y="190" width="280" height="105" rx="20" fill="#3B2430" stroke="#FF7A70"/><text x="100" y="230" class="head">AUTH / USER</text><text x="100" y="258" class="body">UserCreated · ProfileUpdated</text><text x="100" y="280" class="tiny">Kafka · versioned events</text>
     <rect x="70" y="330" width="280" height="105" rx="20" fill="#4A2028" stroke="#FF7A70"/><text x="100" y="370" class="head">TRADING</text><text x="100" y="398" class="body">OrderFilled</text><text x="100" y="420" class="tiny">Kafka · orderId dedup</text>
     <rect x="70" y="470" width="280" height="105" rx="20" fill="#3A2F0B" stroke="#F4C95D"/><text x="100" y="510" class="head">BATCH :50062</text><text x="100" y="538" class="body">FinalizeDailyRanking</text><text x="100" y="560" class="tiny">16:20 KST · same-date guard</text>
     <rect x="70" y="610" width="280" height="105" rx="20" fill="#172A3A" stroke="#4DA3FF"/><text x="100" y="650" class="head">BFF / CLIENT</text><text x="100" y="678" class="body">ListRankings · GetMyRanking</text><text x="100" y="700" class="tiny">authenticated x-user-id</text>
   </g>
 
-  <g filter="url(#shadow)"><rect x="500" y="170" width="620" height="590" rx="32" fill="url(#rank)" stroke="#B794F4" stroke-width="2.5"/>
+  <g><rect x="500" y="170" width="620" height="590" rx="32" fill="url(#rank)" stroke="#B794F4" stroke-width="2.5"/>
     <rect x="532" y="205" width="230" height="34" rx="17" fill="#B794F4" fill-opacity=".15"/><circle cx="554" cy="222" r="6" fill="#D8B4FE"/><text x="572" y="228" class="tiny" fill="#E9D5FF">RANKING SERVICE :50056</text>
     <text x="532" y="285" class="head" font-size="28">Ranking control &amp; read model</text><text x="532" y="315" class="body">PostgreSQL source of truth · Redis derived cache</text>
     <rect x="532" y="350" width="556" height="92" rx="18" fill="#211735" stroke="#72519C"/><text x="558" y="384" class="head">gRPC · Kafka entry</text><text x="558" y="413" class="body">RankingGrpcService · User/Trading Consumers</text>
@@ -31,7 +31,7 @@
   </g>
 
   <text x="1240" y="162" class="kicker">02 · EXTERNAL &amp; OWNED DATA</text>
-  <g filter="url(#shadow)">
+  <g>
     <rect x="1240" y="190" width="490" height="115" rx="22" fill="#102A43" stroke="#4DA3FF" stroke-width="2"/><text x="1270" y="232" class="head">PORTFOLIO SERVICE :50055</text><text x="1270" y="261" class="body">ListDailyPortfolioSnapshots · page 500</text><text x="1270" y="284" class="tiny">total_asset · cumulative_return_rate</text>
     <rect x="1240" y="345" width="490" height="140" rx="22" fill="#263442" stroke="#94A3B8" stroke-width="2"/><text x="1270" y="387" class="head">POSTGRESQL · ranking schema</text><text x="1270" y="416" class="body">participants · consumed_events · runs</text><text x="1270" y="443" class="body">snapshot · history · idempotency · outbox</text><text x="1270" y="468" class="tiny">domain source of truth</text>
     <rect x="1240" y="525" width="235" height="120" rx="22" fill="#3B1D31" stroke="#FB7185" stroke-width="2"/><text x="1270" y="567" class="head">REDIS</text><text x="1270" y="596" class="body">latest · TOP100 · user</text><text x="1270" y="620" class="tiny">TTL 1 day</text>
@@ -42,5 +42,5 @@
   <path d="M1120 275C1175 275 1180 248 1240 248" class="line"/><path d="M1120 415H1240" class="line"/><path d="M1120 620C1180 620 1180 585 1240 585" class="line"/><path d="M1120 535H1180V500H1612V525" class="event"/>
 
   <text x="70" y="850" class="kicker">03 · USER-VISIBLE OUTPUT</text>
-  <g filter="url(#shadow)"><rect x="70" y="880" width="520" height="120" rx="22" fill="#20162F" stroke="#A78BFA"/><text x="100" y="922" class="head">DAILY LEADERBOARD</text><text x="100" y="952" class="body">last completed date · TOP 100 · stable cursor</text><text x="100" y="978" class="tiny">profit rate DESC → trade count DESC → user ID ASC</text><rect x="640" y="880" width="520" height="120" rx="22" fill="#20162F" stroke="#A78BFA"/><text x="670" y="922" class="head">MY RANKING</text><text x="670" y="952" class="body">authenticated user only · last completed result</text><text x="670" y="978" class="tiny">Redis hit or PostgreSQL fallback</text><rect x="1210" y="880" width="520" height="120" rx="22" fill="#20162F" stroke="#A78BFA"/><text x="1240" y="922" class="head">DOWNSTREAM EVENT</text><text x="1240" y="952" class="body">ranking.daily-finalized.v1</text><text x="1240" y="978" class="tiny">rankingDate · rankedUserCount</text></g>
+  <g><rect x="70" y="880" width="520" height="120" rx="22" fill="#20162F" stroke="#A78BFA"/><text x="100" y="922" class="head">DAILY LEADERBOARD</text><text x="100" y="952" class="body">last completed date · TOP 100 · stable cursor</text><text x="100" y="978" class="tiny">profit rate DESC → trade count DESC → user ID ASC</text><rect x="640" y="880" width="520" height="120" rx="22" fill="#20162F" stroke="#A78BFA"/><text x="670" y="922" class="head">MY RANKING</text><text x="670" y="952" class="body">authenticated user only · last completed result</text><text x="670" y="978" class="tiny">Redis hit or PostgreSQL fallback</text><rect x="1210" y="880" width="520" height="120" rx="22" fill="#20162F" stroke="#A78BFA"/><text x="1240" y="922" class="head">DOWNSTREAM EVENT</text><text x="1240" y="952" class="body">ranking.daily-finalized.v1</text><text x="1240" y="978" class="tiny">rankingDate · rankedUserCount</text></g>
 </svg>
