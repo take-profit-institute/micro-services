@@ -146,6 +146,61 @@ class ReservationGrpcServiceTest {
             verify(reservationRepository).findByUserIdAndStatusOrderByCreatedAtDesc(
                     userId, ReservationStatusValue.EXECUTED);
         }
+
+        @Test
+        void shouldIncludeParentReservationIdWhenPresent() {
+            // toProto()의 "parentReservationId != null" 분기 — 정정으로 생성된 예약만 값이 있다.
+            ReservationEntity amended = openLimitReservation();
+            amended.linkParent(UUID.randomUUID());
+            when(reservationRepository.findByUserIdOrderByCreatedAtDesc(userId))
+                    .thenReturn(List.of(amended));
+            ListReservationsRequest request = ListReservationsRequest.newBuilder()
+                    .setUserId(userId.toString()).build();
+
+            runWithActor(userId.toString(), () -> grpcService.listReservations(request, listObserver));
+
+            ArgumentCaptor<ListReservationsResponse> captor = ArgumentCaptor.forClass(ListReservationsResponse.class);
+            verify(listObserver).onNext(captor.capture());
+            assertThat(captor.getValue().getReservations(0).getParentReservationId())
+                    .isEqualTo(amended.getParentReservationId().toString());
+        }
+
+        @Test
+        void shouldIncludeConvertedOrderIdWhenPresent() {
+            // toProto()의 "convertedOrderId != null" 분기 — CONVERTING을 거쳐 전환 완료된 예약만 값이 있다.
+            ReservationEntity converted = openLimitReservation();
+            converted.startConverting();
+            converted.markConverted(UUID.randomUUID());
+            when(reservationRepository.findByUserIdOrderByCreatedAtDesc(userId))
+                    .thenReturn(List.of(converted));
+            ListReservationsRequest request = ListReservationsRequest.newBuilder()
+                    .setUserId(userId.toString()).build();
+
+            runWithActor(userId.toString(), () -> grpcService.listReservations(request, listObserver));
+
+            ArgumentCaptor<ListReservationsResponse> captor = ArgumentCaptor.forClass(ListReservationsResponse.class);
+            verify(listObserver).onNext(captor.capture());
+            assertThat(captor.getValue().getReservations(0).getConvertedOrderId())
+                    .isEqualTo(converted.getConvertedOrderId().toString());
+        }
+
+        @Test
+        void shouldMapPriceAsZeroWhenReservationHasNoPrice() {
+            // toProto()의 "priceKrw == null ? 0 : ..." 분기 — 시장가/시간외종가 예약엔 가격이 없다.
+            ReservationEntity marketReservation = ReservationEntity.reserve(userId, accountId, "005930",
+                    ReservationSideValue.BUY, ReservationTimingValue.OPEN, ReservationOrderKindValue.MARKET,
+                    10, null, tomorrow, 0L, "idem-market-" + UUID.randomUUID());
+            when(reservationRepository.findByUserIdOrderByCreatedAtDesc(userId))
+                    .thenReturn(List.of(marketReservation));
+            ListReservationsRequest request = ListReservationsRequest.newBuilder()
+                    .setUserId(userId.toString()).build();
+
+            runWithActor(userId.toString(), () -> grpcService.listReservations(request, listObserver));
+
+            ArgumentCaptor<ListReservationsResponse> captor = ArgumentCaptor.forClass(ListReservationsResponse.class);
+            verify(listObserver).onNext(captor.capture());
+            assertThat(captor.getValue().getReservations(0).getPrice()).isZero();
+        }
     }
 
     @Nested
@@ -173,6 +228,30 @@ class ReservationGrpcServiceTest {
             ArgumentCaptor<PlaceReservationResponse> captor = ArgumentCaptor.forClass(PlaceReservationResponse.class);
             verify(placeObserver).onNext(captor.capture());
             assertThat(captor.getValue().getReservation().getSymbol()).isEqualTo("005930");
+        }
+
+        @Test
+        void shouldSkipDateParsingWhenScheduledDateIsBlank() {
+            // PREV_CLOSE는 클라이언트가 scheduledDate를 안 보내도 되는 케이스 —
+            // "!isBlank()" 분기의 false 경로(파싱 스킵, scheduledDate=null로 서비스 위임)를 검증.
+            ReservationEntity reservation = ReservationEntity.reserve(userId, accountId, "005930",
+                    ReservationSideValue.SELL, ReservationTimingValue.PREV_CLOSE,
+                    ReservationOrderKindValue.AFTER_HOURS_CLOSE, 10, null, tomorrow, 0L, "idem-prevclose");
+            when(reservationService.placeReservation(eq(userId), argThat(cmd -> cmd.scheduledDate() == null)))
+                    .thenReturn(reservation);
+            PlaceReservationRequest request = PlaceReservationRequest.newBuilder()
+                    .setUserId(userId.toString()).setSymbol("005930")
+                    .setSide(OrderSide.ORDER_SIDE_SELL)
+                    .setTiming(ReservationTiming.RESERVATION_TIMING_PREV_CLOSE)
+                    .setKind(OrderKind.ORDER_KIND_AFTER_HOURS_CLOSE)
+                    .setQuantity(10)
+                    // scheduledDate 미설정 → 기본값 "" (blank)
+                    .build();
+
+            runWithActor(userId.toString(), () -> grpcService.placeReservation(request, placeObserver));
+
+            verify(reservationService).placeReservation(eq(userId), argThat(cmd -> cmd.scheduledDate() == null));
+            verify(placeObserver).onNext(any());
         }
 
         @Test
@@ -331,6 +410,21 @@ class ReservationGrpcServiceTest {
             assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
                     .isEqualTo(Status.Code.NOT_FOUND);
         }
+
+        @Test
+        void shouldMapAccountExceptionToGrpcStatus() {
+            when(reservationService.cancelReservation(eq(userId), any()))
+                    .thenThrow(new AccountException(AccountErrorCode.ACCOUNT_NOT_FOUND));
+            CancelReservationRequest request = CancelReservationRequest.newBuilder()
+                    .setUserId(userId.toString()).setReservationId(UUID.randomUUID().toString()).build();
+
+            runWithActor(userId.toString(), () -> grpcService.cancelReservation(request, cancelObserver));
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(cancelObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.NOT_FOUND);
+        }
     }
 
     @Nested
@@ -358,6 +452,30 @@ class ReservationGrpcServiceTest {
         }
 
         @Test
+        void shouldPassActualValuesWhenRequestFieldsAreProvided() {
+            // UNSPECIFIED/0/blank가 아닌 "진짜 새 값"을 보내는 분기 — 지금까지는 승계(null) 경로만 탔었음.
+            ReservationEntity amended = openLimitReservation();
+            when(reservationService.amendReservation(eq(userId), argThat(cmd ->
+                    cmd.timing() == ReservationTimingValue.OPEN
+                            && cmd.kind() == ReservationOrderKindValue.LIMIT
+                            && cmd.quantity() == 5L && cmd.price() == 80_000L
+                            && cmd.scheduledDate() != null)))
+                    .thenReturn(amended);
+            AmendReservationRequest request = AmendReservationRequest.newBuilder()
+                    .setUserId(userId.toString()).setReservationId(UUID.randomUUID().toString())
+                    .setTiming(ReservationTiming.RESERVATION_TIMING_OPEN)
+                    .setKind(OrderKind.ORDER_KIND_LIMIT)
+                    .setQuantity(5).setPrice(80_000)
+                    .setScheduledDate(tomorrow.toString())
+                    .build();
+
+            runWithActor(userId.toString(), () -> grpcService.amendReservation(request, amendObserver));
+
+            verify(reservationService).amendReservation(eq(userId), argThat(cmd ->
+                    cmd.timing() == ReservationTimingValue.OPEN && cmd.quantity() == 5L));
+        }
+
+        @Test
         void shouldMapMalformedReservationIdToInvalidIdFormat() {
             AmendReservationRequest request = AmendReservationRequest.newBuilder()
                     .setUserId(userId.toString()).setReservationId("not-a-uuid").build();
@@ -368,6 +486,36 @@ class ReservationGrpcServiceTest {
             verify(amendObserver).onError(captor.capture());
             assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
                     .isEqualTo(Status.Code.INVALID_ARGUMENT);
+        }
+
+        @Test
+        void shouldMapAccountExceptionToGrpcStatus() {
+            when(reservationService.amendReservation(eq(userId), any()))
+                    .thenThrow(new AccountException(AccountErrorCode.INSUFFICIENT_AVAILABLE_BALANCE));
+            AmendReservationRequest request = AmendReservationRequest.newBuilder()
+                    .setUserId(userId.toString()).setReservationId(UUID.randomUUID().toString()).build();
+
+            runWithActor(userId.toString(), () -> grpcService.amendReservation(request, amendObserver));
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(amendObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.FAILED_PRECONDITION);
+        }
+
+        @Test
+        void shouldMapDataIntegrityViolationToDuplicatePendingReservation() {
+            when(reservationService.amendReservation(eq(userId), any()))
+                    .thenThrow(new DataIntegrityViolationException("unique violation"));
+            AmendReservationRequest request = AmendReservationRequest.newBuilder()
+                    .setUserId(userId.toString()).setReservationId(UUID.randomUUID().toString()).build();
+
+            runWithActor(userId.toString(), () -> grpcService.amendReservation(request, amendObserver));
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(amendObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.FAILED_PRECONDITION);
         }
 
         @Test
@@ -405,6 +553,35 @@ class ReservationGrpcServiceTest {
         }
 
         @Test
+        void processOpenLimitReservations_shouldRejectMalformedScheduledDateFormat() {
+            ProcessOpenLimitReservationsRequest request = ProcessOpenLimitReservationsRequest.newBuilder()
+                    .setScheduledDate("2026/07/07").build();
+
+            grpcService.processOpenLimitReservations(request, processOpenLimitObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(processOpenLimitObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+            verifyNoInteractions(reservationBatchService);
+        }
+
+        @Test
+        void processOpenLimitReservations_shouldMapServiceReservationException() {
+            when(reservationBatchService.processOpenLimitReservations(tomorrow))
+                    .thenThrow(new ReservationException(ReservationErrorCode.BATCH_DEADLINE_PASSED));
+            ProcessOpenLimitReservationsRequest request = ProcessOpenLimitReservationsRequest.newBuilder()
+                    .setScheduledDate(tomorrow.toString()).build();
+
+            grpcService.processOpenLimitReservations(request, processOpenLimitObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(processOpenLimitObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.FAILED_PRECONDITION);
+        }
+
+        @Test
         void processOpenLimitReservations_shouldReturnProcessedCountOnSuccess() {
             when(reservationBatchService.processOpenLimitReservations(tomorrow)).thenReturn(5);
             ProcessOpenLimitReservationsRequest request = ProcessOpenLimitReservationsRequest.newBuilder()
@@ -419,6 +596,20 @@ class ReservationGrpcServiceTest {
         }
 
         @Test
+        void processPrevCloseReservations_shouldRejectBlankScheduledDate() {
+            ProcessPrevCloseReservationsRequest request =
+                    ProcessPrevCloseReservationsRequest.newBuilder().build();
+
+            grpcService.processPrevCloseReservations(request, prevCloseObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(prevCloseObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+            verifyNoInteractions(reservationBatchService);
+        }
+
+        @Test
         void processPrevCloseReservations_shouldReturnProcessedCount() {
             when(reservationBatchService.processPrevCloseReservations(tomorrow)).thenReturn(2);
             ProcessPrevCloseReservationsRequest request = ProcessPrevCloseReservationsRequest.newBuilder()
@@ -430,6 +621,20 @@ class ReservationGrpcServiceTest {
                     ArgumentCaptor.forClass(ProcessPrevCloseReservationsResponse.class);
             verify(prevCloseObserver).onNext(captor.capture());
             assertThat(captor.getValue().getProcessedCount()).isEqualTo(2);
+        }
+
+        @Test
+        void processTodayCloseReservations_shouldRejectBlankScheduledDate() {
+            ProcessTodayCloseReservationsRequest request =
+                    ProcessTodayCloseReservationsRequest.newBuilder().build();
+
+            grpcService.processTodayCloseReservations(request, todayCloseObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(todayCloseObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+            verifyNoInteractions(reservationBatchService);
         }
 
         @Test
@@ -459,7 +664,7 @@ class ReservationGrpcServiceTest {
         }
 
         @Test
-        void markReservationConverted_shouldMapMalformedIdToInvalidArgument() {
+        void markReservationConverted_shouldMapMalformedReservationIdToInvalidArgument() {
             MarkReservationConvertedRequest request = MarkReservationConvertedRequest.newBuilder()
                     .setReservationId("bad-id").setConvertedOrderId(UUID.randomUUID().toString()).build();
 
@@ -469,6 +674,39 @@ class ReservationGrpcServiceTest {
             verify(markConvertedObserver).onError(captor.capture());
             assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
                     .isEqualTo(Status.Code.INVALID_ARGUMENT);
+        }
+
+        @Test
+        void markReservationConverted_shouldMapMalformedConvertedOrderIdToInvalidArgument() {
+            MarkReservationConvertedRequest request = MarkReservationConvertedRequest.newBuilder()
+                    .setReservationId(UUID.randomUUID().toString()).setConvertedOrderId("bad-order-id").build();
+
+            grpcService.markReservationConverted(request, markConvertedObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(markConvertedObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+            verifyNoInteractions(reservationBatchService);
+        }
+
+        @Test
+        void markReservationConverted_shouldMapNotFoundWhenReservationMissingAfterMarkConverted() {
+            // markConverted 자체는 성공했는데(다른 트랜잭션이 이미 삭제했다거나 하는 극단 상황),
+            // 재조회 시점에 findById가 비어있는 경우 — RESERVATION_NOT_FOUND로 매핑돼야 한다.
+            UUID reservationId = UUID.randomUUID();
+            UUID orderId = UUID.randomUUID();
+            when(reservationRepository.findById(reservationId)).thenReturn(Optional.empty());
+            MarkReservationConvertedRequest request = MarkReservationConvertedRequest.newBuilder()
+                    .setReservationId(reservationId.toString())
+                    .setConvertedOrderId(orderId.toString()).build();
+
+            grpcService.markReservationConverted(request, markConvertedObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(markConvertedObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.NOT_FOUND);
         }
     }
 
@@ -489,6 +727,19 @@ class ReservationGrpcServiceTest {
                     ArgumentCaptor.forClass(ListOpenLimitReservationsResponse.class);
             verify(listOpenLimitObserver).onNext(captor.capture());
             assertThat(captor.getValue().getReservationIds(0)).isEqualTo(id.toString());
+        }
+
+        @Test
+        void listOpenLimitReservations_shouldRejectBlankScheduledDate() {
+            ListOpenLimitReservationsRequest request = ListOpenLimitReservationsRequest.newBuilder().build();
+
+            grpcService.listOpenLimitReservations(request, listOpenLimitObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(listOpenLimitObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+            verifyNoInteractions(reservationBatchService);
         }
 
         @Test
@@ -520,6 +771,22 @@ class ReservationGrpcServiceTest {
         }
 
         @Test
+        void processSingleOpenLimitReservation_shouldMapServiceReservationException() {
+            UUID id = UUID.randomUUID();
+            when(reservationBatchService.processSingleOpenLimitReservation(id))
+                    .thenThrow(new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+            ProcessSingleOpenLimitReservationRequest request =
+                    ProcessSingleOpenLimitReservationRequest.newBuilder().setReservationId(id.toString()).build();
+
+            grpcService.processSingleOpenLimitReservation(request, processSingleObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(processSingleObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.NOT_FOUND);
+        }
+
+        @Test
         void listStaleConvertingReservations_shouldRejectBlankScheduledDate() {
             ListStaleConvertingReservationsRequest request =
                     ListStaleConvertingReservationsRequest.newBuilder().build();
@@ -528,6 +795,18 @@ class ReservationGrpcServiceTest {
 
             verify(listStaleObserver).onError(any());
             verifyNoInteractions(reservationBatchService);
+        }
+
+        @Test
+        void listStaleConvertingReservations_shouldReturnIds() {
+            UUID id = UUID.randomUUID();
+            when(reservationBatchService.listStaleConvertingReservationIds(tomorrow)).thenReturn(List.of(id));
+            ListStaleConvertingReservationsRequest request = ListStaleConvertingReservationsRequest.newBuilder()
+                    .setScheduledDate(tomorrow.toString()).build();
+
+            grpcService.listStaleConvertingReservations(request, listStaleObserver);
+
+            verify(listStaleObserver).onNext(any());
         }
 
         @Test
@@ -546,6 +825,35 @@ class ReservationGrpcServiceTest {
         }
 
         @Test
+        void failStaleConvertingReservation_shouldMapServiceReservationException() {
+            UUID id = UUID.randomUUID();
+            when(reservationBatchService.failStaleConvertingReservation(id))
+                    .thenThrow(new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+            FailStaleConvertingReservationRequest request = FailStaleConvertingReservationRequest.newBuilder()
+                    .setReservationId(id.toString()).build();
+
+            grpcService.failStaleConvertingReservation(request, failStaleObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(failStaleObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.NOT_FOUND);
+        }
+
+        @Test
+        void failStaleConvertingReservation_shouldMapMalformedIdToInvalidArgument() {
+            FailStaleConvertingReservationRequest request = FailStaleConvertingReservationRequest.newBuilder()
+                    .setReservationId("bad").build();
+
+            grpcService.failStaleConvertingReservation(request, failStaleObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(failStaleObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+        }
+
+        @Test
         void listExpirableReservations_shouldReturnIds() {
             UUID id = UUID.randomUUID();
             when(reservationBatchService.listExpirableReservationIds(tomorrow)).thenReturn(List.of(id));
@@ -555,6 +863,19 @@ class ReservationGrpcServiceTest {
             grpcService.listExpirableReservations(request, listExpirableObserver);
 
             verify(listExpirableObserver).onNext(any());
+        }
+
+        @Test
+        void listExpirableReservations_shouldRejectBlankScheduledDate() {
+            ListExpirableReservationsRequest request = ListExpirableReservationsRequest.newBuilder().build();
+
+            grpcService.listExpirableReservations(request, listExpirableObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(listExpirableObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+            verifyNoInteractions(reservationBatchService);
         }
 
         @Test
@@ -580,6 +901,22 @@ class ReservationGrpcServiceTest {
             grpcService.expireReservation(request, expireObserver);
 
             verify(expireObserver).onError(any());
+        }
+
+        @Test
+        void expireReservation_shouldMapServiceReservationException() {
+            UUID id = UUID.randomUUID();
+            when(reservationBatchService.expireReservation(id))
+                    .thenThrow(new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+            ExpireReservationRequest request = ExpireReservationRequest.newBuilder()
+                    .setReservationId(id.toString()).build();
+
+            grpcService.expireReservation(request, expireObserver);
+
+            ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);
+            verify(expireObserver).onError(captor.capture());
+            assertThat(((StatusRuntimeException) captor.getValue()).getStatus().getCode())
+                    .isEqualTo(Status.Code.NOT_FOUND);
         }
     }
 

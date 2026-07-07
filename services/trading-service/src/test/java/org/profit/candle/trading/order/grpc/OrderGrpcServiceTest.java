@@ -185,6 +185,78 @@ class OrderGrpcServiceTest {
         }
 
         @Test
+        void shouldIncludeExecutionDetailsWhenMarketOrderFillsImmediately() {
+            // toProto()의 "execution != null" 분기 — 시장가는 즉시 체결되므로 같은 트랜잭션
+            // 안에서 ExecutionEntity가 이미 존재한다. 지금까지는 execution=null 케이스만 탔었음.
+            OrderEntity order = OrderEntity.place(userId, accountId, "005930", OrderSideValue.BUY,
+                    OrderKindValue.MARKET, 10, null, 0L, "idem-market");
+            order.fill();
+            ExecutionEntity execution = ExecutionEntity.create(order.getId(), 70_000L, 10, 105L, 0L,
+                    700_105L, java.time.Instant.now());
+            when(orderService.placeOrder(eq(userId), any())).thenReturn(order);
+            when(executionRepository.findByOrderId(order.getId())).thenReturn(Optional.of(execution));
+            PlaceOrderRequest request = PlaceOrderRequest.newBuilder()
+                    .setUserId(userId.toString()).setSymbol("005930")
+                    .setSide(OrderSide.ORDER_SIDE_BUY).setKind(OrderKind.ORDER_KIND_MARKET)
+                    .setQuantity(10).build();
+
+            runWithActor(userId.toString(), "idem-market", () -> grpcService.placeOrder(request, placeObserver));
+
+            ArgumentCaptor<PlaceOrderResponse> captor = ArgumentCaptor.forClass(PlaceOrderResponse.class);
+            verify(placeObserver).onNext(captor.capture());
+            assertThat(captor.getValue().getOrder().getExecutedPrice()).isEqualTo(70_000L);
+            assertThat(captor.getValue().getOrder().getNetAmount()).isEqualTo(700_105L);
+        }
+
+        @Test
+        void shouldThrowInvalidArgumentWhenSideUnspecified() {
+            // toSide()가 던지는 StatusRuntimeException은 OrderException이 아니라서
+            // catch 블록에 안 걸린다 — observer.onError가 아니라 메서드 자체가 던진다
+            // (ReservationGrpcService에서 발견된 것과 동일한 패턴).
+            PlaceOrderRequest request = PlaceOrderRequest.newBuilder()
+                    .setUserId(userId.toString()).setSymbol("005930")
+                    .setSide(OrderSide.ORDER_SIDE_UNSPECIFIED).setKind(OrderKind.ORDER_KIND_LIMIT)
+                    .setQuantity(10).setPrice(70_000).build();
+
+            assertThatThrownBy(() -> runWithActor(userId.toString(), "idem-side", () ->
+                    grpcService.placeOrder(request, placeObserver)))
+                    .isInstanceOf(StatusRuntimeException.class)
+                    .extracting(e -> ((StatusRuntimeException) e).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+            verifyNoInteractions(placeObserver);
+        }
+
+        @Test
+        void shouldThrowInvalidArgumentWhenKindUnspecified() {
+            PlaceOrderRequest request = PlaceOrderRequest.newBuilder()
+                    .setUserId(userId.toString()).setSymbol("005930")
+                    .setSide(OrderSide.ORDER_SIDE_BUY).setKind(OrderKind.ORDER_KIND_UNSPECIFIED)
+                    .setQuantity(10).setPrice(70_000).build();
+
+            assertThatThrownBy(() -> runWithActor(userId.toString(), "idem-kind", () ->
+                    grpcService.placeOrder(request, placeObserver)))
+                    .isInstanceOf(StatusRuntimeException.class)
+                    .extracting(e -> ((StatusRuntimeException) e).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+        }
+
+        @Test
+        void shouldThrowInvalidArgumentWhenKindIsAfterHoursClose() {
+            // OrderKind에는 AFTER_HOURS_CLOSE도 있지만 즉시 주문(OrderGrpcService)에서는
+            // MARKET/LIMIT만 허용된다 — default 분기의 또 다른 진입 경로.
+            PlaceOrderRequest request = PlaceOrderRequest.newBuilder()
+                    .setUserId(userId.toString()).setSymbol("005930")
+                    .setSide(OrderSide.ORDER_SIDE_BUY).setKind(OrderKind.ORDER_KIND_AFTER_HOURS_CLOSE)
+                    .setQuantity(10).build();
+
+            assertThatThrownBy(() -> runWithActor(userId.toString(), "idem-kind-2", () ->
+                    grpcService.placeOrder(request, placeObserver)))
+                    .isInstanceOf(StatusRuntimeException.class)
+                    .extracting(e -> ((StatusRuntimeException) e).getStatus().getCode())
+                    .isEqualTo(Status.Code.INVALID_ARGUMENT);
+        }
+
+        @Test
         void shouldMapAccountExceptionFromInsufficientBalanceToFailedPrecondition() {
             when(orderService.placeOrder(eq(userId), any()))
                     .thenThrow(new AccountException(AccountErrorCode.INSUFFICIENT_AVAILABLE_BALANCE));
