@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1220" viewBox="0 0 1800 1220">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#071521"/><stop offset="1" stop-color="#0D1E2B"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#F4C95D"/></marker>
+    <marker id="reply" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#91A4B7"/></marker>
+    <style>.title{font:700 38px Inter,Arial;fill:#F8FAFC}.sub{font:500 17px Inter,Arial;fill:#91A4B7}.actor{font:700 18px Inter,Arial;fill:#FFF4F2}.small{font:600 14px Inter,Arial;fill:#D5E2EC}.time{font:800 15px Inter,Arial;fill:#F4C95D}.rpc{font:700 16px Inter,Arial;fill:#F8FAFC}.note{font:500 14px Inter,Arial;fill:#AFC0CF}.lane{stroke:#34495A;stroke-width:2;stroke-dasharray:7 8}.call{stroke:#F4C95D;stroke-width:2.5;marker-end:url(#arrow)}.return{stroke:#91A4B7;stroke-width:2;stroke-dasharray:7 6;marker-end:url(#reply)}</style>
+  </defs>
+  <rect width="1800" height="1160" rx="34" fill="url(#bg)"/>
+  <text x="72" y="70" class="title">TRADING DAY · DETERMINISTIC JOB CHAIN</text>
+  <text x="72" y="103" class="sub">Batch는 순서를 통제하고, Trading과 Stock이 상태 변경과 Outbox를 소유합니다.</text>
+  <g transform="translate(70 145)">
+    <rect width="280" height="68" rx="18" fill="#3A2F0B" stroke="#F4C95D" stroke-width="2"/><text x="140" y="42" text-anchor="middle" class="actor" fill="#FFF9DB">CANDLE BATCH</text>
+    <rect x="500" width="280" height="68" rx="18" fill="#4A2028" stroke="#FF7A70" stroke-width="2"/><text x="640" y="42" text-anchor="middle" class="actor">TRADING SERVICE</text>
+    <rect x="1000" width="280" height="68" rx="18" fill="#073B32" stroke="#22C997" stroke-width="2"/><text x="1140" y="42" text-anchor="middle" class="actor" fill="#ECFFF8">STOCK SERVICE</text>
+    <rect x="1420" width="240" height="68" rx="18" fill="#263442" stroke="#94A3B8" stroke-width="2"/><text x="1540" y="33" text-anchor="middle" class="actor">DB · OUTBOX</text><text x="1540" y="53" text-anchor="middle" class="small">service-owned tx</text>
+    <path d="M140 68V930M640 68V930M1140 68V930M1540 68V930" class="lane"/>
+    <text x="15" y="134" class="time">08:30 KST</text><path d="M145 145H630" class="call"/><text x="390" y="134" text-anchor="middle" class="rpc">ProcessPrevCloseReservations(date)</text><path d="M650 175H1530" class="call"/><text x="1090" y="166" text-anchor="middle" class="note">예약 처리 + OrderFilled 계열 Outbox</text><path d="M630 205H150" class="return"/><text x="390" y="196" text-anchor="middle" class="small">processed_count</text>
+    <text x="15" y="274" class="time">09:00 KST</text><path d="M145 285H630" class="call"/><text x="390" y="274" text-anchor="middle" class="rpc">ProcessOpenLimitReservations(date)</text><path d="M650 315H1530" class="call"/><text x="1090" y="306" text-anchor="middle" class="note">예약 → 주문 전환 + Outbox</text><path d="M630 345H150" class="return"/><text x="390" y="336" text-anchor="middle" class="small">processed_count</text>
+    <text x="15" y="414" class="time">15:30 KST</text><path d="M145 425H630" class="call"/><text x="390" y="414" text-anchor="middle" class="rpc">ExpirePendingOrders()</text><path d="M650 455H1530" class="call"/><text x="1090" y="446" text-anchor="middle" class="note">미체결 주문 만료</text><path d="M630 485H150" class="return"/><text x="390" y="476" text-anchor="middle" class="small">cancelled_count · 실패하면 다음 Job 중단</text>
+    <path d="M145 535H630" class="call"/><text x="390" y="524" text-anchor="middle" class="rpc">ListStaleConvertingReservations(date)</text><path d="M630 565H150" class="return"/><text x="390" y="556" text-anchor="middle" class="small">reservation_ids</text><path d="M145 605H630" class="call"/><text x="390" y="594" text-anchor="middle" class="rpc">FailStaleConvertingReservation(id) × N</text>
+    <text x="15" y="674" class="time">15:40 KST</text><path d="M145 685H1130" class="call"/><text x="640" y="674" text-anchor="middle" class="rpc">CloseDailyCandles(date · deterministic key)</text><path d="M1130 715H150" class="return"/><text x="640" y="706" text-anchor="middle" class="small">closed_count · 실패하면 종가 예약 미호출</text>
+    <path d="M145 765H630" class="call"/><text x="390" y="754" text-anchor="middle" class="rpc">ProcessTodayCloseReservations(date)</text><path d="M650 795H1530" class="call"/><text x="1090" y="786" text-anchor="middle" class="note">종가 예약 처리 + Outbox</text><path d="M630 825H150" class="return"/><text x="390" y="816" text-anchor="middle" class="small">processed_count</text>
+    <path d="M145 875H630" class="call"/><text x="390" y="864" text-anchor="middle" class="rpc">ListExpirableReservations(date)</text><path d="M630 905H150" class="return"/><text x="390" y="896" text-anchor="middle" class="small">reservation_ids</text><path d="M145 945H630" class="call"/><text x="390" y="934" text-anchor="middle" class="rpc">ExpireReservation(id) × N</text>
+  </g>
+  <rect x="70" y="1150" width="1660" height="1" fill="#294052"/><circle cx="90" cy="1184" r="7" fill="#F4C95D" filter="url(#glow)"/><text x="110" y="1190" class="sub">노란 실선은 호출, 회색 점선은 응답입니다. 동일 거래일 실패 Job은 Spring Batch 메타데이터를 기준으로 재시작합니다.</text>
+</svg>
