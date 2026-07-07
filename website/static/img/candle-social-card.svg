@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Candle Engineering">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="30" x2="1120" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071521"/>
+      <stop offset="1" stop-color="#0B2A32"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(895 160) rotate(130) scale(400)">
+      <stop stop-color="#36D399" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#36D399" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" rx="40" fill="url(#bg)"/>
+  <rect width="1200" height="630" rx="40" fill="url(#glow)"/>
+  <text x="88" y="238" fill="#F6C453" font-family="Inter, sans-serif" font-size="28" font-weight="700" letter-spacing="6">CANDLE ENGINEERING</text>
+  <text x="88" y="335" fill="#F5F8FA" font-family="Inter, sans-serif" font-size="72" font-weight="800">Architecture that compounds.</text>
+  <text x="88" y="408" fill="#A9BCC9" font-family="Inter, sans-serif" font-size="30">Microservices · gRPC · Kafka · Spring Batch</text>
+  <path d="M1005 126c55 62 89 110 89 169 0 58-40 106-89 106s-89-48-89-106c0-42 25-80 58-122 4 36 15 56 31 67 14-30 15-63 0-114Z" fill="#F6C453"/>
+  <rect x="984" y="398" width="42" height="76" rx="21" fill="#36D399"/>
+</svg>
