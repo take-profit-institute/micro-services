@@ -26,9 +26,15 @@ spring:
     redis:
       host: localhost
       port: 6379
+      connect-timeout: ${MARKET_REDIS_CONNECT_TIMEOUT:1s}
+      timeout: ${MARKET_REDIS_TIMEOUT:1s}
 
 server:
   port: 8083
+management:
+  health:
+    redis:
+      enabled: ${MARKET_REDIS_HEALTH_ENABLED:false}
 market:
   quote:
     channel: ${MARKET_QUOTE_CHANNEL:market:quotes}

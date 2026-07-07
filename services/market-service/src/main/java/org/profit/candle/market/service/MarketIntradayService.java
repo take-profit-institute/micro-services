@@ -30,12 +30,14 @@ public class MarketIntradayService {
 
     private static final int DEFAULT_LIMIT = 600;
     private static final int MAX_LIMIT = 2000;
-    private static final Duration CACHE_TTL = Duration.ofSeconds(5);
+    private static final Duration CACHE_TTL = Duration.ofMinutes(1);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final KiwoomMarketClient kiwoomMarketClient;
+    private final IntradayTickCache redisCache;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
+    private final Map<String, Object> locks = new ConcurrentHashMap<>();
 
     private record Cached(List<IntradayTickResult> ticks, Instant at) {
     }
@@ -48,7 +50,29 @@ public class MarketIntradayService {
         if (cached != null && Duration.between(cached.at(), Instant.now()).compareTo(CACHE_TTL) < 0) {
             return trim(cached.ticks(), n);
         }
+        var redisTicks = redisCache.get(symbol);
+        if (redisTicks.isPresent() && !redisTicks.get().isEmpty()) {
+            List<IntradayTickResult> ticks = redisTicks.get();
+            cache.put(symbol, new Cached(ticks, Instant.now()));
+            return trim(ticks, n);
+        }
 
+        synchronized (locks.computeIfAbsent(symbol, ignored -> new Object())) {
+            cached = cache.get(symbol);
+            if (cached != null && Duration.between(cached.at(), Instant.now()).compareTo(CACHE_TTL) < 0) {
+                return trim(cached.ticks(), n);
+            }
+            redisTicks = redisCache.get(symbol);
+            if (redisTicks.isPresent() && !redisTicks.get().isEmpty()) {
+                List<IntradayTickResult> ticks = redisTicks.get();
+                cache.put(symbol, new Cached(ticks, Instant.now()));
+                return trim(ticks, n);
+            }
+            return fetchAndCache(symbol, n, cached);
+        }
+    }
+
+    private List<IntradayTickResult> fetchAndCache(String symbol, int n, Cached cached) {
         List<IntradayTickResult> all;
         try {
             KiwoomTickChartResponse response = kiwoomMarketClient.getTickChart(symbol);
@@ -72,6 +96,7 @@ public class MarketIntradayService {
             return List.of();
         }
         cache.put(symbol, new Cached(all, Instant.now()));
+        redisCache.put(symbol, all, CACHE_TTL);
         return trim(all, n);
     }
 
