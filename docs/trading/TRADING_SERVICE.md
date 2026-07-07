@@ -19,6 +19,7 @@
 8. [데이터베이스 테이블 설명](#8-데이터베이스-테이블-설명)
 9. [API 계약 (Proto)](#9-api-계약-proto)
 10. [핵심 설계 결정 요약](#10-핵심-설계-결정-요약)
+11. [테스트는 어떻게 검증하나](#11-테스트는-어떻게-검증하나)
 
 ---
 
@@ -639,22 +640,29 @@ Kafka 전송에 실패하면(또는 발행 후 컨슈머가 재시작하면) 같
 
 ## 8. 데이터베이스 테이블 설명
 
-> **갱신 사항**: 이전 초안은 계좌/주문 테이블만 있는 단일 스키마를 가정했지만, 실제로는 **3개 스키마**(`account`/`order_svc`/`reservation`)에 각각 도메인 테이블 + `outbox_events` + `idempotency_records`가 있다. 컬럼명도 실제로는 `_krw` 접미사가 붙어 원 단위임을 명시한다.
+> **갱신 사항**: 이전 초안은 계좌/주문 테이블만 있는 단일 스키마를 가정했지만, 실제로는 **3개 스키마**(`account`/`order_svc`/`reservation`)에 각각 도메인 테이블 + `outbox_events` + `idempotency_records`가 있다. 이번 갱신에서는 실제 Flyway 마이그레이션 파일을 직접 확인해 컬럼뿐 아니라 **CHECK 제약·UNIQUE 인덱스·FK**까지 정확히 반영했다 — 이전 버전에 있던 오탈자(주문 상태에 `REJECTED`가 있다고 적었던 부분, 실제로는 `FAILED`가 맞다)도 이번에 바로잡았다.
 
 ### `account.accounts` — 계좌
 
 ```sql
 CREATE TABLE account.accounts (
   id          UUID PRIMARY KEY,
-  user_id     UUID NOT NULL UNIQUE,       -- Auth/User 서비스 소유, 값만 복사
-  status      VARCHAR(20) NOT NULL,       -- ACTIVE / INACTIVE
-  cash_krw    BIGINT NOT NULL,            -- 보유 현금(원 단위 정수)
-  locked_krw  BIGINT NOT NULL,            -- 주문/예약으로 잠긴 금액
-  created_at  TIMESTAMPTZ NOT NULL,
-  updated_at  TIMESTAMPTZ NOT NULL
+  user_id     UUID NOT NULL,
+  status      VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',   -- ACTIVE / INACTIVE
+  cash_krw    BIGINT NOT NULL DEFAULT 0,                -- 보유 현금(원 단위 정수)
+  locked_krw  BIGINT NOT NULL DEFAULT 0,                -- 잠금 금액
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT uq_accounts_user_id UNIQUE (user_id),                                -- 1인당 계좌 1개
+  CONSTRAINT chk_accounts_cash_non_negative CHECK (cash_krw >= 0),
+  CONSTRAINT chk_accounts_locked_non_negative CHECK (locked_krw >= 0),
+  CONSTRAINT chk_accounts_locked_not_exceed_cash CHECK (locked_krw <= cash_krw)   -- 잠금 금액이 현금을 못 넘음
 );
 -- 가용 금액 = cash_krw - locked_krw (DB 컬럼이 아니라 조회 시 계산)
 ```
+
+**갱신 사항**: `status`는 원래 PostgreSQL `ENUM` 타입(`account.account_status`)으로 만들었다가, JPA `@Enumerated(EnumType.STRING)`과의 궁합을 맞추기 위해 나중에 `VARCHAR(20)`으로 바꾼 이력이 있다(마이그레이션 `V20260704`). `locked_krw <= cash_krw` CHECK 제약이 눈여겨볼 만한데, 애플리케이션 코드가 잔고 잠금 검증을 실수해도 DB가 마지막 방어선 역할을 한다.
 
 금액을 `double`이 아닌 정수(`long`/`BIGINT`)로 저장하는 이유는 이전 초안과 동일 — 부동소수점 오차가 금융에서는 치명적이기 때문이다.
 
@@ -662,38 +670,72 @@ CREATE TABLE account.accounts (
 
 ```sql
 CREATE TABLE order_svc.orders (
-  id                 UUID PRIMARY KEY,
-  user_id            UUID NOT NULL,
-  account_id         UUID NOT NULL,        -- account 도메인 소유, 값만 복사
-  symbol             VARCHAR(20) NOT NULL, -- Market 도메인 소유, 값만 복사
-  side               VARCHAR(10) NOT NULL, -- BUY / SELL
-  order_kind         VARCHAR(10) NOT NULL, -- MARKET / LIMIT
-  quantity           BIGINT NOT NULL,
-  price_krw          BIGINT,               -- LIMIT일 때만 값 존재
-  reserved_amount_krw BIGINT NOT NULL,     -- 이 주문이 잠근 금액(BUY만 0보다 큼)
-  status             VARCHAR(10) NOT NULL, -- PENDING / FILLED / CANCELLED / REJECTED
-  parent_order_id    UUID,                 -- 정정 시 원 주문 참조
-  idempotency_key    UUID NOT NULL,
-  executed_at        TIMESTAMPTZ,
-  created_at         TIMESTAMPTZ NOT NULL,
-  updated_at         TIMESTAMPTZ NOT NULL
+  id                  UUID PRIMARY KEY,
+  user_id             UUID NOT NULL,
+  account_id          UUID NOT NULL,          -- account 도메인 소유, 값만 복사 (FK 없음)
+  symbol              VARCHAR(20) NOT NULL,   -- Market 도메인 소유, 값만 복사 (FK 없음)
+  side                VARCHAR(10) NOT NULL,   -- BUY / SELL
+  order_kind          VARCHAR(20) NOT NULL,   -- MARKET / LIMIT
+  quantity            BIGINT NOT NULL,
+  price_krw           BIGINT,                 -- LIMIT일 때만 값 존재
+  reserved_amount_krw BIGINT NOT NULL DEFAULT 0,
+  status              VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING / FILLED / CANCELLED / FAILED
+  parent_order_id     UUID,                   -- 정정 시 원 주문 참조 (self-FK)
+  idempotency_key     TEXT NOT NULL,
+  executed_at         TIMESTAMPTZ,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT uq_orders_idempotency_key UNIQUE (idempotency_key),
+  CONSTRAINT fk_orders_parent_order FOREIGN KEY (parent_order_id) REFERENCES order_svc.orders (id),
+  CONSTRAINT chk_orders_quantity_positive CHECK (quantity > 0),
+  CONSTRAINT chk_orders_price_krw_positive CHECK (price_krw IS NULL OR price_krw > 0),
+  -- LIMIT 주문은 price_krw 필수, MARKET 주문은 price_krw가 없어야 함
+  CONSTRAINT chk_orders_price_krw_by_kind CHECK (
+      (order_kind = 'LIMIT' AND price_krw IS NOT NULL)
+      OR (order_kind = 'MARKET' AND price_krw IS NULL)
+  ),
+  CONSTRAINT chk_orders_reserved_amount_non_negative CHECK (reserved_amount_krw >= 0)
 );
+
+-- 동일 계좌·동일 종목에 PENDING 주문 1건만 허용 (부분 유니크 인덱스)
+CREATE UNIQUE INDEX uq_orders_account_symbol_pending
+  ON order_svc.orders (account_id, symbol) WHERE status = 'PENDING';
+
+-- 사용자별 주문 목록 조회(상태 필터 + 최신순 정렬) 가속
+CREATE INDEX idx_orders_user_status_created_at
+  ON order_svc.orders (user_id, status, created_at DESC, id DESC);
 ```
+
+**갱신 사항 — proto와 실제 구현이 완전히 일치하진 않는다**: `trading_common.proto`의 `OrderStatus`에는 `ORDER_STATUS_REJECTED` 값이 정의돼 있지만, 실제 `order_svc.orders.status` 컬럼에는 그 값이 없다 — 주문 도메인이 실제로 쓰는 값은 `PENDING`/`FILLED`/`CANCELLED`/`FAILED` 4개뿐이다. 마찬가지로 `OrderKind`에는 `ORDER_KIND_AFTER_HOURS_CLOSE`가 있지만 이 값은 즉시 주문(order)이 아니라 **예약 주문(reservation) 쪽 `order_kind`가 재사용하는 값**이다 — `order_svc.orders`는 `MARKET`/`LIMIT` 두 개만 CHECK 제약으로 허용한다. proto가 두 도메인의 enum을 공유하다 보니 "정의는 돼 있지만 이 도메인에서는 안 쓰는 값"이 섞여 있는 셈이다.
+
+`동일 계좌·동일 종목 PENDING 주문 1건만 허용`이라는 규칙(6절에서 다시 설명)은 애플리케이션 코드의 `existsBy...` 체크뿐 아니라 **부분 유니크 인덱스로 DB 레벨에서도 이중으로 강제**된다 — 동시 요청 경쟁 상황에서도 중복 PENDING 주문이 절대 생기지 않는다.
 
 ### `order_svc.executions` — 체결 (신규, 이전 초안엔 없던 테이블)
 
 ```sql
 CREATE TABLE order_svc.executions (
-  id                  BIGSERIAL PRIMARY KEY,
-  order_id            UUID NOT NULL UNIQUE, -- 체결 전엔 row 자체가 없음
+  id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  order_id            UUID NOT NULL,
   executed_price_krw  BIGINT NOT NULL,
   executed_quantity   BIGINT NOT NULL,
-  fee_krw             BIGINT NOT NULL,      -- 매수/매도 공통 0.015%
-  tax_krw             BIGINT NOT NULL,      -- 거래세, 매도만 0.18%
-  net_amount_krw      BIGINT NOT NULL,      -- 매수: 체결금액+수수료 / 매도: 체결금액-수수료-거래세
-  executed_at         TIMESTAMPTZ NOT NULL  -- append-only: updated_at 없음
+  fee_krw             BIGINT NOT NULL,          -- 매수/매도 공통 0.015%
+  tax_krw             BIGINT NOT NULL DEFAULT 0, -- 거래세, 매도만 0.18%
+  net_amount_krw      BIGINT NOT NULL,
+  executed_at         TIMESTAMPTZ NOT NULL DEFAULT now(),  -- append-only: updated_at 없음
+
+  CONSTRAINT uq_executions_order_id UNIQUE (order_id),   -- 체결 전엔 row 자체가 없음(1:1)
+  CONSTRAINT fk_executions_order FOREIGN KEY (order_id) REFERENCES order_svc.orders (id),
+  CONSTRAINT chk_executions_price_positive CHECK (executed_price_krw > 0),
+  CONSTRAINT chk_executions_quantity_positive CHECK (executed_quantity > 0),
+  CONSTRAINT chk_executions_fee_non_negative CHECK (fee_krw >= 0),
+  CONSTRAINT chk_executions_tax_non_negative CHECK (tax_krw >= 0)
 );
+
+CREATE INDEX idx_executions_order_id ON order_svc.executions (order_id);
 ```
+
+주문 1건당 체결 1건(전량 체결만 지원, 분할 체결 없음)이라 `order_id`에 UNIQUE + FK를 걸어 정합성을 강제한다.
 
 ### `reservation.reservations` — 예약 주문 (신규, 이전 초안엔 없던 테이블)
 
@@ -703,22 +745,57 @@ CREATE TABLE reservation.reservations (
   user_id               UUID NOT NULL,
   account_id            UUID NOT NULL,
   symbol                VARCHAR(20) NOT NULL,
-  side                  VARCHAR(10) NOT NULL,
-  timing                VARCHAR(20) NOT NULL, -- OPEN / PREV_CLOSE / TODAY_CLOSE
-  order_kind            VARCHAR(20) NOT NULL, -- MARKET / LIMIT / AFTER_HOURS_CLOSE
+  side                  VARCHAR(10) NOT NULL,   -- BUY / SELL
+  timing                VARCHAR(20) NOT NULL,   -- OPEN / PREV_CLOSE / TODAY_CLOSE
+  order_kind            VARCHAR(30) NOT NULL,   -- MARKET / LIMIT / AFTER_HOURS_CLOSE
   quantity              BIGINT NOT NULL,
-  price_krw             BIGINT,                -- LIMIT(시가+지정가)일 때만 값 존재
+  price_krw             BIGINT,                  -- LIMIT(시가+지정가)일 때만 값 존재
   scheduled_date        DATE NOT NULL,
-  reserved_amount_krw   BIGINT NOT NULL,
-  status                VARCHAR(20) NOT NULL,  -- RESERVED/CONVERTING/EXECUTED/CANCELLED/FAILED/EXPIRED
-  converted_order_id    UUID,                  -- 시가+지정가 전환 완료 시에만 값 존재
-  parent_reservation_id UUID,                  -- 정정 시 원 예약 참조
-  idempotency_key       UUID NOT NULL,
+  reserved_amount_krw   BIGINT NOT NULL DEFAULT 0,
+  status                VARCHAR(20) NOT NULL DEFAULT 'RESERVED', -- RESERVED/CONVERTING/EXECUTED/CANCELLED/FAILED/EXPIRED
+  converted_order_id    UUID,                    -- 시가+지정가 전환 완료 시에만 값 존재
+  parent_reservation_id UUID REFERENCES reservation.reservations (id),  -- 정정 시 원 예약 참조(같은 스키마 내부 FK)
+  idempotency_key       TEXT NOT NULL,
   expires_at            TIMESTAMPTZ,
-  created_at            TIMESTAMPTZ NOT NULL,
-  updated_at            TIMESTAMPTZ NOT NULL
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT uq_reservations_idempotency_key UNIQUE (idempotency_key),
+  CONSTRAINT chk_reservations_side CHECK (side IN ('BUY', 'SELL')),
+  -- timing×order_kind 조합은 정확히 4가지만 허용 (아래 표 참고)
+  CONSTRAINT chk_reservations_timing_order_kind CHECK (
+      (timing = 'OPEN' AND order_kind IN ('MARKET', 'LIMIT'))
+      OR (timing IN ('TODAY_CLOSE', 'PREV_CLOSE') AND order_kind = 'AFTER_HOURS_CLOSE')
+  ),
+  CONSTRAINT chk_reservations_price_krw CHECK (
+      (order_kind = 'LIMIT' AND price_krw IS NOT NULL)
+      OR (order_kind != 'LIMIT' AND price_krw IS NULL)
+  )
 );
+
+-- 동일 계좌·동일 종목에 RESERVED 예약 1건만 허용(주문의 PENDING 유니크 인덱스와 같은 패턴)
+CREATE UNIQUE INDEX uq_reservations_account_symbol_reserved
+  ON reservation.reservations (account_id, symbol) WHERE status = 'RESERVED';
+
+-- 배치가 "오늘 처리할 RESERVED 건"을 조회할 때 타는 인덱스
+CREATE INDEX idx_reservations_batch_lookup
+  ON reservation.reservations (scheduled_date, status, timing) WHERE status = 'RESERVED';
+
+-- 사용자별 예약 목록 페이징 조회 가속
+CREATE INDEX idx_reservations_user_status_created_id
+  ON reservation.reservations (user_id, status, created_at DESC, id DESC);
 ```
+
+`timing × order_kind` 조합은 코드(4절)에서 본 것처럼 딱 4개만 허용된다 — CHECK 제약이 애플리케이션 검증과 동일한 규칙을 DB에도 걸어둔 것이다.
+
+| timing | order_kind | 의미 |
+|---|---|---|
+| OPEN | MARKET | 시가 + 시장가 |
+| OPEN | LIMIT | 시가 + 지정가 (유일하게 order_svc로 전환되는 케이스) |
+| PREV_CLOSE | AFTER_HOURS_CLOSE | 전일종가 |
+| TODAY_CLOSE | AFTER_HOURS_CLOSE | 당일종가 |
+
+**갱신 사항**: `parent_reservation_id` 컬럼은 정정(AmendReservation) 시 원 예약을 추적하기 위한 것으로, `reservation.reservations` 테이블 내부를 가리키는 self-FK다. order_svc의 `parent_order_id`와 완전히 같은 패턴이다.
 
 ### `account.consumed_events` — Kafka 컨슈머 멱등성 (신규)
 
@@ -726,7 +803,7 @@ CREATE TABLE reservation.reservations (
 CREATE TABLE account.consumed_events (
   event_id     UUID PRIMARY KEY,   -- 같은 이벤트 재수신 시 존재 여부만 확인
   event_type   VARCHAR(120) NOT NULL,
-  consumed_at  TIMESTAMPTZ NOT NULL
+  consumed_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
 
@@ -741,9 +818,12 @@ CREATE TABLE order_svc.outbox_events (
   occurred_at  TIMESTAMPTZ NOT NULL,
   published_at TIMESTAMPTZ              -- NULL이면 미발행
 );
--- account/reservation 스키마에도 동일 구조로 각각 존재 (엔티티명은
--- AccountOutboxEvent/OrderOutboxEvent/ReservationOutboxEvent로 클래스명 충돌 회피)
+
+-- 미발행 이벤트만 빠르게 조회하기 위한 인덱스(3개 스키마 각각 존재)
+CREATE INDEX idx_order_svc_outbox_events_pending
+  ON order_svc.outbox_events (occurred_at) WHERE published_at IS NULL;
 ```
+account/reservation 스키마에도 동일 구조로 각각 존재한다(엔티티명은 `AccountOutboxEvent`/`OrderOutboxEvent`/`ReservationOutboxEvent`로 클래스명 충돌을 회피).
 
 ### `<schema>.idempotency_records` — 멱등성 기록 (3개 스키마 각각 존재)
 
@@ -752,20 +832,18 @@ CREATE TABLE order_svc.idempotency_records (
   actor_id         VARCHAR(120) NOT NULL,
   operation        VARCHAR(200) NOT NULL,  -- gRPC full method name
   idempotency_key  VARCHAR(64) NOT NULL,
-  request_hash     CHAR(64) NOT NULL,
+  request_hash     VARCHAR(64) NOT NULL,
   response_payload BYTEA NOT NULL,         -- AES-256-GCM 암호화된 값 (평문 아님!)
   response_type    VARCHAR(200) NOT NULL,
   grpc_code        VARCHAR(40) NOT NULL,
-  created_at       TIMESTAMPTZ NOT NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at       TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (actor_id, operation, idempotency_key)
 );
--- account/reservation 스키마에도 동일 구조로 각각 존재
--- (AccountIdempotencyRecord/OrderIdempotencyRecord/ReservationIdempotencyRecord)
 ```
+account/reservation 스키마에도 동일 구조로 각각 존재한다(`AccountIdempotencyRecord`/`OrderIdempotencyRecord`/`ReservationIdempotencyRecord`).
 
 복합 기본키 설명은 이전 초안과 동일 — 같은 사용자가 다른 작업에, 또는 다른 사용자가 같은 UUID를 써도 충돌하지 않는다.
-
 ---
 
 ## 9. API 계약 (Proto)
@@ -778,7 +856,7 @@ CREATE TABLE order_svc.idempotency_records (
 |--------|-----|
 | `OrderSide` | `BUY`, `SELL` |
 | `OrderKind` | `MARKET`, `LIMIT`, `AFTER_HOURS_CLOSE` |
-| `OrderStatus` | `PENDING`, `FILLED`, `CANCELLED`, `REJECTED` |
+| `OrderStatus` | proto 정의: `PENDING`, `FILLED`, `CANCELLED`, `REJECTED`. **단, order_svc DB/엔티티가 실제로 쓰는 값은 `PENDING`/`FILLED`/`CANCELLED`/`FAILED`이며 `REJECTED`는 쓰이지 않는다**(8절 갱신 사항 참고) |
 | `ReservationTiming` | `OPEN`(시가), `PREV_CLOSE`(전일종가), `TODAY_CLOSE`(당일종가) |
 | `ReservationStatus` | `RESERVED`, `EXECUTED`, `CANCELLED`, `CONVERTING`, `FAILED`, `EXPIRED` |
 
@@ -836,4 +914,49 @@ CREATE TABLE order_svc.idempotency_records (
 
 ---
 
-*이 문서는 이전 온보딩 초안의 설명 방식(비유, ASCII 다이어그램, 코드 스니펫)을 유지하면서, 내용은 dev 브랜치의 실제 코드를 기준으로 갱신했다. "갱신 사항"/"신규"로 표시된 부분이 이전 초안과 달라졌거나 새로 추가된 지점이다.*
+## 11. 테스트는 어떻게 검증하나
+
+이전 초안에는 테스트 얘기가 아예 없었다. 이번에 실제 테스트 코드(26개 파일)를 열어봤더니, "이 코드가 진짜 의도대로 동작하는지"를 계층마다 다른 방식으로 확인하고 있었다 — 그 방식들을 소개한다.
+
+### 왜 계층마다 검증 방식이 다른가
+
+**비유**: 요리를 검증하는 방법은 재료에 따라 다르다. 채소는 손으로 만져보면 되지만(순수 단위 테스트), 고기는 온도계로 찔러봐야 하고(Mock으로 외부 의존성 대체), 완성된 코스 요리는 실제로 손님상에 나가는 절차 그대로 재현해봐야 한다(in-process 서버). Trading Service 테스트도 계층별로 딱 맞는 방식을 골라 쓰고 있다.
+
+| 계층 | 검증 방식 | 왜 이렇게 하는가 |
+|---|---|---|
+| Entity (`OrderEntity`, `ReservationEntity` 등) | Mock 없이 순수 단위 테스트 | 상태 전이 로직 자체는 외부 의존성이 없으므로 그냥 호출해서 결과만 확인하면 된다 |
+| 도메인 서비스 (`DefaultOrderService` 등) | Mockito로 리포지토리/외부 클라이언트를 Mock 처리 | 실제 DB 없이도 "이 조건일 때 이 메서드를 호출하는가"를 검증할 수 있다 |
+| gRPC 서비스 (`OrderGrpcService` 등) | Mockito + `@ParameterizedTest`/`@EnumSource` | 에러코드 → gRPC Status 매핑처럼 **경우의 수가 많은 로직**은 하나하나 손으로 테스트를 안 쓰고, enum 값 전체를 자동으로 순회하며 빠짐없이 검증한다 |
+| Kafka 컨슈머 (`ReservationDueConsumer` 등) | Mockito + **진짜 `ObjectMapper`** | 여기서 진짜로 확인하고 싶은 건 "역직렬화가 실제로 되는가"이기 때문에, 이 부분만큼은 Mock으로 대체하면 의미가 없다 |
+| 외부 gRPC 클라이언트 (`DefaultMarketSessionClient` 등) | **in-process gRPC 서버**를 직접 띄움 | Mockito로 스텁을 만들면 "요청을 특정 문자열로 만들어 보냈는가"까지는 확인 못 한다. 진짜 gRPC 프로토콜로 왕복시켜야 요청/응답 매핑이 실제로 맞는지 확인된다 |
+| 멱등성 처리(`IdempotencyExecutor`) | Mockito, 4단계 분기(해시 계산→조회→트랜잭션 실행→동시 경합 시 재조회) 전부 검증 | 6절에서 설명한 알고리즘이 정확히 코드에 반영됐는지 단계별로 확인한다 |
+
+### 예시 — gRPC 에러코드 매핑을 어떻게 "빠짐없이" 테스트하는가
+
+`OrderErrorCode`에 정의된 에러 코드가 10개가 넘는데, 이걸 gRPC `Status`로 바꾸는 로직(`toGrpcException`)이 하나라도 빠지면 클라이언트가 알 수 없는 오류를 받게 된다. 그래서 손으로 10개 테스트 메서드를 쓰는 대신, JUnit의 `@EnumSource`로 **enum 값 전체를 자동으로 순회**한다.
+
+```java
+@ParameterizedTest(name = "{0}")
+@EnumSource(OrderErrorCode.class)
+@DisplayName("OrderErrorCode 전체 값이 예외 없이 gRPC Status로 매핑된다")
+void shouldMapEveryOrderErrorCodeToSomeGrpcStatus(OrderErrorCode errorCode) {
+    when(orderService.placeOrder(eq(userId), any())).thenThrow(new OrderException(errorCode));
+    // ... PlaceOrder 호출 ...
+    // 어떤 에러코드가 새로 추가되더라도, 매핑이 누락되면 이 테스트가 바로 실패한다
+}
+```
+
+새로운 `OrderErrorCode` 값이 추가됐는데 `toGrpcException`에 매핑을 깜빡 잊으면, 이 테스트가 자동으로 잡아준다 — enum과 매핑 로직이 항상 같은 개수를 유지하도록 강제하는 셈이다.
+
+
+### 로컬에서 테스트 실행하기
+
+```bash
+./gradlew :trading-service:test
+```
+
+DB/Kafka/외부 서비스가 필요한 테스트는 거의 없다 — 대부분 Mockito Mock이나 in-process gRPC 서버로 대체되어 있어서, 별도 인프라 없이도 `./gradlew test` 한 줄로 대부분 검증된다. 실제 인프라가 필요한 건 서비스를 띄워서 손으로 확인할 때(8절에서 다룬 로컬 실행/grpcurl 시나리오)뿐이다.
+
+---
+
+*이 문서는 이전 온보딩 초안의 설명 방식(비유, ASCII 다이어그램, 코드 스니펫)을 유지하면서, 내용은 dev 브랜치의 실제 코드·Flyway 마이그레이션·테스트 코드를 기준으로 갱신했다. "갱신 사항"/"신규"로 표시된 부분이 이전 초안과 달라졌거나 새로 추가된 지점이다.*
