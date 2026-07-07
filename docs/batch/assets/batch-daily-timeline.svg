@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="620" viewBox="0 0 1800 620" role="img" aria-labelledby="title desc">
+<svg preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision" xmlns="http://www.w3.org/2000/svg" width="3600" height="1240" viewBox="0 0 1800 620" role="img" aria-labelledby="title desc">
   <title id="title">Candle Batch daily timeline</title>
   <desc id="desc">KST 08:30 Trading reservation processing through 16:30 Stock synchronization.</desc>
   <defs>
@@ -54,7 +54,7 @@
   <path d="M120 315H1680" stroke="url(#gold)" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
 
   <!-- 08:30 -->
-  <g filter="url(#shadow)">
+  <g>
     <rect x="70" y="168" width="222" height="118" rx="20" fill="url(#trading)" stroke="#FF7A70" stroke-width="2"/>
     <text x="92" y="205" fill="#FFB2AA" font-family="Inter, Pretendard, sans-serif" font-size="18" font-weight="700">08:30 · TRADING</text>
     <text x="92" y="239" fill="#FFF4F2" font-family="Inter, Pretendard, sans-serif" font-size="21" font-weight="700">PREV_CLOSE 예약</text>
@@ -63,7 +63,7 @@
   <circle cx="181" cy="315" r="12" fill="#071521" stroke="#FF7A70" stroke-width="5"/>
 
   <!-- 09:00 -->
-  <g filter="url(#shadow)">
+  <g>
     <rect x="309" y="344" width="222" height="118" rx="20" fill="url(#trading)" stroke="#FF7A70" stroke-width="2"/>
     <text x="331" y="381" fill="#FFB2AA" font-family="Inter, Pretendard, sans-serif" font-size="18" font-weight="700">09:00 · TRADING</text>
     <text x="331" y="415" fill="#FFF4F2" font-family="Inter, Pretendard, sans-serif" font-size="21" font-weight="700">OPEN + LIMIT</text>
@@ -72,7 +72,7 @@
   <circle cx="420" cy="315" r="12" fill="#071521" stroke="#FF7A70" stroke-width="5"/>
 
   <!-- 15:30 -->
-  <g filter="url(#shadow)">
+  <g>
     <rect x="548" y="156" width="236" height="130" rx="20" fill="url(#trading)" stroke="#FF7A70" stroke-width="2"/>
     <text x="570" y="193" fill="#FFB2AA" font-family="Inter, Pretendard, sans-serif" font-size="18" font-weight="700">15:30 · TRADING</text>
     <text x="570" y="227" fill="#FFF4F2" font-family="Inter, Pretendard, sans-serif" font-size="20" font-weight="700">미체결 만료</text>
@@ -81,7 +81,7 @@
   <circle cx="666" cy="315" r="12" fill="#071521" stroke="#FF7A70" stroke-width="5"/>
 
   <!-- 15:40 -->
-  <g filter="url(#shadow)">
+  <g>
     <rect x="801" y="344" width="236" height="130" rx="20" fill="url(#trading)" stroke="#FF7A70" stroke-width="2"/>
     <text x="823" y="381" fill="#FFB2AA" font-family="Inter, Pretendard, sans-serif" font-size="18" font-weight="700">15:40 · CLOSE</text>
     <text x="823" y="415" fill="#FFF4F2" font-family="Inter, Pretendard, sans-serif" font-size="20" font-weight="700">일봉 · 종가 예약</text>
@@ -90,7 +90,7 @@
   <circle cx="919" cy="315" r="12" fill="#071521" stroke="#FF7A70" stroke-width="5"/>
 
   <!-- 16:00 -->
-  <g filter="url(#shadow)">
+  <g>
     <rect x="1054" y="168" width="222" height="118" rx="20" fill="url(#portfolio)" stroke="#4DA3FF" stroke-width="2"/>
     <text x="1076" y="205" fill="#9CCBFF" font-family="Inter, Pretendard, sans-serif" font-size="18" font-weight="700">16:00 · PORTFOLIO</text>
     <text x="1076" y="239" fill="#EFF8FF" font-family="Inter, Pretendard, sans-serif" font-size="21" font-weight="700">EOD SNAPSHOT</text>
@@ -99,7 +99,7 @@
   <circle cx="1165" cy="315" r="12" fill="#071521" stroke="#4DA3FF" stroke-width="5"/>
 
   <!-- 16:20 -->
-  <g filter="url(#shadow)">
+  <g>
     <rect x="1293" y="344" width="222" height="118" rx="20" fill="url(#ranking)" stroke="#B794F4" stroke-width="2"/>
     <text x="1315" y="381" fill="#D7C1FF" font-family="Inter, Pretendard, sans-serif" font-size="18" font-weight="700">16:20 · RANKING</text>
     <text x="1315" y="415" fill="#FAF5FF" font-family="Inter, Pretendard, sans-serif" font-size="21" font-weight="700">DAILY FINALIZE</text>
@@ -108,7 +108,7 @@
   <circle cx="1404" cy="315" r="12" fill="#071521" stroke="#B794F4" stroke-width="5"/>
 
   <!-- 16:30 -->
-  <g filter="url(#shadow)">
+  <g>
     <rect x="1532" y="168" width="210" height="118" rx="20" fill="url(#stock)" stroke="#22C997" stroke-width="2"/>
     <text x="1554" y="205" fill="#8EF0D1" font-family="Inter, Pretendard, sans-serif" font-size="18" font-weight="700">16:30 · STOCK</text>
     <text x="1554" y="239" fill="#ECFFF8" font-family="Inter, Pretendard, sans-serif" font-size="21" font-weight="700">MASTER SYNC</text>

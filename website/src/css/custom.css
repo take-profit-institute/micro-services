@@ -56,8 +56,10 @@ body {
 .theme-doc-markdown img[src$='.svg'] {
   display: block;
   width: 100%;
+  height: auto;
   margin: 1.75rem auto;
   border-radius: 18px;
+  image-rendering: auto;
   box-shadow: 0 20px 55px rgba(2, 10, 18, 0.22);
 }
 

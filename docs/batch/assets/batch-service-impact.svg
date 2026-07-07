@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180">
+<svg preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision" xmlns="http://www.w3.org/2000/svg" width="3600" height="2360" viewBox="0 0 1800 1180">
   <defs>
     <linearGradient id="impactBg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#071521"/><stop offset="1" stop-color="#111A2C"/></linearGradient>
     <filter id="soft"><feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#000" flood-opacity=".28"/></filter>
@@ -13,7 +13,7 @@
   <text x="72" y="101" class="subtitle">Batch는 실행을 조정하고, 각 서비스는 자신의 데이터·Outbox·복구 경계를 소유합니다.</text>
 
   <text x="72" y="158" class="section">01 · ORCHESTRATION</text>
-  <g filter="url(#soft)">
+  <g>
     <rect x="70" y="185" width="350" height="92" rx="20" class="job"/><text x="245" y="222" text-anchor="middle" class="head">TRADING JOBS</text><text x="245" y="248" text-anchor="middle" class="body">08:30 · 09:00 · 15:30 · 15:40</text>
     <rect x="465" y="185" width="300" height="92" rx="20" class="job"/><text x="615" y="222" text-anchor="middle" class="head">STOCK JOBS</text><text x="615" y="248" text-anchor="middle" class="body">15:40 Close · 16:30 Sync</text>
     <rect x="810" y="185" width="300" height="92" rx="20" class="job"/><text x="960" y="222" text-anchor="middle" class="head">PORTFOLIO EOD</text><text x="960" y="248" text-anchor="middle" class="body">16:00 · businessDate</text>
@@ -27,7 +27,7 @@
   <path d="M1350 277V380" class="line"/>
   <rect x="55" y="325" width="350" height="40" rx="8" fill="#081622"/>
   <text x="72" y="350" class="section">02 · SERVICE-OWNED STATE</text>
-  <g filter="url(#soft)">
+  <g>
     <rect x="70" y="380" width="350" height="190" rx="24" fill="#4A2028" stroke="#FF7A70" stroke-width="2"/><text x="245" y="418" text-anchor="middle" class="head">TRADING</text><text x="245" y="449" text-anchor="middle" class="body">reservation.reservations</text><text x="245" y="475" text-anchor="middle" class="body">order_svc.orders · executions</text><text x="245" y="501" text-anchor="middle" class="body">account balances</text><text x="245" y="527" text-anchor="middle" class="body">domain Outbox events</text><rect x="152" y="540" width="186" height="24" rx="12" fill="#6B2A35"/><text x="245" y="557" text-anchor="middle" class="tiny" fill="#FFF4F2">transaction owner</text>
     <rect x="465" y="380" width="300" height="190" rx="24" fill="#073B32" stroke="#22C997" stroke-width="2"/><text x="615" y="418" text-anchor="middle" class="head">STOCK</text><text x="615" y="449" text-anchor="middle" class="body">confirmed daily candles</text><text x="615" y="475" text-anchor="middle" class="body">stocks · synced_at</text><text x="615" y="501" text-anchor="middle" class="body">Stock Outbox</text><text x="615" y="527" text-anchor="middle" class="body">Kiwoom integration</text><rect x="527" y="540" width="176" height="24" rx="12" fill="#0D594A"/><text x="615" y="557" text-anchor="middle" class="tiny" fill="#ECFFF8">transaction owner</text>
     <rect x="810" y="380" width="300" height="190" rx="24" fill="#102A43" stroke="#4DA3FF" stroke-width="2"/><text x="960" y="418" text-anchor="middle" class="head">PORTFOLIO</text><text x="960" y="449" text-anchor="middle" class="body">active holdings</text><text x="960" y="475" text-anchor="middle" class="body">portfolio_snapshots</text><text x="960" y="501" text-anchor="middle" class="body">daily profit · return rate</text><text x="960" y="527" text-anchor="middle" class="body">history read model</text><rect x="872" y="540" width="176" height="24" rx="12" fill="#173E64"/><text x="960" y="557" text-anchor="middle" class="tiny" fill="#EFF8FF">metric owner</text>
@@ -40,7 +40,7 @@
   <path d="M1545 475H1590" class="dash"/>
 
   <text x="72" y="650" class="section">03 · FAILURE CONTAINMENT</text>
-  <g filter="url(#soft)">
+  <g>
     <rect x="70" y="680" width="510" height="170" rx="22" fill="#132330" stroke="#5D7183" stroke-width="2"/><circle cx="106" cy="719" r="9" fill="#FF7A70"/><text x="132" y="726" class="head">DEPENDENT CHAIN STOPS</text><text x="98" y="763" class="body">• 선행 Trading Job 실패 → 종속 Job 미실행</text><text x="98" y="792" class="body">• 일봉 마감 실패 → 종가 예약 처리 미호출</text><text x="98" y="821" class="body">• EOD 미완료 → Ranking RPC 미호출</text>
     <rect x="645" y="680" width="510" height="170" rx="22" fill="#132330" stroke="#5D7183" stroke-width="2"/><circle cx="681" cy="719" r="9" fill="#F4C95D"/><text x="707" y="726" class="head">COMMITTED DATA STAYS</text><text x="673" y="763" class="body">• Ranking 실패가 Portfolio EOD를 rollback하지 않음</text><text x="673" y="792" class="body">• Stock Sync 실패가 당일 Ranking을 삭제하지 않음</text><text x="673" y="821" class="body">• 서비스별 transaction 경계 유지</text>
     <rect x="1220" y="680" width="515" height="170" rx="22" fill="#132330" stroke="#5D7183" stroke-width="2"/><circle cx="1256" cy="719" r="9" fill="#22C997"/><text x="1282" y="726" class="head">RESTART SAFELY</text><text x="1248" y="763" class="body">• 동일 거래일 JobInstance와 Step context 사용</text><text x="1248" y="792" class="body">• 상태 변경 RPC는 동일 멱등성 키 유지</text><text x="1248" y="821" class="body">• Outbox publisher와 consumer dedup으로 복구</text>
