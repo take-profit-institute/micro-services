@@ -67,3 +67,13 @@ body {
   display: table;
   width: 100%;
 }
+
+/* Wide architecture diagrams use the reading area instead of being squeezed by the desktop TOC. */
+.docs-doc-page:has(.candle-svg-preview) .theme-doc-toc-desktop {
+  display: none;
+}
+
+.docs-doc-page:has(.candle-svg-preview) main .row > .col {
+  max-width: 100%;
+  flex-basis: 100%;
+}
