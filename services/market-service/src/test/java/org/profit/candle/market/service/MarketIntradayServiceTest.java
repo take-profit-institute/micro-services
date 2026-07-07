@@ -5,8 +5,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -17,9 +20,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.profit.candle.market.client.KiwoomMarketClient;
 import org.profit.candle.market.dto.IntradayTickResult;
 import org.profit.candle.market.dto.response.KiwoomTickChartResponse;
+import org.profit.candle.market.session.MarketSession;
+import org.profit.candle.market.session.TradingCalendar;
 
 @ExtendWith(MockitoExtension.class)
 class MarketIntradayServiceTest {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final TradingCalendar NO_HOLIDAYS = date -> false;
 
     @Mock
     KiwoomMarketClient kiwoomMarketClient;
@@ -30,7 +38,7 @@ class MarketIntradayServiceTest {
         when(kiwoomMarketClient.getTickChart("000660"))
                 .thenReturn(response(List.of()))
                 .thenReturn(response(List.of(item("+2187000", "20260707151928"))));
-        MarketIntradayService service = new MarketIntradayService(kiwoomMarketClient, cache);
+        MarketIntradayService service = new MarketIntradayService(kiwoomMarketClient, cache, marketSession("2026-07-07T10:00:00"));
 
         assertThat(service.getIntradayTicks("000660", 0)).isEmpty();
         var ticks = service.getIntradayTicks("000660", 0);
@@ -46,7 +54,7 @@ class MarketIntradayServiceTest {
         FakeIntradayTickCache cache = new FakeIntradayTickCache();
         when(kiwoomMarketClient.getTickChart("000660"))
                 .thenReturn(response(List.of(item("+2187000", "20260707151928"))));
-        MarketIntradayService service = new MarketIntradayService(kiwoomMarketClient, cache);
+        MarketIntradayService service = new MarketIntradayService(kiwoomMarketClient, cache, marketSession("2026-07-07T10:00:00"));
 
         assertThat(service.getIntradayTicks("000660", 0)).hasSize(1);
         assertThat(service.getIntradayTicks("000660", 0)).hasSize(1);
@@ -58,13 +66,49 @@ class MarketIntradayServiceTest {
     void returnsRedisCachedTicksBeforeCallingKiwoom() {
         FakeIntradayTickCache cache = new FakeIntradayTickCache();
         cache.ticks = List.of(new IntradayTickResult(2_187_000L, Instant.parse("2026-07-07T06:19:28Z")));
-        MarketIntradayService service = new MarketIntradayService(kiwoomMarketClient, cache);
+        MarketIntradayService service = new MarketIntradayService(kiwoomMarketClient, cache, marketSession("2026-07-07T10:00:00"));
 
         var ticks = service.getIntradayTicks("000660", 0);
 
         assertThat(ticks).hasSize(1);
         assertThat(ticks.getFirst().price()).isEqualTo(2_187_000L);
         verify(kiwoomMarketClient, times(0)).getTickChart("000660");
+    }
+
+    @Test
+    void cachesUntilNextOpenWhenMarketIsClosed() {
+        FakeIntradayTickCache cache = new FakeIntradayTickCache();
+        when(kiwoomMarketClient.getTickChart("000660"))
+                .thenReturn(response(List.of(item("+2187000", "20260707151928"))));
+        MarketIntradayService service = new MarketIntradayService(
+                kiwoomMarketClient,
+                cache,
+                marketSession("2026-07-03T15:31:00")); // Friday after close
+
+        assertThat(service.getIntradayTicks("000660", 0)).hasSize(1);
+
+        assertThat(cache.ttls).hasSize(1);
+        assertThat(cache.ttls.getFirst()).isGreaterThan(Duration.ofDays(2));
+    }
+
+    @Test
+    void usesShortCacheDuringRegularMarketHours() {
+        FakeIntradayTickCache cache = new FakeIntradayTickCache();
+        when(kiwoomMarketClient.getTickChart("000660"))
+                .thenReturn(response(List.of(item("+2187000", "20260707151928"))));
+        MarketIntradayService service = new MarketIntradayService(
+                kiwoomMarketClient,
+                cache,
+                marketSession("2026-07-07T10:00:00"));
+
+        assertThat(service.getIntradayTicks("000660", 0)).hasSize(1);
+
+        assertThat(cache.ttls).containsExactly(Duration.ofMinutes(1));
+    }
+
+    private static MarketSession marketSession(String kstDateTime) {
+        Instant instant = LocalDateTime.parse(kstDateTime).atZone(KST).toInstant();
+        return new MarketSession(Clock.fixed(instant, KST), NO_HOLIDAYS);
     }
 
     private static KiwoomTickChartResponse response(List<KiwoomTickChartResponse.Item> ticks) {

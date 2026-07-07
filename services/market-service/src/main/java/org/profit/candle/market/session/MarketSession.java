@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.Duration;
 
 /**
  * 장 세션 런타임 상태.
@@ -65,6 +66,24 @@ public class MarketSession {
         LocalTime t = now().toLocalTime();
         boolean open = !t.isBefore(REGULAR_OPEN) && t.isBefore(REGULAR_CLOSE);
         return open ? "OPEN" : "CLOSED";
+    }
+
+    /** 다음 정규장 시작(거래일 09:00 KST)까지 남은 시간. 장중이면 0을 돌려준다. */
+    public Duration durationUntilNextRegularOpen() {
+        ZonedDateTime current = now();
+        if ("OPEN".equals(status())) {
+            return Duration.ZERO;
+        }
+
+        LocalDate candidate = current.toLocalDate();
+        if (!current.toLocalTime().isBefore(REGULAR_OPEN)) {
+            candidate = candidate.plusDays(1);
+        }
+        while (!isTradingDay(candidate)) {
+            candidate = candidate.plusDays(1);
+        }
+        ZonedDateTime nextOpen = ZonedDateTime.of(candidate, REGULAR_OPEN, KST);
+        return Duration.between(current, nextOpen);
     }
 
     /** WS를 붙여둬야 하는 시간대인가. 거래일의 연결창(08:50~15:40) 안이면 true. */
