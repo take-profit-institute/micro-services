@@ -57,3 +57,8 @@ docker-compose.override.yaml
 **/firebase-adminsdk.json
 # misc
 .DS_Store
+
+# Docusaurus
+website/node_modules/
+website/build/
+website/.docusaurus/
