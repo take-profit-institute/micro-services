@@ -49,14 +49,28 @@ public class MarketIntradayService {
             return trim(cached.ticks(), n);
         }
 
-        KiwoomTickChartResponse response = kiwoomMarketClient.getTickChart(symbol);
-        List<IntradayTickResult> all = response.ticks() == null ? List.of()
-                : response.ticks().stream()
-                        .map(this::toResult)
-                        .filter(Objects::nonNull)
-                        .sorted(Comparator.comparing(IntradayTickResult::time)) // 오래된 -> 최신
-                        .toList();
+        List<IntradayTickResult> all;
+        try {
+            KiwoomTickChartResponse response = kiwoomMarketClient.getTickChart(symbol);
+            all = response.ticks() == null ? List.of()
+                    : response.ticks().stream()
+                            .map(this::toResult)
+                            .filter(Objects::nonNull)
+                            .sorted(Comparator.comparing(IntradayTickResult::time)) // 오래된 -> 최신
+                            .toList();
+        } catch (RuntimeException exception) {
+            if (cached != null && !cached.ticks().isEmpty()) {
+                return trim(cached.ticks(), n);
+            }
+            throw exception;
+        }
 
+        if (all.isEmpty() && cached != null && !cached.ticks().isEmpty()) {
+            return trim(cached.ticks(), n);
+        }
+        if (all.isEmpty()) {
+            return List.of();
+        }
         cache.put(symbol, new Cached(all, Instant.now()));
         return trim(all, n);
     }
