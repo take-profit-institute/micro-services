@@ -94,6 +94,11 @@ public class DefaultOrderService implements OrderService {
             return orderExecutionService.fillMarketOrder(order.getId());
         }
 
+        // EXE-002 보완: 지정가라도 접수 시점에 이미 현재가 조건을 만족하면(매수를 현재가보다
+        // 높게, 매도를 현재가보다 낮게 부른 경우) 다음 시세 tick을 기다리지 않고 즉시 체결한다.
+        // 조건 미충족 시에는 order가 PENDING 그대로 반환된다.
+        orderExecutionService.fillLimitOrderIfConditionMetOnPlacement(order);
+
         return order;
     }
 
@@ -139,6 +144,12 @@ public class DefaultOrderService implements OrderService {
                         order.getId().toString(), userId.toString(), order.getSymbol(),
                         order.getSide().name(), order.getQuantity(),
                         order.getPriceKrw() == null ? 0 : order.getPriceKrw(), reservedAmountKrw));
+
+        // OPEN+LIMIT 예약 전환도 09:00 시가 현재가가 이미 지정가 조건을 만족할 수 있다
+        // (일반 접수와 동일 원칙) — 다음 tick을 기다리지 않고 이 시점에 즉시 확인한다.
+        if (command.kind() == OrderKindValue.LIMIT) {
+            orderExecutionService.fillLimitOrderIfConditionMetOnPlacement(order);
+        }
 
         return order;
     }
@@ -219,6 +230,10 @@ public class DefaultOrderService implements OrderService {
                 new OrderAmendedPayload(amended.getId().toString(), original.getId().toString(),
                         userId.toString(), original.getSymbol(), amended.getQuantity(),
                         amended.getPriceKrw() == null ? 0L : amended.getPriceKrw(), newReservedAmountKrw));
+
+        // amend는 "취소 + 재생성"이라 새로 만들어진 amended도 신규 지정가 주문과 동일하게
+        // 접수 즉시 조건체결 체크를 거친다 (정정가를 현재가보다 유리하게 바꾼 경우 대응).
+        orderExecutionService.fillLimitOrderIfConditionMetOnPlacement(amended);
 
         return amended;
     }

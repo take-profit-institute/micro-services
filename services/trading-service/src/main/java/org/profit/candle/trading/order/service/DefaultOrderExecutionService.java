@@ -181,4 +181,33 @@ public class DefaultOrderExecutionService implements OrderExecutionService {
         }
         return count;
     }
+
+    @Override
+    public void fillLimitOrderIfConditionMetOnPlacement(OrderEntity order) {
+        long currentPriceKrw;
+        try {
+            currentPriceKrw = marketPriceProvider.getCurrentPriceKrw(order.getSymbol());
+        } catch (OrderException e) {
+            // 현재가 조회 실패(market-service 장애 등)로 접수 자체를 실패시키지 않는다.
+            // PENDING 상태로 남겨두면 이후 tick 기반 EXE-002가 잡아준다.
+            log.warn("접수 즉시 조건체결 확인 중 현재가 조회 실패 — orderId={}, symbol={}",
+                    order.getId(), order.getSymbol(), e);
+            return;
+        }
+
+        // BUY: 부른 값(price)이 현재가보다 높거나 같으면 즉시 매수 체결
+        // SELL: 부른 값(price)이 현재가보다 낮거나 같으면 즉시 매도 체결
+        boolean mayFill = switch (order.getSide()) {
+            case BUY -> currentPriceKrw <= order.getPriceKrw();
+            case SELL -> currentPriceKrw >= order.getPriceKrw();
+        };
+        if (!mayFill) {
+            return;
+        }
+
+        // fillIfConditionMet은 락 재획득 후 조건을 다시 검증하고 체결한다. 같은 트랜잭션(같은
+        // 영속성 컨텍스트) 안이라 findByIdForUpdate가 반환하는 인스턴스는 호출부가 들고 있는
+        // order와 동일한 identity라서, 별도로 재조회하지 않아도 order.fill() 결과가 반영된다.
+        limitFillExecutor.fillIfConditionMet(order.getId(), currentPriceKrw);
+    }
 }
