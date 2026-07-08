@@ -9,6 +9,8 @@ spring:
       channel:
         market-service:
           target: ${MARKET_SERVICE_GRPC_ADDRESS:static://localhost:50063}
+        trading-service:
+          target: ${TRADING_SERVICE_GRPC_ADDRESS:static://localhost:50054}
   datasource:
     url: ${PORTFOLIO_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=portfolio,public}
     username: ${PORTFOLIO_DB_USERNAME:candle}

@@ -10,6 +10,7 @@ import org.profit.candle.portfolio.analytics.dto.TradingStatsResult;
 import org.profit.candle.portfolio.analytics.entity.PortfolioSnapshotEntity;
 import org.profit.candle.portfolio.analytics.market.MarketQuoteClient;
 import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotReader;
+import org.profit.candle.portfolio.analytics.trading.TradingBalanceClient;
 import org.profit.candle.portfolio.holding.entity.HoldingEntity;
 import org.profit.candle.portfolio.holding.repository.HoldingReader;
 import org.profit.candle.portfolio.holding.trade.entity.RealizedTradeEntity;
@@ -35,6 +36,7 @@ public class DefaultPortfolioAnalyticsService implements PortfolioAnalyticsServi
     private final PortfolioSnapshotReader snapshotReader;
     private final RealizedTradeReader realizedTradeReader;
     private final MarketQuoteClient marketQuoteClient;
+    private final TradingBalanceClient tradingBalanceClient;
 
     @Override
     @Transactional(readOnly = true)
@@ -48,15 +50,25 @@ public class DefaultPortfolioAnalyticsService implements PortfolioAnalyticsServi
                 .mapToLong(h -> h.quantity() * currentPrice(h, currentPrices)).sum();
         long totalUnrealizedProfit = totalStockValue - totalBookValue;
         long totalRealizedProfit = all.stream().mapToLong(HoldingEntity::realizedProfit).sum();
+        long totalAsset = tradingBalanceClient.cash(userId) + totalStockValue;
 
         String totalReturnRate = totalBookValue > 0
                 ? String.format("%.2f", (double) totalUnrealizedProfit / totalBookValue * 100)
                 : "0.00";
 
-        // dayProfit / dayReturnRate: 전일 스냅샷 연동 필요 (현재는 0 반환)
+        PortfolioSnapshotEntity previousSnapshot = snapshotReader
+                .findLatestByUserId(userId)
+                .orElse(null);
+        long dayProfit = previousSnapshot != null
+                ? totalAsset - previousSnapshot.totalAsset()
+                : 0L;
+        String dayReturnRate = previousSnapshot != null && previousSnapshot.totalAsset() > 0
+                ? String.format("%.2f", (double) dayProfit / previousSnapshot.totalAsset() * 100)
+                : "0.00";
+
         return new PortfolioSummaryResult(
                 userId, totalBookValue, totalStockValue, totalUnrealizedProfit,
-                totalRealizedProfit, totalReturnRate, "0.00", 0L, active.size());
+                totalRealizedProfit, totalReturnRate, dayReturnRate, dayProfit, active.size());
     }
 
     @Override

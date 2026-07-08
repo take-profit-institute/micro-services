@@ -13,6 +13,7 @@ import org.profit.candle.portfolio.analytics.dto.TradingStatsResult;
 import org.profit.candle.portfolio.analytics.entity.PortfolioSnapshotEntity;
 import org.profit.candle.portfolio.analytics.market.MarketQuoteClient;
 import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotReader;
+import org.profit.candle.portfolio.analytics.trading.TradingBalanceClient;
 import org.profit.candle.portfolio.holding.entity.HoldingEntity;
 import org.profit.candle.portfolio.holding.entity.SellOutcome;
 import org.profit.candle.portfolio.holding.repository.HoldingReader;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +39,7 @@ class DefaultPortfolioAnalyticsServiceTest {
     @Mock PortfolioSnapshotReader snapshotReader;
     @Mock RealizedTradeReader realizedTradeReader;
     @Mock MarketQuoteClient marketQuoteClient;
+    @Mock TradingBalanceClient tradingBalanceClient;
     @InjectMocks DefaultPortfolioAnalyticsService service;
 
     private static final String USER_ID = "user-1";
@@ -101,6 +104,24 @@ class DefaultPortfolioAnalyticsServiceTest {
         assertThat(result.totalStockValue()).isEqualTo(900_000);
         assertThat(result.totalUnrealizedProfit()).isEqualTo(150_000);
         assertThat(result.totalReturnRate()).isEqualTo("20.00"); // 150000/750000*100
+    }
+
+    @Test
+    void getSummary_comparesCurrentTotalAssetWithLatestSnapshotForDayProfit() {
+        HoldingEntity h = holding("005930", 10, 75_000, "반도체");
+        when(holdingReader.findActiveByUserId(USER_ID)).thenReturn(List.of(h));
+        when(holdingReader.findByUserId(USER_ID)).thenReturn(List.of(h));
+        when(marketQuoteClient.currentPrices(List.of("005930")))
+                .thenReturn(Map.of("005930", 90_000L));
+        when(tradingBalanceClient.cash(USER_ID)).thenReturn(200_000L);
+        when(snapshotReader.findLatestByUserId(USER_ID))
+                .thenReturn(Optional.of(snapshot(LocalDate.now().minusDays(3), 1_000_000, 800_000, 0, "0.00")));
+
+        PortfolioSummaryResult result = service.getSummary(USER_ID);
+
+        assertThat(result.totalStockValue()).isEqualTo(900_000);
+        assertThat(result.dayProfit()).isEqualTo(100_000);
+        assertThat(result.dayReturnRate()).isEqualTo("10.00");
     }
 
     @Test
