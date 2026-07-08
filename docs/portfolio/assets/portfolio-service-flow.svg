@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .band { fill: #eef2f7; }
+      .title { font: 700 30px Arial, sans-serif; fill: #0f172a; }
+      .label { font: 700 18px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 14px Arial, sans-serif; fill: #334155; }
+      .tiny { font: 12px Arial, sans-serif; fill: #475569; }
+      .box { fill: #ffffff; stroke: #94a3b8; stroke-width: 2; rx: 8; }
+      .service { fill: #e0f2fe; stroke: #0284c7; }
+      .db { fill: #ecfdf5; stroke: #059669; }
+      .external { fill: #fff7ed; stroke: #ea580c; }
+      .event { fill: #fef2f2; stroke: #dc2626; }
+      .arrow { stroke: #334155; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dashed { stroke-dasharray: 7 6; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="760"/>
+  <text class="title" x="48" y="58">Portfolio Service Structure and Runtime Flow</text>
+
+  <rect class="band" x="40" y="90" width="1200" height="190" rx="8"/>
+  <text class="label" x="60" y="125">1. Holding read model update</text>
+
+  <rect class="box external" x="70" y="155" width="190" height="82"/>
+  <text class="label" x="98" y="188">trading-service</text>
+  <text class="small" x="96" y="214">OrderFilled event</text>
+
+  <rect class="box event" x="315" y="155" width="190" height="82"/>
+  <text class="label" x="360" y="188">Kafka</text>
+  <text class="small" x="333" y="214">trading.order-filled.v1</text>
+
+  <rect class="box service" x="560" y="145" width="215" height="102"/>
+  <text class="label" x="588" y="180">TradingEventConsumer</text>
+  <text class="small" x="588" y="207">parse payload</text>
+  <text class="small" x="588" y="229">dedup by orderId</text>
+
+  <rect class="box service" x="830" y="145" width="190" height="102"/>
+  <text class="label" x="862" y="180">HoldingService</text>
+  <text class="small" x="858" y="207">applyBuyFill</text>
+  <text class="small" x="858" y="229">applySellFill</text>
+
+  <rect class="box db" x="1060" y="125" width="145" height="142"/>
+  <text class="label" x="1084" y="160">portfolio DB</text>
+  <text class="small" x="1085" y="190">holdings</text>
+  <text class="small" x="1085" y="214">realized_trades</text>
+  <text class="small" x="1085" y="238">consumed_events</text>
+
+  <path class="arrow" d="M260 196 H315"/>
+  <path class="arrow" d="M505 196 H560"/>
+  <path class="arrow" d="M775 196 H830"/>
+  <path class="arrow" d="M1020 196 H1060"/>
+
+  <rect class="band" x="40" y="315" width="1200" height="210" rx="8"/>
+  <text class="label" x="60" y="350">2. Portfolio query path</text>
+
+  <rect class="box external" x="70" y="385" width="170" height="82"/>
+  <text class="label" x="122" y="418">BFF</text>
+  <text class="small" x="100" y="444">gRPC request</text>
+
+  <rect class="box service" x="295" y="365" width="215" height="122"/>
+  <text class="label" x="327" y="400">PortfolioGrpcService</text>
+  <text class="small" x="325" y="427">mapping only</text>
+  <text class="small" x="325" y="449">validation</text>
+  <text class="small" x="325" y="471">service call</text>
+
+  <rect class="box service" x="565" y="365" width="225" height="122"/>
+  <text class="label" x="595" y="400">AnalyticsService</text>
+  <text class="small" x="595" y="427">summary</text>
+  <text class="small" x="595" y="449">history</text>
+  <text class="small" x="595" y="471">sector / stats</text>
+
+  <rect class="box db" x="845" y="360" width="155" height="132"/>
+  <text class="label" x="873" y="395">portfolio DB</text>
+  <text class="small" x="875" y="422">holdings</text>
+  <text class="small" x="875" y="446">snapshots</text>
+  <text class="small" x="875" y="470">trades</text>
+
+  <rect class="box external" x="1055" y="330" width="145" height="72"/>
+  <text class="label" x="1075" y="362">market-service</text>
+  <text class="small" x="1087" y="386">BatchQuotes</text>
+
+  <rect class="box external" x="1055" y="435" width="145" height="72"/>
+  <text class="label" x="1075" y="467">trading-service</text>
+  <text class="small" x="1087" y="491">GetBalance</text>
+
+  <path class="arrow" d="M240 426 H295"/>
+  <path class="arrow" d="M510 426 H565"/>
+  <path class="arrow" d="M790 426 H845"/>
+  <path class="arrow dashed" d="M790 390 C890 310 965 330 1055 366"/>
+  <path class="arrow dashed" d="M790 462 C900 525 970 490 1055 471"/>
+
+  <rect class="band" x="40" y="560" width="1200" height="150" rx="8"/>
+  <text class="label" x="60" y="595">3. EOD snapshot path</text>
+
+  <rect class="box external" x="70" y="625" width="170" height="58"/>
+  <text class="label" x="105" y="660">batch service</text>
+
+  <rect class="box service" x="310" y="610" width="225" height="88"/>
+  <text class="label" x="338" y="642">PortfolioGrpcService</text>
+  <text class="small" x="345" y="668">RecordDailySnapshot</text>
+
+  <rect class="box service" x="605" y="610" width="230" height="88"/>
+  <text class="label" x="632" y="642">SnapshotService</text>
+  <text class="small" x="635" y="668">unique by user/date</text>
+
+  <rect class="box db" x="910" y="610" width="210" height="88"/>
+  <text class="label" x="943" y="642">portfolio_snapshots</text>
+  <text class="small" x="950" y="668">daily asset history</text>
+
+  <path class="arrow" d="M240 654 H310"/>
+  <path class="arrow" d="M535 654 H605"/>
+  <path class="arrow" d="M835 654 H910"/>
+</svg>
