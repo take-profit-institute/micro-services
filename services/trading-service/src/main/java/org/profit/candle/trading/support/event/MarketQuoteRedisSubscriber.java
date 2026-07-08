@@ -11,32 +11,21 @@ import org.profit.candle.trading.order.service.OrderExecutionService;
 import org.profit.candle.trading.reservation.service.ReservationBatchService;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
-import org.springframework.stereotype.Component;
 
 /**
- * market-service가 발행하는 {@code market:quotes} Redis Pub/Sub 채널을 구독해
- * 기존 {@code OrderMarketPriceConsumer}(Kafka) + {@code ReservationMarketPriceConsumer}(Kafka)
- * 두 개를 대체한다.
+ * market-service가 발행하는 {@code market:quotes} Redis Pub/Sub 채널을 구독하는 구현체.
  *
- * <p>market-service는 Kafka를 전혀 사용하지 않고 Redis Pub/Sub만 사용한다 — 기존
- * {@code market.order-book.v1} Kafka 토픽은 발행 주체가 없어 영구히 수신되지 않았다.
- * wishlist-service가 이미 동일 채널을 {@code RedisMarketQuoteSubscriber}로 구독 중이며,
- * 이 클래스는 그 구조를 그대로 미러링한다.</p>
+ * <p><b>[2026-07-08 현황] 현재 비활성화됨 — {@code @Component} 제거.</b> Redis/Kafka 두 구현체
+ * 중 팀장 결정으로 Kafka 경로({@code OrderMarketPriceConsumer}/{@code ReservationMarketPriceConsumer})만
+ * 활성화하기로 함. 이 클래스는 삭제하지 않고 대안 구현으로 남겨두되, Spring 빈으로 등록되지
+ * 않으므로 실제로는 아무 메시지도 처리하지 않는다.</p>
  *
- * <p>수행 순서:
- * 1. {@link CachedMarketPriceProvider} 캐시 갱신 — 시장가 즉시 체결(EXE-001)에서 사용
- * 2. {@link OrderExecutionService}로 PENDING 지정가 조건 체결(EXE-002)
- * 3. {@link ReservationBatchService}로 당일 OPEN+MARKET RESERVED 예약 체결
- * </p>
- *
- * <p><b>Kafka와의 차이 — 재시도 없음:</b> Redis Pub/Sub은 컨슈머 그룹/오프셋 개념이 없어
- * 발행 시점에 구독자가 없거나 처리 중 예외가 나도 재전달되지 않는다(at-most-once).
- * 기존 Kafka 컨슈머의 "예외 재throw → 오프셋 커밋 차단 → 재시도" 패턴은 여기서 의미가 없다.
- * 시세는 초 단위로 계속 재발행되고 아래 로직이 모두 멱등하게 짜여 있어(RESERVED가 아니면
- * skip 등) 실질적인 정합성 문제는 없지만, 이 특성 변화는 리뷰에서 명시적으로 인지해야 한다.</p>
+ * <p>다시 활성화하려면: 이 클래스에 {@code @Component}를 복원하고, {@code RedisListenerConfig}의
+ * {@code @Configuration}도 함께 복원해야 한다 — 그래야 {@code RedisMessageListenerContainer}가
+ * 이 subscriber를 주입받아 채널을 구독한다. 둘 중 하나만 켜면 Spring 컨텍스트 시작 시
+ * "MarketQuoteRedisSubscriber 빈을 찾을 수 없다"는 에러로 부팅이 실패한다.</p>
  */
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class MarketQuoteRedisSubscriber implements MessageListener {
 
@@ -91,7 +80,6 @@ public class MarketQuoteRedisSubscriber implements MessageListener {
             }
         } catch (RuntimeException e) {
             // Redis Pub/Sub은 재전달이 없다 — 여기서 던져도 재시도되지 않으므로 로그만 남긴다.
-            // 다음 tick이 곧 다시 들어오고 위 로직이 멱등하므로 실질적 영향은 제한적이다.
             log.error("현재가 이벤트 처리 실패 — symbol={}", tick.symbol(), e);
         }
     }
