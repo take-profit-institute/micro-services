@@ -1,5 +1,7 @@
 # Candle Batch Architecture
 
+![Batch architecture overview](./assets/batch-architecture-overview.svg)
+
 ## 1. 문서 목적
 
 이 문서는 Candle의 일일 Batch가 어떤 순서로 실행되고, 어떤 서비스에 영향을 주는지

@@ -11,6 +11,8 @@ import org.profit.candle.portfolio.holding.exception.HoldingErrorCode;
 import org.profit.candle.portfolio.holding.exception.HoldingException;
 import org.profit.candle.portfolio.holding.repository.HoldingReader;
 import org.profit.candle.portfolio.holding.repository.HoldingWriter;
+import org.profit.candle.portfolio.holding.stock.StockMetadata;
+import org.profit.candle.portfolio.holding.stock.StockMetadataClient;
 import org.profit.candle.portfolio.holding.trade.entity.RealizedTradeEntity;
 import org.profit.candle.portfolio.holding.trade.repository.RealizedTradeWriter;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,7 @@ public class DefaultHoldingService implements HoldingService {
     private final HoldingReader holdingReader;
     private final HoldingWriter holdingWriter;
     private final RealizedTradeWriter realizedTradeWriter;
+    private final StockMetadataClient stockMetadataClient;
 
     @Override
     @Transactional(readOnly = true)
@@ -87,7 +90,8 @@ public class DefaultHoldingService implements HoldingService {
     @Transactional
     public void applyBuyFill(String userId, String symbol, long quantity, long executedPrice) {
         HoldingEntity holding = holdingReader.findByUserIdAndSymbol(userId, symbol)
-                .orElseGet(() -> new HoldingEntity(userId, symbol, "", "", ""));
+                .orElseGet(() -> newHolding(userId, symbol));
+        enrichIfMissing(holding);
         holding.applyBuy(quantity, executedPrice);
         holdingWriter.save(holding);
     }
@@ -114,5 +118,20 @@ public class DefaultHoldingService implements HoldingService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private HoldingEntity newHolding(String userId, String symbol) {
+        StockMetadata metadata = stockMetadataClient.getMetadata(symbol);
+        return new HoldingEntity(userId, symbol, metadata.name(), metadata.sector(), metadata.market());
+    }
+
+    private void enrichIfMissing(HoldingEntity holding) {
+        if (!holding.metadataMissing()) {
+            return;
+        }
+        StockMetadata metadata = stockMetadataClient.getMetadata(holding.symbol());
+        if (!metadata.isBlank()) {
+            holding.enrichMetadata(metadata.name(), metadata.sector(), metadata.market());
+        }
     }
 }

@@ -1,5 +1,7 @@
 # News Service 운영 문서
 
+![News architecture overview](./assets/news-architecture-overview.svg)
+
 ## 1. 목적과 현재 전제
 
 `news-service`는 종목별 최신 뉴스를 수집하고 조회하는 서비스다. 현재 구현은 다음 전제를 가진다.

@@ -6,6 +6,10 @@ spring:
   grpc:
     server:
       port: ${MARKET_GRPC_PORT:50063}
+    client:
+      channel:
+        stock-service:
+          target: ${STOCK_SERVICE_GRPC_ADDRESS:static://localhost:50060}
   datasource:
     url: jdbc:postgresql://localhost:5433/market
     username: ${POSTGRES_USER:candle}
@@ -41,6 +45,8 @@ management:
 market:
   quote:
     channel: ${MARKET_QUOTE_CHANNEL:market:quotes}
+  price:
+    topic: ${MARKET_PRICE_TOPIC:market.price.v1}
   order-book:
     topic: ${MARKET_ORDER_BOOK_TOPIC:market.order-book.v1}
   ws:

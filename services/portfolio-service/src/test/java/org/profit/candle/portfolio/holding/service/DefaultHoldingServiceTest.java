@@ -11,6 +11,8 @@ import org.profit.candle.portfolio.holding.entity.HoldingEntity;
 import org.profit.candle.portfolio.holding.exception.HoldingErrorCode;
 import org.profit.candle.portfolio.holding.repository.HoldingReader;
 import org.profit.candle.portfolio.holding.repository.HoldingWriter;
+import org.profit.candle.portfolio.holding.stock.StockMetadata;
+import org.profit.candle.portfolio.holding.stock.StockMetadataClient;
 import org.profit.candle.portfolio.holding.trade.entity.RealizedTradeEntity;
 import org.profit.candle.portfolio.holding.trade.repository.RealizedTradeWriter;
 
@@ -21,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
@@ -33,6 +36,7 @@ class DefaultHoldingServiceTest {
     @Mock HoldingReader holdingReader;
     @Mock HoldingWriter holdingWriter;
     @Mock RealizedTradeWriter realizedTradeWriter;
+    @Mock StockMetadataClient stockMetadataClient;
     @InjectMocks DefaultHoldingService service;
 
     private static final String USER_ID = "user-1";
@@ -206,16 +210,39 @@ class DefaultHoldingServiceTest {
 
         assertThat(existing.quantity()).isEqualTo(15);
         verify(holdingWriter).save(existing);
+        verify(stockMetadataClient, never()).getMetadata(any(String.class));
     }
 
     @Test
-    void applyBuyFill_newHolding_createsEntityAndSaves() {
+    void applyBuyFill_newHolding_enrichesMetadataAndSaves() {
         when(holdingReader.findByUserIdAndSymbol(USER_ID, SYMBOL)).thenReturn(Optional.empty());
         when(holdingWriter.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(stockMetadataClient.getMetadata(SYMBOL))
+                .thenReturn(new StockMetadata("삼성전자", "반도체", "KOSPI"));
 
         service.applyBuyFill(USER_ID, SYMBOL, 10, 75_000);
 
-        verify(holdingWriter).save(any(HoldingEntity.class));
+        verify(holdingWriter).save(argThat(holding ->
+                holding.name().equals("삼성전자")
+                        && holding.sector().equals("반도체")
+                        && holding.market().equals("KOSPI")
+                        && holding.quantity() == 10));
+    }
+
+    @Test
+    void applyBuyFill_existingHoldingWithMissingMetadata_enrichesBeforeSave() {
+        HoldingEntity existing = new HoldingEntity(USER_ID, SYMBOL, "", "", "");
+        when(holdingReader.findByUserIdAndSymbol(USER_ID, SYMBOL)).thenReturn(Optional.of(existing));
+        when(holdingWriter.save(existing)).thenReturn(existing);
+        when(stockMetadataClient.getMetadata(SYMBOL))
+                .thenReturn(new StockMetadata("삼성전자", "반도체", "KOSPI"));
+
+        service.applyBuyFill(USER_ID, SYMBOL, 10, 75_000);
+
+        assertThat(existing.name()).isEqualTo("삼성전자");
+        assertThat(existing.sector()).isEqualTo("반도체");
+        assertThat(existing.market()).isEqualTo("KOSPI");
+        verify(holdingWriter).save(existing);
     }
 
     // ─── applySellFill ──────────────────────────────────────────────────────

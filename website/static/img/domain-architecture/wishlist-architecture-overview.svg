@@ -48,9 +48,9 @@
 
   <path d="M315 305H380" class="line"/>
   <path d="M725 236H820" class="line"/>
-  <path d="M725 286 C945 360 1030 238 1175 238" class="line dash"/>
+  <path d="M725 285 H790 V95 H1310 V160" class="line dash"/>
   <path d="M835 500H740" class="lineGreen"/>
-  <path d="M725 510H1175" class="lineGreen"/>
+  <path d="M725 548 H805 V625 H1310 V575" class="lineGreen"/>
   <path d="M560 330V415" class="line"/>
   <text x="70" y="690" class="small">Wishlist owns user watchlist and alert records · Market quote input via Redis · Market subscription demand via Outbox/Kafka</text>
 </svg>

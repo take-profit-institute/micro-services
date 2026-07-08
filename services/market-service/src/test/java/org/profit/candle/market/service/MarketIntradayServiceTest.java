@@ -83,7 +83,7 @@ class MarketIntradayServiceTest {
         MarketIntradayService service = new MarketIntradayService(
                 kiwoomMarketClient,
                 cache,
-                marketSession("2026-07-03T15:31:00")); // Friday after close
+                marketSession("2026-07-03T22:01:00")); // Friday after close (22:00)
 
         assertThat(service.getIntradayTicks("000660", 0)).hasSize(1);
 

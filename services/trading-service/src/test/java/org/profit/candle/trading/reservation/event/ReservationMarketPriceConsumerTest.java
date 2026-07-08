@@ -14,6 +14,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,7 +43,11 @@ class ReservationMarketPriceConsumerTest {
     }
 
     private ConsumerRecord<String, String> record(String json) {
-        return new ConsumerRecord<>("market.order-book.v1", 0, 0L, "005930", json);
+        return new ConsumerRecord<>("market.price.v1", 0, 0L, "005930", json);
+    }
+
+    private ConsumerRecord<String, Object> objectRecord(Object payload) {
+        return new ConsumerRecord<>("market.price.v1", 0, 0L, "005930", payload);
     }
 
     @Test
@@ -50,6 +56,31 @@ class ReservationMarketPriceConsumerTest {
         consumer.consume(record("""
                 {"symbol":"005930","price":70000}
                 """));
+
+        verify(reservationBatchService).processOpenMarketReservations(
+                LocalDate.of(2026, 7, 6), "005930", 70_000L);
+    }
+
+    @Test
+    @DisplayName("추가 필드가 붙어도 무시하고 처리한다")
+    void shouldIgnoreUnknownFields() {
+        consumer.consume(record("""
+                {"symbol":"005930","price":70000,"source":"websocket","quotedAt":"2026-07-08T10:00:00Z"}
+                """));
+
+        verify(reservationBatchService).processOpenMarketReservations(
+                LocalDate.of(2026, 7, 6), "005930", 70_000L);
+    }
+
+    @Test
+    @DisplayName("LinkedHashMap payload도 MarketPriceEvent로 변환해 처리한다")
+    void shouldHandleLinkedHashMapPayload() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("symbol", "005930");
+        payload.put("price", 70_000);
+        payload.put("ignored", "field");
+
+        consumer.consume(objectRecord(payload));
 
         verify(reservationBatchService).processOpenMarketReservations(
                 LocalDate.of(2026, 7, 6), "005930", 70_000L);

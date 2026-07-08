@@ -1,5 +1,7 @@
 # User Service 기능·연동·운영 가이드
 
+![User architecture overview](./assets/user-architecture-overview.svg)
+
 ## 1. 문서 목적과 책임
 
 User Service는 Candle 사용자의 프로필 Read/Write 모델을 소유한다. Auth가 발행한

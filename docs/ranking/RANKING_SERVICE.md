@@ -1,5 +1,7 @@
 # Ranking Service 기능·연동·운영 가이드
 
+![Ranking architecture overview](./assets/ranking-architecture-overview.svg)
+
 ## 1. 문서 목적과 책임
 
 Ranking Service는 Portfolio가 거래일별로 확정한 EOD 자산과 누적 수익률을 입력으로 받아

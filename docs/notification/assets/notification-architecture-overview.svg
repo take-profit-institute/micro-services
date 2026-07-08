@@ -10,8 +10,8 @@
   </defs>
   <rect class="bg" width="1500" height="750" rx="34"/>
   <path class="grid" d="M75 0V750 M150 0V750 M225 0V750 M300 0V750 M375 0V750 M450 0V750 M525 0V750 M600 0V750 M675 0V750 M750 0V750 M825 0V750 M900 0V750 M975 0V750 M1050 0V750 M1125 0V750 M1200 0V750 M1275 0V750 M1350 0V750 M1425 0V750 M0 90H1500 M0 180H1500 M0 270H1500 M0 360H1500 M0 450H1500 M0 540H1500 M0 630H1500"/>
-  <text x="64" y="76" class="title">NOTIFICATION SERVICE</text>
-  <text x="66" y="112" class="sub">gRPC COMMANDS · IDEMPOTENCY · FCM DELIVERY STATUS</text>
+  <text x="64" y="92" class="title">NOTIFICATION SERVICE</text>
+  <text x="66" y="128" class="sub">gRPC COMMANDS · IDEMPOTENCY · FCM DELIVERY STATUS</text>
 
   <rect x="70" y="235" width="250" height="130" rx="24" class="box"/>
   <text x="105" y="285" class="txt">CLIENT / SERVICE</text>
@@ -41,8 +41,8 @@
 
   <path d="M320 300H400" class="line"/>
   <path d="M745 245H835" class="line"/>
-  <path d="M745 330 C785 330 800 457 835 457" class="line dash"/>
+  <path d="M745 330 H790 V457 H835" class="line dash"/>
   <path d="M1130 310H1195" class="lineGreen"/>
-  <path d="M1210 360 C1140 560 970 570 990 525" class="lineGreen dash"/>
+  <path d="M1325 395 V590 H990 V540" class="lineGreen dash"/>
   <text x="70" y="690" class="small">State-changing RPCs use idempotency · FCM is called directly · Kafka relay is not implemented yet</text>
 </svg>

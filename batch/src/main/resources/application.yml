@@ -73,8 +73,9 @@ batch:
       enabled: ${BATCH_TRADING_ENABLED:false}
       previous-close-cron: "${BATCH_TRADING_PREVIOUS_CLOSE_CRON:0 30 8 * * MON-FRI}"
       open-limit-cron: "${BATCH_TRADING_OPEN_LIMIT_CRON:0 0 9 * * MON-FRI}"
-      market-close-cron: "${BATCH_TRADING_MARKET_CLOSE_CRON:0 30 15 * * MON-FRI}"
-      today-close-cron: "${BATCH_TRADING_TODAY_CLOSE_CRON:0 40 15 * * MON-FRI}"
+      # 데모 연장: 정규장 마감을 22:00으로 늘림에 맞춰 마감 배치도 22:00/22:10으로 이동(실 정규장은 15:30/15:40).
+      market-close-cron: "${BATCH_TRADING_MARKET_CLOSE_CRON:0 0 22 * * MON-FRI}"
+      today-close-cron: "${BATCH_TRADING_TODAY_CLOSE_CRON:0 10 22 * * MON-FRI}"
   grpc:
     market-target: market
     stock-target: stock
