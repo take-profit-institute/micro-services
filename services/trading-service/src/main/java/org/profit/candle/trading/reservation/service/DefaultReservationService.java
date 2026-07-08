@@ -138,6 +138,13 @@ public class DefaultReservationService implements ReservationService {
         // CAN-007: 정정은 원예약 취소 + 신규 예약 생성 방식으로 처리한다.
         ReservationCancelResult cancelResult = doCancel(original, userId);
 
+        // 원예약 CANCELLED UPDATE를 신규 RESERVED INSERT보다 먼저 DB에 반영한다.
+        // Hibernate 기본 flush 순서(insert→update) 때문에 flush를 강제하지 않으면
+        // 신규 INSERT 시점에 원본이 아직 RESERVED로 남아 부분 유니크 인덱스
+        // (uq_reservations_account_symbol_reserved: account_id+symbol+side WHERE status='RESERVED')를
+        // 위반해 DataIntegrityViolationException → DUPLICATE_PENDING_RESERVATION(422)로 터진다.
+        reservationRepository.flush();
+
         // null 필드는 원예약 값을 그대로 승계한다 (BFF AmendReservationBody: 모든 필드 선택).
         ReservationTimingValue timing = command.timing() != null ? command.timing() : original.getTiming();
         ReservationOrderKindValue kind = command.kind() != null ? command.kind() : original.getOrderKind();
