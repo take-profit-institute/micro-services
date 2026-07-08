@@ -36,6 +36,10 @@ public class NewsCollectionService {
     private final NewsCollectionSleeper sleeper;
 
     public NewsCollectionResult collectActiveTargets() {
+        return collectActiveTargets(null);
+    }
+
+    public NewsCollectionResult collectActiveTargets(String logMessagePrefix) {
         List<CollectionTarget> targets = targetRepository.findByActiveTrueOrderByPriorityAsc();
         int successCount = 0;
         int failCount = 0;
@@ -99,7 +103,7 @@ public class NewsCollectionService {
             }
         }
 
-        collectionWriter.recordLog(targets.size(), successCount, failCount, failureSummary.message());
+        collectionWriter.recordLog(targets.size(), successCount, failCount, logMessage(logMessagePrefix, failureSummary.message()));
         return new NewsCollectionResult(targets.size(), successCount, failCount);
     }
 
@@ -128,6 +132,17 @@ public class NewsCollectionService {
 
     private static boolean hasNextBatch(int batchEnd, int targetCount) {
         return batchEnd < targetCount;
+    }
+
+    private static String logMessage(String prefix, String message) {
+        if (prefix == null || prefix.isBlank()) {
+            return message;
+        }
+        String prefixedMessage = prefix + " " + message;
+        if (prefixedMessage.length() <= MESSAGE_LIMIT) {
+            return prefixedMessage;
+        }
+        return prefixedMessage.substring(0, MESSAGE_LIMIT);
     }
 
     record FailureDetail(
