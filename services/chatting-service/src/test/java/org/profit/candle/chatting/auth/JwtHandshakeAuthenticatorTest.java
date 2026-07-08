@@ -95,7 +95,7 @@ class JwtHandshakeAuthenticatorTest {
     private static ChatProperties properties(String issuer, String audience) {
         return new ChatProperties(
                 new ChatProperties.Jwt("http://unused/.well-known/jwks.json", issuer, audience),
-                new ChatProperties.Room(500, Duration.ofHours(2)),
+                new ChatProperties.Room(500, Duration.ofMinutes(1), Duration.ofSeconds(20)),
                 new ChatProperties.Cors(List.of()));
     }
 

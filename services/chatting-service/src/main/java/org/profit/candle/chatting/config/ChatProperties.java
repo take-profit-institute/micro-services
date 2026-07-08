@@ -22,7 +22,14 @@ public record ChatProperties(Jwt jwt, Room room, Cors cors) {
     public record Jwt(String jwkSetUri, String issuer, String audience) {
     }
 
-    public record Room(int capacity, Duration counterTtl) {
+    /**
+     * @param capacity    방 정원(초과 시 새 방 배정)
+     * @param presenceTtl heartbeat 없이 presence 멤버가 생존하는 시간. 이 시간 지나면 정리되어
+     *                    비정상 종료(브라우저 강제종료·네트워크 단절)로 새는 인원이 자가치유된다.
+     * @param heartbeat   커넥션이 자신의 presence(ZSET score)를 갱신하는 주기.
+     *                    {@code presenceTtl}의 약 1/3 권장(2~3회 누락까지 허용).
+     */
+    public record Room(int capacity, Duration presenceTtl, Duration heartbeat) {
     }
 
     public record Cors(List<String> allowedOriginPatterns) {

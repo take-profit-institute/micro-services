@@ -1,7 +1,9 @@
 package org.profit.candle.chatting.room;
 
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.chatting.config.ChatProperties;
+import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -10,6 +12,12 @@ import reactor.core.publisher.Mono;
 /**
  * Redis 기반 방 레지스트리 — 배정({@link RoomAssigner})과 인원 카운팅({@link RoomCounter})을 함께 구현한다.
  * 소비자는 필요한 인터페이스 하나만 주입받는다(REST는 배정, WS는 카운팅).
+ *
+ * <h3>presence 모델 — per-멤버 TTL(자가치유)</h3>
+ * 단일 INCR/DECR 카운터는 비정상 종료(DECR 누락)나 재연결(중복 INCR)로 영구히 드리프트한다. 대신
+ * 방마다 ZSET({@code {roomId}_presence})을 두어 member=커넥션, score=마지막 heartbeat 시각으로 관리한다.
+ * 활성 인원 = score가 {@code now - presenceTtl} 이후인 멤버 수. 조회 전 만료분을 정리하므로, leave가
+ * 누락돼도 heartbeat가 끊긴 멤버는 TTL 경과 후 자동으로 빠진다.
  *
  * <h3>동시성 — 낙관적(락 없음)</h3>
  * 버스트 시 같은 방에 순간적으로 정원을 넘겨 배정될 수 있으나, 주식 채팅 특성상 "대략 500명 안팎"이면
@@ -32,7 +40,7 @@ public class RedisRoomRegistry implements RoomAssigner, RoomCounter {
                 return allocateNewRoom(symbol);
             }
             return Flux.range(1, max)
-                    .concatMap(room -> count(new RoomKey(symbol, room))
+                    .concatMap(room -> activeCount(new RoomKey(symbol, room))
                             .map(current -> RoomAssignment.of(new RoomKey(symbol, room), current)))
                     .filter(assignment -> assignment.count() < properties.room().capacity())
                     .next()
@@ -41,21 +49,39 @@ public class RedisRoomRegistry implements RoomAssigner, RoomCounter {
     }
 
     @Override
-    public Mono<Long> enter(RoomKey key) {
-        return redis.opsForValue().increment(key.countKey())
-                .flatMap(value -> redis.expire(key.countKey(), properties.room().counterTtl()).thenReturn(value));
+    public Mono<Long> enter(RoomKey key, String memberId) {
+        return touch(key, memberId);
     }
 
     @Override
-    public Mono<Long> leave(RoomKey key) {
-        // 카운터를 0 미만으로 내리지 않는다. enter/leave 비대칭(조기 취소)이나
-        // TTL 만료 후 DECR로 키가 -1로 생성되는 경우, 음수 값이 배정 로직(count < capacity)을
-        // 왜곡하므로 0으로 바닥을 친다. 낙관적 설계에 맞춰 원자적 보장까지는 두지 않는다.
-        String countKey = key.countKey();
-        return redis.opsForValue().decrement(countKey)
-                .flatMap(value -> value < 0
-                        ? redis.opsForValue().set(countKey, "0").thenReturn(0L)
-                        : Mono.just(value));
+    public Mono<Long> heartbeat(RoomKey key, String memberId) {
+        return touch(key, memberId);
+    }
+
+    @Override
+    public Mono<Long> leave(RoomKey key, String memberId) {
+        return redis.opsForZSet().remove(key.presenceKey(), memberId)
+                .then(activeCount(key));
+    }
+
+    /** presence에 멤버 등록/갱신(ZADD score=now) + 키 TTL 안전망 → 정리 후 활성 인원 반환. */
+    private Mono<Long> touch(RoomKey key, String memberId) {
+        String presenceKey = key.presenceKey();
+        double now = Instant.now().toEpochMilli();
+        return redis.opsForZSet().add(presenceKey, memberId, now)
+                // 방이 완전히 비면(모든 멤버 만료) 메모리 회수되도록 키 자체에도 넉넉한 TTL을 건다.
+                .then(redis.expire(presenceKey, properties.room().presenceTtl().multipliedBy(2)))
+                .then(activeCount(key));
+    }
+
+    /** 만료(score < now - presenceTtl) 멤버를 정리한 뒤 활성 인원(ZCARD)을 센다. */
+    private Mono<Long> activeCount(RoomKey key) {
+        String presenceKey = key.presenceKey();
+        double cutoff = Instant.now().toEpochMilli() - properties.room().presenceTtl().toMillis();
+        return redis.opsForZSet().removeRangeByScore(presenceKey, Range.closed(0d, cutoff))
+                .then(redis.opsForZSet().size(presenceKey))
+                .map(size -> size == null ? 0L : size)
+                .defaultIfEmpty(0L);
     }
 
     private Mono<RoomAssignment> allocateNewRoom(String symbol) {
@@ -67,11 +93,5 @@ public class RedisRoomRegistry implements RoomAssigner, RoomCounter {
         return redis.opsForValue().get(ROOM_SEQ_PREFIX + symbol)
                 .map(Integer::parseInt)
                 .defaultIfEmpty(0);
-    }
-
-    private Mono<Long> count(RoomKey key) {
-        return redis.opsForValue().get(key.countKey())
-                .map(Long::parseLong)
-                .defaultIfEmpty(0L);
     }
 }

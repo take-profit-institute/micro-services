@@ -1,10 +1,13 @@
 package org.profit.candle.chatting.ws;
 
 import java.net.URI;
+import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.profit.candle.chatting.auth.HandshakeAuthenticator;
+import org.profit.candle.chatting.config.ChatProperties;
 import org.profit.candle.chatting.room.RoomCounter;
 import org.profit.candle.chatting.room.RoomKey;
 import org.springframework.web.reactive.socket.HandshakeInfo;
@@ -16,6 +19,7 @@ import reactor.test.StepVerifier;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -28,6 +32,7 @@ class ChatWebSocketHandlerTest {
     HandshakeAuthenticator authenticator;
     RoomCounter roomCounter;
     ChatBroker broker;
+    ChatProperties properties;
     ChatWebSocketHandler handler;
 
     WebSocketSession session;
@@ -37,7 +42,12 @@ class ChatWebSocketHandlerTest {
         authenticator = mock(HandshakeAuthenticator.class);
         roomCounter = mock(RoomCounter.class);
         broker = mock(ChatBroker.class);
-        handler = new ChatWebSocketHandler(authenticator, roomCounter, broker, mock(ObjectMapper.class));
+        // heartbeat 주기는 길게 잡는다 — 단위 테스트에선 outbound가 구독되지 않아 실제로 틱하지 않는다.
+        properties = new ChatProperties(
+                new ChatProperties.Jwt("http://unused/.well-known/jwks.json", "iss", "aud"),
+                new ChatProperties.Room(500, Duration.ofMinutes(1), Duration.ofSeconds(30)),
+                new ChatProperties.Cors(List.of()));
+        handler = new ChatWebSocketHandler(authenticator, roomCounter, broker, mock(ObjectMapper.class), properties);
 
         session = mock(WebSocketSession.class);
         HandshakeInfo info = mock(HandshakeInfo.class);
@@ -50,38 +60,38 @@ class ChatWebSocketHandlerTest {
 
     @Test
     void handle_enterFails_doesNotLeave() {
-        // enter(자원 획득) 실패 → leave(DECR)가 호출되면 안 됨 (카운터 음수 방지)
-        when(roomCounter.enter(any(RoomKey.class)))
+        // enter(자원 획득) 실패 → leave(정리)가 호출되면 안 됨 (인원 비대칭 방지)
+        when(roomCounter.enter(any(RoomKey.class), anyString()))
                 .thenReturn(Mono.error(new IllegalStateException("redis down")));
 
         StepVerifier.create(handler.handle(session))
                 .expectError(IllegalStateException.class)
                 .verify();
 
-        verify(roomCounter, never()).leave(any());
+        verify(roomCounter, never()).leave(any(), anyString());
     }
 
     @Test
     void handle_clientDisconnects_leavesExactlyOnce() {
         // enter 성공 후 수신 종료(클라 끊김) → 정확히 1회 leave
-        when(roomCounter.enter(any(RoomKey.class))).thenReturn(Mono.just(1L));
-        when(roomCounter.leave(any(RoomKey.class))).thenReturn(Mono.just(0L));
+        when(roomCounter.enter(any(RoomKey.class), anyString())).thenReturn(Mono.just(1L));
+        when(roomCounter.leave(any(RoomKey.class), anyString())).thenReturn(Mono.just(0L));
         when(session.send(any())).thenReturn(Mono.empty());
 
         StepVerifier.create(handler.handle(session))
                 .verifyComplete();
 
-        verify(roomCounter).enter(new RoomKey("005930", 1));
-        verify(roomCounter).leave(new RoomKey("005930", 1));
+        verify(roomCounter).enter(eq(new RoomKey("005930", 1)), anyString());
+        verify(roomCounter).leave(eq(new RoomKey("005930", 1)), anyString());
     }
 
     @Test
     void handle_broadcastsPresenceOnEnterAndLeave() {
         // 입장 시 갱신 인원(join)과 퇴장 시 갱신 인원(leave)을 각각 방 채널로 발행한다.
         ChatWebSocketHandler realHandler =
-                new ChatWebSocketHandler(authenticator, roomCounter, broker, new ObjectMapper());
-        when(roomCounter.enter(any(RoomKey.class))).thenReturn(Mono.just(3L));
-        when(roomCounter.leave(any(RoomKey.class))).thenReturn(Mono.just(2L));
+                new ChatWebSocketHandler(authenticator, roomCounter, broker, new ObjectMapper(), properties);
+        when(roomCounter.enter(any(RoomKey.class), anyString())).thenReturn(Mono.just(3L));
+        when(roomCounter.leave(any(RoomKey.class), anyString())).thenReturn(Mono.just(2L));
         when(session.send(any())).thenReturn(Mono.empty());
         when(broker.publish(eq("chat:005930_1"), any())).thenReturn(Mono.just(1L));
 
@@ -100,7 +110,7 @@ class ChatWebSocketHandlerTest {
         StepVerifier.create(handler.handle(session))
                 .verifyComplete();
 
-        verify(roomCounter, never()).enter(any());
-        verify(roomCounter, never()).leave(any());
+        verify(roomCounter, never()).enter(any(), anyString());
+        verify(roomCounter, never()).leave(any(), anyString());
     }
 }

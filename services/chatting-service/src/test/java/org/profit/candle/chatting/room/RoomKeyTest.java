@@ -39,6 +39,6 @@ class RoomKeyTest {
 
         assertThat(key.roomId()).isEqualTo("005930_1");
         assertThat(key.channel()).isEqualTo("chat:005930_1");
-        assertThat(key.countKey()).isEqualTo("005930_1_count");
+        assertThat(key.presenceKey()).isEqualTo("005930_1_presence");
     }
 }

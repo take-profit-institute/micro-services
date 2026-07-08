@@ -5,7 +5,7 @@ package org.profit.candle.chatting.room;
  *
  * <ul>
  *   <li>Pub/Sub 채널: {@code chat:{symbol}_{room}}</li>
- *   <li>인원 카운터 키: {@code {symbol}_{room}_count}</li>
+ *   <li>presence 키(ZSET, member=커넥션, score=last-seen): {@code {symbol}_{room}_presence}</li>
  * </ul>
  */
 public record RoomKey(String symbol, int room) {
@@ -28,7 +28,8 @@ public record RoomKey(String symbol, int room) {
         return "chat:" + roomId();
     }
 
-    public String countKey() {
-        return roomId() + "_count";
+    /** presence ZSET 키. member=커넥션 식별자, score=마지막 heartbeat epoch millis. */
+    public String presenceKey() {
+        return roomId() + "_presence";
     }
 }
