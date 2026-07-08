@@ -26,7 +26,7 @@ spring:
     client:
       channel:
         market:
-          target: ${BATCH_MARKET_GRPC_TARGET:static://localhost:50060}
+          target: ${BATCH_MARKET_GRPC_TARGET:static://localhost:50063}
           ssl:
             enabled: false
         stock:
@@ -65,6 +65,10 @@ batch:
     stock-sync:
       enabled: ${BATCH_STOCK_SYNC_ENABLED:false}
       cron: "${BATCH_STOCK_SYNC_CRON:0 30 16 * * MON-FRI}"
+    market-order-book:
+      enabled: ${BATCH_MARKET_ORDER_BOOK_ENABLED:false}
+      cron: "${BATCH_MARKET_ORDER_BOOK_CRON:0 */1 * * * MON-FRI}"
+      deadline-millis: ${BATCH_MARKET_ORDER_BOOK_DEADLINE_MILLIS:120000}
     trading:
       enabled: ${BATCH_TRADING_ENABLED:false}
       previous-close-cron: "${BATCH_TRADING_PREVIOUS_CLOSE_CRON:0 30 8 * * MON-FRI}"

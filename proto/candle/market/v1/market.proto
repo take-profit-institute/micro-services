@@ -17,6 +17,40 @@ message GetQuoteResponse { Quote quote = 1; }
 message BatchQuotesRequest { repeated string symbols = 1; }
 message BatchQuotesResponse { repeated Quote quotes = 1; }
 
+message OrderBookLevel {
+  int32 level = 1;
+  int64 ask_price = 2;
+  int64 ask_quantity = 3;
+  int64 bid_price = 4;
+  int64 bid_quantity = 5;
+}
+
+message OrderBook {
+  string symbol = 1;
+  int64 best_ask_price = 2;
+  int64 best_ask_quantity = 3;
+  int64 best_bid_price = 4;
+  int64 best_bid_quantity = 5;
+  int64 total_ask_quantity = 6;
+  int64 total_bid_quantity = 7;
+  google.protobuf.Timestamp quoted_at = 8;
+  repeated OrderBookLevel levels = 9;
+}
+
+message GetOrderBookRequest { string symbol = 1; }
+message GetOrderBookResponse { OrderBook order_book = 1; }
+
+// batch-service가 정규장 중 1분마다 호출한다. market-service는 활성 전체 종목의
+// Kiwoom ka10004 호가를 조회해 Redis orderbook cache를 갱신한다.
+message RefreshOrderBooksRequest {}
+message RefreshOrderBooksResponse {
+  int32 target_count = 1;
+  int32 success_count = 2;
+  int32 fail_count = 3;
+  bool skipped = 4;
+  string reason = 5;
+}
+
 // 당일 실시간 시세 그래프의 초기 스냅샷. 키움 주식틱차트(ka10079)를 조회해 오늘치 틱을 돌려준다.
 // 장마감이어도 오늘 그래프를 그릴 수 있게 REST 로 당겨오는 경로다. 라이브 갱신은 WS(Redis)로 별도.
 message IntradayTick {
@@ -109,6 +143,8 @@ service MarketService {
   rpc SearchStocks(SearchStocksRequest) returns (SearchStocksResponse);
   rpc GetQuote(GetQuoteRequest) returns (GetQuoteResponse);
   rpc BatchQuotes(BatchQuotesRequest) returns (BatchQuotesResponse);
+  rpc GetOrderBook(GetOrderBookRequest) returns (GetOrderBookResponse);
+  rpc RefreshOrderBooks(RefreshOrderBooksRequest) returns (RefreshOrderBooksResponse);
   rpc GetIntradayTicks(GetIntradayTicksRequest) returns (GetIntradayTicksResponse);
   rpc StreamQuotes(StreamQuotesRequest) returns (stream LiveQuote);
   rpc GetMarketStatus(GetMarketStatusRequest) returns (GetMarketStatusResponse);

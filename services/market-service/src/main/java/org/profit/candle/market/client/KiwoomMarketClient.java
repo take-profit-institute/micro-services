@@ -1,8 +1,10 @@
 package org.profit.candle.market.client;
 
 import lombok.RequiredArgsConstructor;
+import org.profit.candle.market.dto.request.KiwoomOrderBookRequest;
 import org.profit.candle.market.dto.request.KiwoomStockRequest;
 import org.profit.candle.market.dto.request.KiwoomTickChartRequest;
+import org.profit.candle.market.dto.response.KiwoomOrderBookResponse;
 import org.profit.candle.market.dto.response.KiwoomStockResponse;
 import org.profit.candle.market.dto.response.KiwoomTickChartResponse;
 import org.profit.candle.market.exception.MarketErrorCode;
@@ -63,6 +65,32 @@ public class KiwoomMarketClient {
             throw new MarketException(MarketErrorCode.KIWOOM_INVALID_RESPONSE);
         }
         if (response.returnCode() != 0) {
+            throw new MarketException(MarketErrorCode.KIWOOM_BUSINESS_FAILED);
+        }
+        return response;
+    }
+
+    /** 주식호가요청(ka10004) — 현재 매수/매도 호가 10단계. */
+    public KiwoomOrderBookResponse getOrderBook(String stockCode) {
+        String token = token();
+
+        KiwoomOrderBookResponse response = kiwoomWebClient.post()
+                .uri("/api/dostk/mrkcond")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
+                .header("api-id", "ka10004")
+                .header("authorization", "Bearer " + token)
+                .bodyValue(new KiwoomOrderBookRequest(stockCode))
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, httpResponse -> httpResponse.bodyToMono(String.class)
+                        .defaultIfEmpty("")
+                        .flatMap(body -> Mono.error(new MarketException(MarketErrorCode.KIWOOM_HTTP_FAILED))))
+                .bodyToMono(KiwoomOrderBookResponse.class)
+                .block();
+
+        if (response == null) {
+            throw new MarketException(MarketErrorCode.KIWOOM_INVALID_RESPONSE);
+        }
+        if (response.returnCode() != null && response.returnCode() != 0) {
             throw new MarketException(MarketErrorCode.KIWOOM_BUSINESS_FAILED);
         }
         return response;

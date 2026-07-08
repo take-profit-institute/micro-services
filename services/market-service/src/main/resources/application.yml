@@ -22,6 +22,9 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
   data:
     redis:
       host: localhost
@@ -38,6 +41,8 @@ management:
 market:
   quote:
     channel: ${MARKET_QUOTE_CHANNEL:market:quotes}
+  order-book:
+    topic: ${MARKET_ORDER_BOOK_TOPIC:market.order-book.v1}
   ws:
     supervise-interval-ms: ${MARKET_WS_SUPERVISE_INTERVAL_MS:30000}
     force-connect: ${MARKET_WS_FORCE_CONNECT:false}
