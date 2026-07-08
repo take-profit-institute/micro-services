@@ -659,6 +659,110 @@
   word-break: keep-all;
 }
 
+.architectureSection {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 9rem max(4vw, 2rem);
+}
+
+.architectureHeading {
+  display: grid;
+  margin-bottom: 4rem;
+  grid-template-columns: 1.12fr 0.88fr;
+  align-items: end;
+  gap: 4rem;
+}
+
+.architectureHeading h2 {
+  margin: 0.9rem 0 0;
+  font-size: clamp(2.55rem, 4.5vw, 4.9rem);
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+  word-break: keep-all;
+}
+
+.architectureHeading p {
+  margin: 0;
+  color: #93a8b6;
+  font-size: 1rem;
+  line-height: 1.85;
+  word-break: keep-all;
+}
+
+.architectureGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.architectureCard {
+  overflow: hidden;
+  border: 1px solid rgba(136, 164, 182, 0.18);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 85% 12%, rgba(246, 196, 83, 0.09), transparent 28%),
+    linear-gradient(145deg, rgba(14, 37, 52, 0.9), rgba(8, 25, 37, 0.92));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+}
+
+.architectureImageWrap {
+  display: flex;
+  height: 235px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(136, 164, 182, 0.14);
+  background: #071521;
+}
+
+.architectureImageWrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: auto;
+}
+
+.architectureBody {
+  padding: 1.35rem;
+}
+
+.architectureBody > span {
+  color: var(--gold);
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+}
+
+.architectureBody h3 {
+  margin: 0.55rem 0 0.75rem;
+  font-size: 1.55rem;
+  letter-spacing: -0.04em;
+}
+
+.architectureBody p {
+  min-height: 86px;
+  margin: 0 0 1.1rem;
+  color: #91a6b4;
+  font-size: 0.88rem;
+  line-height: 1.68;
+  word-break: keep-all;
+}
+
+.architectureBody a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #f8d980;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.architectureBody a:hover {
+  color: #fff1b9;
+  text-decoration: none;
+}
+
 .sectionHeading {
   display: grid;
   margin-bottom: 4rem;
@@ -696,14 +800,14 @@
 
 .documentGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 
 .documentCard {
   position: relative;
   display: flex;
-  min-height: 390px;
+  min-height: 310px;
   padding: 1.5rem;
   flex-direction: column;
   justify-content: space-between;
@@ -742,6 +846,8 @@
 .gold { --card-glow: #f6c453; --card-border: rgba(246, 196, 83, 0.5); }
 .violet { --card-glow: #b88cff; --card-border: rgba(184, 140, 255, 0.5); }
 .coral { --card-glow: #ff7474; --card-border: rgba(255, 116, 116, 0.5); }
+.mint { --card-glow: #36d399; --card-border: rgba(54, 211, 153, 0.5); }
+.blue { --card-glow: #54a7ff; --card-border: rgba(84, 167, 255, 0.5); }
 
 .cardTop {
   display: flex;
@@ -937,6 +1043,9 @@
   .summarySection { grid-template-columns: 1fr; gap: 3rem; }
   .servicesHeading { grid-template-columns: 1fr; gap: 2rem; }
   .serviceGroups { grid-template-columns: 1fr; }
+  .architectureHeading { grid-template-columns: 1fr; gap: 2rem; }
+  .architectureGrid { grid-template-columns: 1fr; }
+  .architectureImageWrap { height: 330px; }
   .journeyHeading { grid-template-columns: 1fr; gap: 2rem; }
   .journeyGrid { grid-template-columns: repeat(2, 1fr); }
   .flowSection { grid-template-columns: 1fr; }
@@ -960,7 +1069,7 @@
   .summarySection { padding: 6rem 1.2rem 0; }
   .summaryGrid article { grid-template-columns: 54px 1fr; }
   .summaryGrid p { grid-column: 2; }
-  .servicesSection, .journeySection { padding: 6rem 1.2rem; }
+  .servicesSection, .architectureSection, .journeySection { padding: 6rem 1.2rem; }
   .serviceGroup { padding: 1.2rem; }
   .serviceGroup > header { min-height: auto; }
   .serviceRow {
@@ -970,6 +1079,7 @@
   .serviceRow p { grid-column: 2; }
   .journeyGrid { grid-template-columns: 1fr; }
   .journeyCard { min-height: 290px; }
+  .architectureImageWrap { height: 220px; }
   .documentGrid { grid-template-columns: 1fr; }
   .documentCard { min-height: 340px; }
   .flowSection { padding: 6rem 1.2rem; }

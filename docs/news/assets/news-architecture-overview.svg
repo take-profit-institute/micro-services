@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="1500" viewBox="0 0 1500 750" role="img" aria-labelledby="title desc" preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
+  <title id="title">News Service architecture overview</title>
+  <desc id="desc">News collection scheduler, Stock gRPC, Naver News REST API, and PostgreSQL storage</desc>
+  <defs>
+    <marker id="arrow" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#f6c84c"/></marker>
+    <marker id="blue" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#55a7ff"/></marker>
+    <style>
+      .bg{fill:#071521}.grid{stroke:#1a3448;stroke-width:1;opacity:.32}.title{font:800 38px Inter,Arial,sans-serif;fill:#fff}.sub{font:700 15px Inter,Arial,sans-serif;fill:#9fb4c8;letter-spacing:.14em}.box{fill:#112538;stroke:#6d8195;stroke-width:1.7}.news{fill:#3a2f08;stroke:#f6c84c;stroke-width:2.4}.stock{fill:#0d3b31;stroke:#2dd4a3;stroke-width:2.2}.api{fill:#3b1d24;stroke:#ff756f;stroke-width:2.2}.db{fill:#102f4d;stroke:#55a7ff;stroke-width:2.2}.txt{font:800 22px Inter,Arial,sans-serif;fill:#f8fbff}.body{font:600 15px Inter,Arial,sans-serif;fill:#c9d6e3}.small{font:700 12px Inter,Arial,sans-serif;fill:#aebfd0}.line{stroke:#f6c84c;stroke-width:3;fill:none;marker-end:url(#arrow)}.lineBlue{stroke:#55a7ff;stroke-width:3;fill:none;marker-end:url(#blue)}.dash{stroke-dasharray:8 8}
+    </style>
+  </defs>
+  <rect class="bg" width="1500" height="750" rx="34"/>
+  <path class="grid" d="M75 0V750 M150 0V750 M225 0V750 M300 0V750 M375 0V750 M450 0V750 M525 0V750 M600 0V750 M675 0V750 M750 0V750 M825 0V750 M900 0V750 M975 0V750 M1050 0V750 M1125 0V750 M1200 0V750 M1275 0V750 M1350 0V750 M1425 0V750 M0 90H1500 M0 180H1500 M0 270H1500 M0 360H1500 M0 450H1500 M0 540H1500 M0 630H1500"/>
+  <text x="64" y="76" class="title">NEWS SERVICE</text>
+  <text x="66" y="112" class="sub">SCHEDULED COLLECTION · STOCK NAME LOOKUP · NAVER NEWS SEARCH</text>
+
+  <rect x="70" y="210" width="270" height="135" rx="26" class="box"/>
+  <text x="105" y="260" class="txt">SCHEDULER</text>
+  <text x="105" y="296" class="body">collectNews()</text>
+  <text x="105" y="324" class="small">advisory lock</text>
+
+  <rect x="435" y="160" width="310" height="210" rx="30" class="news"/>
+  <text x="475" y="212" class="txt">NEWS COLLECTOR</text>
+  <text x="475" y="250" class="body">active collection targets</text>
+  <text x="475" y="282" class="body">filter by stock name</text>
+  <text x="475" y="314" class="body">article + stock mapping</text>
+
+  <rect x="860" y="120" width="250" height="125" rx="24" class="stock"/>
+  <text x="895" y="168" class="txt">STOCK gRPC</text>
+  <text x="895" y="204" class="body">GetStock(code)</text>
+
+  <rect x="860" y="305" width="250" height="125" rx="24" class="api"/>
+  <text x="895" y="353" class="txt">NAVER NEWS</text>
+  <text x="895" y="389" class="body">REST search API</text>
+
+  <rect x="1190" y="210" width="250" height="185" rx="28" class="db"/>
+  <text x="1225" y="260" class="txt">POSTGRES · news</text>
+  <text x="1225" y="296" class="body">articles</text>
+  <text x="1225" y="326" class="body">article_stock_mappings</text>
+  <text x="1225" y="356" class="body">collection_logs</text>
+
+  <rect x="435" y="500" width="310" height="110" rx="24" class="box"/>
+  <text x="475" y="545" class="txt">GetStockNews</text>
+  <text x="475" y="580" class="body">DB-only latest 3 articles</text>
+
+  <path d="M340 278H420" class="line"/>
+  <path d="M745 230 C795 230 800 182 845 182" class="line"/>
+  <path d="M745 300 C795 300 800 368 845 368" class="line"/>
+  <path d="M1110 368 C1150 368 1150 315 1175 315" class="lineBlue"/>
+  <path d="M745 555 C930 555 1030 395 1175 350" class="lineBlue dash"/>
+  <text x="70" y="690" class="small">No Kafka/Redis/Outbox currently · collection writes owned news schema only · lookup reads PostgreSQL only</text>
+</svg>

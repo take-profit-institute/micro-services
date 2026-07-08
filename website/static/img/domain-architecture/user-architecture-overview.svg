@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="1500" viewBox="0 0 1600 750" role="img" aria-labelledby="title desc" preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
+  <title id="title">User Service architecture overview</title>
+  <desc id="desc">User profile event projection, profile update and outbox flow</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#071521"/><stop offset="1" stop-color="#141025"/></linearGradient>
+    <marker id="arrowBlue" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#55a7ff"/></marker>
+    <marker id="arrowGreen" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#2dd4a3"/></marker>
+    <marker id="arrowPurple" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#b48cff"/></marker>
+    <style>
+      .bg{fill:url(#bg)}.grid{stroke:#1c3447;stroke-width:1;opacity:.34}.title{font:800 42px Inter,Arial,sans-serif;fill:#f8fbff;letter-spacing:.02em}.sub{font:700 17px Inter,Arial,sans-serif;fill:#9fb4c8;letter-spacing:.16em}.label{font:800 20px Inter,Arial,sans-serif;fill:#f8fbff}.body{font:600 15px Inter,Arial,sans-serif;fill:#c9d6e3}.small{font:700 12px Inter,Arial,sans-serif;fill:#aebfd0}.panel{fill:#102234;stroke:#6d8195;stroke-width:1.5}.auth{fill:#3d3006;stroke:#f6c84c;stroke-width:2.3}.user{fill:#0d2f4d;stroke:#55a7ff;stroke-width:2.4}.event{fill:#103d31;stroke:#2dd4a3;stroke-width:2.2}.idp{fill:#3a2456;stroke:#b48cff;stroke-width:2.2}.lineBlue{stroke:#55a7ff;stroke-width:3;fill:none;marker-end:url(#arrowBlue)}.lineGreen{stroke:#2dd4a3;stroke-width:3;fill:none;marker-end:url(#arrowGreen)}.linePurple{stroke:#b48cff;stroke-width:3;fill:none;marker-end:url(#arrowPurple)}.dash{stroke-dasharray:8 8}
+    </style>
+  </defs>
+  <rect class="bg" width="1600" height="750" rx="34"/>
+  <path class="grid" d="M80 0V750 M160 0V750 M240 0V750 M320 0V750 M400 0V750 M480 0V750 M560 0V750 M640 0V750 M720 0V750 M800 0V750 M880 0V750 M960 0V750 M1040 0V750 M1120 0V750 M1200 0V750 M1280 0V750 M1360 0V750 M1440 0V750 M1520 0V750 M0 90H1600 M0 180H1600 M0 270H1600 M0 360H1600 M0 450H1600 M0 540H1600 M0 630H1600"/>
+  <text x="70" y="78" class="title">CANDLE · USER SERVICE</text>
+  <text x="72" y="116" class="sub">PROFILE SOURCE · IDEMPOTENT UPDATE · PROFILE UPDATED OUTBOX</text>
+
+  <rect x="64" y="165" width="270" height="120" rx="24" class="auth"/>
+  <text x="96" y="212" class="label">AUTH EVENT</text>
+  <text x="96" y="246" class="body">auth.user-created.v1</text>
+
+  <rect x="64" y="420" width="270" height="120" rx="24" class="panel"/>
+  <text x="96" y="467" class="label">BFF / CLIENT</text>
+  <text x="96" y="501" class="body">GetMe · UpdateProfile</text>
+
+  <rect x="430" y="120" width="370" height="210" rx="30" class="event"/>
+  <text x="470" y="170" class="label">UserCreatedEventConsumer</text>
+  <text x="470" y="205" class="body">JSON validate</text>
+  <text x="470" y="235" class="body">consumed_events duplicate guard</text>
+  <text x="470" y="265" class="body">DefaultProfileGenerator</text>
+  <text x="470" y="295" class="body">create user_profiles</text>
+
+  <rect x="430" y="400" width="370" height="210" rx="30" class="user"/>
+  <text x="470" y="450" class="label">UserGrpcService</text>
+  <text x="470" y="485" class="body">actor guard</text>
+  <text x="470" y="515" class="body">IdempotencyExecutor</text>
+  <text x="470" y="545" class="body">DefaultUserProfileService</text>
+  <text x="470" y="575" class="body">UserProfileEntity.updateProfile()</text>
+
+  <rect x="910" y="160" width="300" height="170" rx="28" class="user"/>
+  <text x="950" y="208" class="label">POSTGRES · users</text>
+  <text x="950" y="244" class="body">user_profiles</text>
+  <text x="950" y="274" class="body">consumed_events</text>
+  <text x="950" y="304" class="body">user_idempotency_records</text>
+
+  <rect x="910" y="430" width="300" height="150" rx="28" class="idp"/>
+  <text x="950" y="478" class="label">USER OUTBOX</text>
+  <text x="950" y="514" class="body">user_outbox_events</text>
+  <text x="950" y="544" class="body">user.profile-updated.v1</text>
+
+  <rect x="1310" y="430" width="210" height="150" rx="28" class="panel"/>
+  <text x="1350" y="478" class="label">DOWNSTREAM</text>
+  <text x="1350" y="514" class="body">Ranking nickname</text>
+  <text x="1350" y="544" class="body">future consumers</text>
+
+  <path d="M334 225H415" class="lineGreen"/>
+  <path d="M800 225H895" class="lineBlue"/>
+  <path d="M334 480H415" class="lineBlue"/>
+  <path d="M800 505H895" class="linePurple"/>
+  <path d="M1060 430V345" class="lineBlue"/>
+  <path d="M1210 505H1295" class="linePurple dash"/>
+  <text x="70" y="690" class="small">Source of truth: user_profiles · idempotency only for UpdateProfile · event delivery via user_outbox_events</text>
+</svg>
