@@ -32,6 +32,7 @@ public class JobParameterFactory {
         return new JobParametersBuilder()
                 .addString("jobName", jobName)
                 .addString("businessDate", businessDate.toString())
+                .addLong("runId", System.nanoTime())
                 .addString("requestedAt", requestedAt.toString(), false)
                 .toJobParameters();
     }
