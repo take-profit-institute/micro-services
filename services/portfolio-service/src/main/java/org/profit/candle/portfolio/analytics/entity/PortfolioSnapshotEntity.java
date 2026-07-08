@@ -45,6 +45,19 @@ public class PortfolioSnapshotEntity {
 
     protected PortfolioSnapshotEntity() {}
 
+    public PortfolioSnapshotEntity(Long id, String userId, LocalDate snapshotDate, long totalAsset,
+                                   long stockValue, long dailyProfit, String cumulativeReturnRate,
+                                   Instant createdAt) {
+        this.id = id;
+        this.userId = userId;
+        this.snapshotDate = snapshotDate;
+        this.totalAsset = totalAsset;
+        this.stockValue = stockValue;
+        this.dailyProfit = dailyProfit;
+        this.cumulativeReturnRate = cumulativeReturnRate;
+        this.createdAt = createdAt;
+    }
+
     public PortfolioSnapshotEntity(String userId, LocalDate snapshotDate, long totalAsset,
                                    long stockValue, long dailyProfit, String cumulativeReturnRate) {
         this.userId = userId;

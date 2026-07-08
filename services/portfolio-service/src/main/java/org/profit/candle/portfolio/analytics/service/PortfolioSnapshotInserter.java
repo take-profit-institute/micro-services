@@ -2,26 +2,55 @@ package org.profit.candle.portfolio.analytics.service;
 
 import lombok.RequiredArgsConstructor;
 import org.profit.candle.portfolio.analytics.entity.PortfolioSnapshotEntity;
-import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotWriter;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 일별 스냅샷 삽입을 감싸는 독립 트랜잭션 경계.
- *
- * 별도 빈으로 두는 이유: (user_id, snapshot_date) UNIQUE 위반이 이 트랜잭션 "안"에서 발생하고
- * 롤백되어 DataIntegrityViolationException 으로 호출부에 전파돼야 한다. 그래야 동시 중복 호출
- * 경합에서 진 쪽이 상위 로직에서 재조회로 멱등 반환할 수 있다(IDEMPOTENCY.md §5-5).
- * 같은 클래스 내부 호출은 프록시를 우회해 트랜잭션이 걸리지 않으므로 분리한다.
+ * 일별 스냅샷 저장을 DB upsert로 처리한다.
+ * EOD 배치는 같은 거래일을 재실행할 수 있으므로 (user_id, snapshot_date)가 이미 있으면
+ * 최신 계산값으로 덮어쓴다.
  */
 @Component
 @RequiredArgsConstructor
 public class PortfolioSnapshotInserter {
 
-    private final PortfolioSnapshotWriter snapshotWriter;
+    private static final String UPSERT_SQL = """
+            INSERT INTO portfolio_snapshots (
+                user_id, snapshot_date, total_asset, stock_value,
+                daily_profit, cumulative_return_rate, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, now())
+            ON CONFLICT (user_id, snapshot_date) DO UPDATE SET
+                total_asset = EXCLUDED.total_asset,
+                stock_value = EXCLUDED.stock_value,
+                daily_profit = EXCLUDED.daily_profit,
+                cumulative_return_rate = EXCLUDED.cumulative_return_rate
+            RETURNING id, user_id, snapshot_date, total_asset, stock_value,
+                      daily_profit, cumulative_return_rate, created_at
+            """;
+
+    private final JdbcTemplate jdbcTemplate;
 
     @Transactional
-    public PortfolioSnapshotEntity insert(PortfolioSnapshotEntity entity) {
-        return snapshotWriter.save(entity);
+    public PortfolioSnapshotEntity upsert(PortfolioSnapshotEntity entity) {
+        return jdbcTemplate.queryForObject(
+                UPSERT_SQL,
+                (resultSet, rowNumber) -> new PortfolioSnapshotEntity(
+                        resultSet.getLong("id"),
+                        resultSet.getString("user_id"),
+                        resultSet.getObject("snapshot_date", java.time.LocalDate.class),
+                        resultSet.getLong("total_asset"),
+                        resultSet.getLong("stock_value"),
+                        resultSet.getLong("daily_profit"),
+                        resultSet.getString("cumulative_return_rate"),
+                        resultSet.getTimestamp("created_at").toInstant()
+                ),
+                entity.userId(),
+                entity.snapshotDate(),
+                entity.totalAsset(),
+                entity.stockValue(),
+                entity.dailyProfit(),
+                entity.cumulativeReturnRate()
+        );
     }
 }

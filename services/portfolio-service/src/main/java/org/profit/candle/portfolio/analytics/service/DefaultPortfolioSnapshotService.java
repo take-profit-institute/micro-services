@@ -7,12 +7,10 @@ import org.profit.candle.portfolio.analytics.dto.PortfolioSnapshotResult;
 import org.profit.candle.portfolio.analytics.dto.RecordDailySnapshotCommand;
 import org.profit.candle.portfolio.analytics.entity.PortfolioSnapshotEntity;
 import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotReader;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -24,25 +22,11 @@ public class DefaultPortfolioSnapshotService implements PortfolioSnapshotService
     private final PortfolioSnapshotReader snapshotReader;
     private final PortfolioSnapshotInserter snapshotInserter;
 
-    // 멱등 기준 = (user_id, snapshot_date) UNIQUE. 이미 있으면 기존 값을 그대로 반환하고(선착순 고정),
-    // 없을 때만 삽입한다. 삽입은 독립 트랜잭션(snapshotInserter)이라 동시 중복 호출 경합에서
-    // 진 쪽은 UNIQUE 위반으로 롤백되고, 여기서 재조회해 기존 스냅샷을 멱등 반환한다(IDEMPOTENCY.md §5-5).
-    // 오케스트레이션은 트랜잭션 밖이라 각 조회/삽입이 자체 트랜잭션으로 실행되며, 위반 후 재조회가
-    // poisoned transaction 문제 없이 동작한다.
+    // EOD 배치는 같은 거래일을 운영자가 재실행할 수 있다.
+    // 따라서 (user_id, snapshot_date)가 이미 있으면 기존 스냅샷을 최신 계산값으로 upsert한다.
     @Override
     public PortfolioSnapshotResult recordDailySnapshot(RecordDailySnapshotCommand command) {
-        Optional<PortfolioSnapshotEntity> existing =
-                snapshotReader.findByUserIdAndDate(command.userId(), command.snapshotDate());
-        if (existing.isPresent()) {
-            return toResult(existing.get());
-        }
-        try {
-            return toResult(snapshotInserter.insert(buildSnapshot(command)));
-        } catch (DataIntegrityViolationException e) {
-            return snapshotReader.findByUserIdAndDate(command.userId(), command.snapshotDate())
-                    .map(this::toResult)
-                    .orElseThrow(() -> e);
-        }
+        return toResult(snapshotInserter.upsert(buildSnapshot(command)));
     }
 
     @Override
