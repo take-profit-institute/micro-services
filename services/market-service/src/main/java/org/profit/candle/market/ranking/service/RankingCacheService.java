@@ -7,16 +7,20 @@ import org.profit.candle.market.ranking.exception.RankingErrorCode;
 import org.profit.candle.market.ranking.exception.RankingException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
 public class RankingCacheService {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final RedisTemplate<String, Object> redisTemplate;
 
     public <T> void validateResponse(List<T> items, int returnCode) {
@@ -48,8 +52,18 @@ public class RankingCacheService {
 
     public RankingSnapshot read(String redisKey) {
         Object cached = redisTemplate.opsForValue().get(redisKey);
+        if (cached == null) {
+            return null;
+        }
         if (cached instanceof RankingSnapshot snapshot) {
             return snapshot;
+        }
+        // Value 시리얼라이저가 @class 타입정보를 남기지 않아 캐시가 Map 으로 역직렬화되는 경우에도
+        // 최신 스냅샷을 그대로 살려 반환한다(항목만 매핑, asOf 는 조회 시각으로 대체).
+        if (cached instanceof Map<?, ?> map) {
+            StockRankingCacheItem[] items =
+                    OBJECT_MAPPER.convertValue(map.get("items"), StockRankingCacheItem[].class);
+            return new RankingSnapshot(List.of(items), Instant.now());
         }
         return null;
     }
