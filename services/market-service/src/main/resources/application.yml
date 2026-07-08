@@ -41,6 +41,8 @@ management:
 market:
   quote:
     channel: ${MARKET_QUOTE_CHANNEL:market:quotes}
+  price:
+    topic: ${MARKET_PRICE_TOPIC:market.price.v1}
   order-book:
     topic: ${MARKET_ORDER_BOOK_TOPIC:market.order-book.v1}
   ws:

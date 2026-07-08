@@ -17,34 +17,25 @@ import org.springframework.stereotype.Component;
  *
  * <p>토픽명({@code TOPIC})은 Market 담당자(팀장)와 협의 후 확정 예정.</p>
  *
- * <p><b>[2026-07-08 현황]</b> market-service는 현재 Kafka를 전혀 발행하지 않고
- * Redis Pub/Sub({@code market:quotes} 채널)만 사용한다. 즉 이 리스너는 지금
- * 실제로는 아무 메시지도 수신하지 못하는 상태다 — 같은 역할(캐시 갱신 + 지정가 체결)은
- * {@code trading.support.event.MarketQuoteRedisSubscriber}가 Redis 경로로 대신 수행 중이다.
- *
- * <p>이 클래스는 삭제하지 않고 유지한다 — 팀장 지시로, market-service가 추후 Kafka 발행을
- * 추가하는 경우를 대비해 토픽명(TOPIC 상수)만 교체하면 바로 살아날 수 있게 남겨둔다.
- * 두 경로(Kafka/Redis)가 동시에 활성화되어도 아래 처리(캐시 갱신, 지정가 조건 체결)는
- * 멱등하므로 중복 실행 자체가 정합성 문제를 일으키지는 않는다 — 다만 실제로 market-service가
- * Kafka 발행을 붙이는 시점에는 두 경로를 동시에 둘지, 하나로 정리할지 다시 논의 필요.</p>
+ * <p>토픽은 orderbook 스냅샷과 섞지 않고 현재가 전용 {@code market.price.v1}을 사용한다.
+ * payload는 {@code {"symbol":"005930","price":71400}} 형태다.</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderMarketPriceConsumer {
 
-    private static final String TOPIC = "market.order-book.v1";
     private static final String GROUP_ID = "trading-service-order-market-price";
 
     private final CachedMarketPriceProvider cachedMarketPriceProvider;
     private final OrderExecutionService orderExecutionService;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = TOPIC, groupId = GROUP_ID)
-    public void consume(ConsumerRecord<String, String> record) {
+    @KafkaListener(topics = "${market.price.topic:market.price.v1}", groupId = GROUP_ID)
+    public void consume(ConsumerRecord<String, ?> record) {
         MarketPriceEvent event;
         try {
-            event = objectMapper.readValue(record.value(), MarketPriceEvent.class);
+            event = parse(record.value());
         } catch (Exception e) {
             // poison pill — 재시도해도 동일하게 실패하므로 skip. PII 포함 가능성으로 value 로그 제외.
             log.error("현재가 이벤트 역직렬화 실패 — offset={}, topic={}",
@@ -80,5 +71,15 @@ public class OrderMarketPriceConsumer {
                     event.symbol(), record.offset(), e);
             throw new RuntimeException("현재가 이벤트 처리 실패 — symbol: " + event.symbol(), e);
         }
+    }
+
+    private MarketPriceEvent parse(Object payload) throws Exception {
+        if (payload instanceof MarketPriceEvent event) {
+            return event;
+        }
+        if (payload instanceof CharSequence json) {
+            return objectMapper.readValue(json.toString(), MarketPriceEvent.class);
+        }
+        return objectMapper.convertValue(payload, MarketPriceEvent.class);
     }
 }

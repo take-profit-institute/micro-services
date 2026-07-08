@@ -47,6 +47,8 @@ trading:
 market:
   quote:
     channel: ${MARKET_QUOTE_CHANNEL:market:quotes}
+  price:
+    topic: ${MARKET_PRICE_TOPIC:market.price.v1}
 
 candle:
   security:
