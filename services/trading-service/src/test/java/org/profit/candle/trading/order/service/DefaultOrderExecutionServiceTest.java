@@ -196,4 +196,75 @@ class DefaultOrderExecutionServiceTest {
             return candidate;
         }
     }
+
+    /**
+     * EXE-002 보완: placeOrder/amendOrder 직후 이 주문 1건에 대해서만 현재가와 즉시 비교한다.
+     * 시세 tick을 기다리지 않고, "부른 값이 이미 시장가를 이긴 경우"를 접수 시점에 바로 잡는다.
+     */
+    @Nested
+    @DisplayName("fillLimitOrderIfConditionMetOnPlacement")
+    class FillLimitOrderIfConditionMetOnPlacement {
+
+        @Test
+        void shouldFillImmediatelyWhenBuyPriceIsAboveOrEqualCurrentPrice() {
+            // 매수 지정가 72,000원 > 현재가 71,000원 → "더 비싸게라도 사겠다"는 뜻이라 즉시 체결
+            OrderEntity order = OrderEntity.place(userId, accountId, "005930", OrderSideValue.BUY,
+                    OrderKindValue.LIMIT, 1, 72_000L, 72_010L, "idem-imm-1");
+            when(marketPriceProvider.getCurrentPriceKrw("005930")).thenReturn(71_000L);
+
+            executionService.fillLimitOrderIfConditionMetOnPlacement(order);
+
+            verify(limitFillExecutor).fillIfConditionMet(order.getId(), 71_000L);
+        }
+
+        @Test
+        void shouldNotFillWhenBuyPriceIsBelowCurrentPrice() {
+            // 매수 지정가 70,000원 < 현재가 71,000원 → 아직 조건 미충족, PENDING 유지
+            OrderEntity order = OrderEntity.place(userId, accountId, "005930", OrderSideValue.BUY,
+                    OrderKindValue.LIMIT, 1, 70_000L, 70_010L, "idem-imm-2");
+            when(marketPriceProvider.getCurrentPriceKrw("005930")).thenReturn(71_000L);
+
+            executionService.fillLimitOrderIfConditionMetOnPlacement(order);
+
+            verifyNoInteractions(limitFillExecutor);
+        }
+
+        @Test
+        void shouldFillImmediatelyWhenSellPriceIsBelowOrEqualCurrentPrice() {
+            // 매도 지정가 70,000원 < 현재가 71,000원 → "더 싸게라도 팔겠다"는 뜻이라 즉시 체결
+            OrderEntity order = OrderEntity.place(userId, accountId, "005930", OrderSideValue.SELL,
+                    OrderKindValue.LIMIT, 1, 70_000L, 0L, "idem-imm-3");
+            when(marketPriceProvider.getCurrentPriceKrw("005930")).thenReturn(71_000L);
+
+            executionService.fillLimitOrderIfConditionMetOnPlacement(order);
+
+            verify(limitFillExecutor).fillIfConditionMet(order.getId(), 71_000L);
+        }
+
+        @Test
+        void shouldNotFillWhenSellPriceIsAboveCurrentPrice() {
+            // 매도 지정가 72,000원 > 현재가 71,000원 → 아직 조건 미충족, PENDING 유지
+            OrderEntity order = OrderEntity.place(userId, accountId, "005930", OrderSideValue.SELL,
+                    OrderKindValue.LIMIT, 1, 72_000L, 0L, "idem-imm-4");
+            when(marketPriceProvider.getCurrentPriceKrw("005930")).thenReturn(71_000L);
+
+            executionService.fillLimitOrderIfConditionMetOnPlacement(order);
+
+            verifyNoInteractions(limitFillExecutor);
+        }
+
+        @Test
+        void shouldStayPendingWithoutThrowingWhenPriceLookupFails() {
+            // market-service 장애 등으로 현재가 조회 자체가 실패해도 접수 자체를 실패시키지 않는다.
+            // 이후 tick 기반 EXE-002(fillLimitOrdersIfConditionMet)가 정상적으로 잡아준다.
+            OrderEntity order = OrderEntity.place(userId, accountId, "005930", OrderSideValue.BUY,
+                    OrderKindValue.LIMIT, 1, 72_000L, 72_010L, "idem-imm-5");
+            when(marketPriceProvider.getCurrentPriceKrw("005930"))
+                    .thenThrow(new OrderException(OrderErrorCode.MARKET_PRICE_UNAVAILABLE));
+
+            executionService.fillLimitOrderIfConditionMetOnPlacement(order);
+
+            verifyNoInteractions(limitFillExecutor);
+        }
+    }
 }

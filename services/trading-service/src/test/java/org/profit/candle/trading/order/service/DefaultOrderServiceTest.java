@@ -159,6 +159,8 @@ class DefaultOrderServiceTest {
 
             verify(orderExecutionService).fillMarketOrder(any());
             assertThat(result).isEqualTo(filled);
+            // 시장가는 fillMarketOrder로 바로 끝난다 — 지정가 접수 즉시 체결 체크는 별개 분기라 호출 안 됨.
+            verify(orderExecutionService, never()).fillLimitOrderIfConditionMetOnPlacement(any());
         }
 
         @Test
@@ -170,6 +172,23 @@ class DefaultOrderServiceTest {
                     .isInstanceOf(OrderException.class)
                     .extracting(e -> ((OrderException) e).errorCode())
                     .isEqualTo(OrderErrorCode.INVALID_QUANTITY);
+        }
+
+        @Test
+        void shouldCheckImmediateFillConditionForLimitOrderAfterSaving() {
+            // EXE-002 보완: 지정가 주문도 저장 직후 이 주문 1건에 대해 접수 즉시 조건체결 체크를 태운다.
+            when(accountService.getAccount(userId)).thenReturn(account);
+            when(orderRepository.existsByAccountIdAndSymbolAndSideAndStatus(any(), anyString(), any(), any()))
+                    .thenReturn(false);
+
+            PlaceOrderCommand command = new PlaceOrderCommand(
+                    "005930", OrderSideValue.BUY, OrderKindValue.LIMIT, 10, 72_000L, "idem-7");
+
+            OrderEntity result = orderService.placeOrder(userId, command);
+
+            verify(orderExecutionService).fillLimitOrderIfConditionMetOnPlacement(result);
+            // 시장가 전용 경로는 타지 않는다.
+            verify(orderExecutionService, never()).fillMarketOrder(any());
         }
     }
 
@@ -195,6 +214,8 @@ class DefaultOrderServiceTest {
             verify(orderRepository, never()).save(any());
             // 재수신 시에도 ReservationConverted를 다시 발행해 CONVERTING에 stuck되지 않게 한다.
             verify(outboxWriter).record(eq(outboxOperations), eq("ReservationConverted"), anyString(), any());
+            // 멱등 replay 경로는 신규 생성이 아니므로 즉시체결 체크 대상이 아니다.
+            verifyNoInteractions(orderExecutionService);
         }
 
         @Test
@@ -214,6 +235,23 @@ class DefaultOrderServiceTest {
             // 예약 전환 경로는 거래시간 검증/lockBalance 대상이 아니다.
             verifyNoInteractions(tradingHoursValidator);
             verify(accountService, never()).lockBalance(any(), anyLong());
+        }
+
+        @Test
+        void shouldCheckImmediateFillConditionForOpenLimitReservationConversion() {
+            // OPEN+LIMIT 예약이 09:00에 PENDING으로 전환될 때도, 시가가 이미 지정가 조건을
+            // 만족하면 다음 tick을 기다리지 않고 이 시점에 즉시 체결 체크를 태운다.
+            when(accountService.getAccount(userId)).thenReturn(account);
+            when(orderRepository.findByIdempotencyKey("reservation-idem-3"))
+                    .thenReturn(Optional.empty());
+
+            PlaceOrderCommand command = new PlaceOrderCommand(
+                    "005930", OrderSideValue.BUY, OrderKindValue.LIMIT, 10, 72_000L, "reservation-idem-3");
+
+            OrderEntity result = orderService.placeOrderFromReservation(
+                    userId, command, 700_105L, UUID.randomUUID());
+
+            verify(orderExecutionService).fillLimitOrderIfConditionMetOnPlacement(result);
         }
     }
 
@@ -312,6 +350,22 @@ class DefaultOrderServiceTest {
                     .isInstanceOf(OrderException.class)
                     .extracting(e -> ((OrderException) e).errorCode())
                     .isEqualTo(OrderErrorCode.INVALID_QUANTITY);
+        }
+
+        @Test
+        void shouldCheckImmediateFillConditionForAmendedOrder() {
+            // amend는 취소+재생성이라, 새로 생성된 amended 주문도 신규 지정가와 동일하게
+            // 접수 즉시 조건체결 체크 대상이다 (정정가를 유리하게 바꾼 경우 대응).
+            OrderEntity original = OrderEntity.place(userId, account.getId(), "005930",
+                    OrderSideValue.BUY, OrderKindValue.LIMIT, 10, 70_000L, 700_105L, "idem-orig-3");
+            when(orderRepository.findByIdAndUserIdForUpdate(original.getId(), userId))
+                    .thenReturn(Optional.of(original));
+
+            AmendOrderCommand command = new AmendOrderCommand(5, 80_000L, "idem-amend-3");
+
+            OrderEntity amended = orderService.amendOrder(userId, original.getId(), command);
+
+            verify(orderExecutionService).fillLimitOrderIfConditionMetOnPlacement(amended);
         }
     }
 
