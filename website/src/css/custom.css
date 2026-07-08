@@ -68,6 +68,23 @@ body {
   border-top: 1px solid rgba(132, 156, 176, 0.12);
 }
 
+.footer__links .footer__col:first-child {
+  flex: 0 1 34rem;
+}
+
+.footer__links .footer__col:first-child .footer__items {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(7rem, max-content);
+  grid-template-rows: repeat(5, auto);
+  column-gap: 2rem;
+  row-gap: 0.45rem;
+}
+
+.footer__links .footer__col:first-child .footer__item {
+  break-inside: avoid;
+}
+
 .theme-doc-markdown {
   min-width: 0;
   max-width: 100%;

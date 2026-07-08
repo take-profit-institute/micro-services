@@ -56,7 +56,7 @@
 }
 
 .heroContent {
-  max-width: 760px;
+  max-width: 920px;
 }
 
 .statusLine {
@@ -88,12 +88,13 @@
 }
 
 .hero h1 {
-  max-width: 790px;
+  max-width: none;
   margin: 1.7rem 0 1.6rem;
-  font-size: clamp(3.45rem, 6.3vw, 6.9rem);
+  font-size: clamp(3.35rem, 5vw, 6.15rem);
   font-weight: 850;
   line-height: 0.98;
   letter-spacing: -0.065em;
+  white-space: normal;
 }
 
 .hero h1 span {
@@ -269,36 +270,61 @@
   position: absolute;
   z-index: 4;
   display: flex;
-  width: 145px;
-  padding: 0.7rem 0.8rem;
+  width: 126px;
+  padding: 0.55rem 0.65rem;
   flex-direction: column;
   border: 1px solid rgba(130, 158, 177, 0.25);
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(8, 25, 37, 0.92);
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.2);
 }
 
 .serviceNode small {
-  margin-bottom: 0.28rem;
+  margin-bottom: 0.22rem;
   color: #718998;
-  font-size: 0.5rem;
+  font-size: 0.45rem;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
 
 .serviceNode strong {
-  font-size: 0.78rem;
+  font-size: 0.68rem;
   letter-spacing: 0.04em;
 }
 
 .serviceNode span {
-  margin-top: 0.18rem;
+  margin-top: 0.14rem;
   color: #8fa5b3;
-  font-size: 0.63rem;
+  font-size: 0.55rem;
 }
 
+.authNode {
+  top: 3%;
+  left: 4%;
+  border-color: rgba(246, 196, 83, 0.42);
+}
+
+.authNode strong { color: var(--gold); }
+
+.userNode {
+  top: 3%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-color: rgba(84, 167, 255, 0.42);
+}
+
+.userNode strong { color: var(--blue); }
+
+.marketNode {
+  top: 3%;
+  right: 4%;
+  border-color: rgba(54, 211, 153, 0.4);
+}
+
+.marketNode strong { color: var(--mint); }
+
 .tradingNode {
-  top: 12%;
+  top: 38%;
   left: 4%;
   border-color: rgba(255, 116, 116, 0.42);
 }
@@ -306,41 +332,96 @@
 .tradingNode strong { color: var(--coral); }
 
 .stockNode {
-  top: 15%;
-  right: 3%;
+  top: 20%;
+  left: 4%;
   border-color: rgba(54, 211, 153, 0.4);
 }
 
 .stockNode strong { color: var(--mint); }
 
+.wishlistNode {
+  top: 20%;
+  right: 4%;
+  border-color: rgba(246, 196, 83, 0.42);
+}
+
+.wishlistNode strong { color: var(--gold); }
+
 .portfolioNode {
-  bottom: 11%;
-  left: 3%;
+  top: 38%;
+  right: 4%;
   border-color: rgba(84, 167, 255, 0.42);
 }
 
 .portfolioNode strong { color: var(--blue); }
 
 .rankingNode {
-  right: 4%;
-  bottom: 8%;
+  top: 56%;
+  left: 4%;
   border-color: rgba(184, 140, 255, 0.45);
 }
 
 .rankingNode strong { color: var(--violet); }
 
+.missionNode {
+  top: 56%;
+  right: 4%;
+  border-color: rgba(246, 196, 83, 0.42);
+}
+
+.missionNode strong { color: var(--gold); }
+
+.learningNode {
+  top: 73%;
+  left: 4%;
+  border-color: rgba(54, 211, 153, 0.4);
+}
+
+.learningNode strong { color: var(--mint); }
+
+.notificationNode {
+  top: 73%;
+  right: 4%;
+  border-color: rgba(184, 140, 255, 0.45);
+}
+
+.notificationNode strong { color: var(--violet); }
+
+.chattingNode {
+  bottom: 2%;
+  left: 28%;
+  border-color: rgba(84, 167, 255, 0.42);
+}
+
+.chattingNode strong { color: var(--blue); }
+
+.newsNode {
+  right: 28%;
+  bottom: 2%;
+  border-color: rgba(255, 116, 116, 0.42);
+}
+
+.newsNode strong { color: var(--coral); }
+
 .mapFooter {
   padding: 0.9rem 0.55rem 0.3rem;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 1.1rem;
+  gap: 0.55rem;
   border-top: 1px solid rgba(129, 159, 178, 0.14);
   letter-spacing: 0.02em;
 }
 
 .mapFooter span {
   display: inline-flex;
+  min-height: 26px;
+  padding: 0.28rem 0.52rem;
   align-items: center;
   gap: 0.4rem;
+  border: 1px solid rgba(132, 160, 179, 0.16);
+  border-radius: 999px;
+  background: rgba(7, 20, 31, 0.54);
+  white-space: nowrap;
 }
 
 .mapFooter i {
@@ -349,9 +430,16 @@
   border-radius: 50%;
 }
 
+.springDot { background: var(--mint); }
 .grpcDot { background: var(--blue); }
 .kafkaDot { background: var(--coral); }
+.outboxDot { background: var(--gold); }
+.redisDot { background: #ff7474; }
+.postgresDot { background: #54a7ff; }
+.timescaleDot { background: #b88cff; }
 .batchDot { background: var(--gold); }
+.flywayDot { background: #36d399; }
+.dockerDot { background: #64b5f6; }
 
 .metrics {
   display: grid;
@@ -1052,6 +1140,8 @@
   }
 
   .heroContent { max-width: 860px; }
+  .hero h1 { white-space: normal; }
+  .hero h1 span { display: block; }
   .systemMap { max-width: 760px; justify-self: center; }
   .sectionHeading { grid-template-columns: 1fr; gap: 2rem; }
   .summarySection { grid-template-columns: 1fr; gap: 3rem; }
@@ -1070,11 +1160,28 @@
   .hero { padding: 5rem 1.2rem 3.5rem; gap: 3.5rem; }
   .hero h1 { font-size: clamp(3rem, 15vw, 4.5rem); }
   .statusVersion { display: none; }
-  .systemMap { min-height: 490px; padding: 0.7rem; }
-  .orbit { height: 390px; }
-  .serviceNode { width: 118px; padding: 0.55rem; }
+  .systemMap { min-height: auto; padding: 0.7rem; }
+  .orbit {
+    display: grid;
+    height: auto;
+    padding: 1rem 0.2rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+  .orbitLineOne,
+  .orbitLineTwo,
+  .core {
+    display: none;
+  }
+  .serviceNode {
+    position: relative;
+    inset: auto;
+    transform: none;
+    width: auto;
+    min-height: 58px;
+    padding: 0.55rem;
+  }
   .serviceNode span { display: none; }
-  .core { width: 105px; height: 105px; }
   .mapFooter { flex-wrap: wrap; }
   .metrics { grid-template-columns: repeat(2, 1fr); }
   .metrics div:nth-child(2) { border-right: 0; }

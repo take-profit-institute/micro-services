@@ -268,6 +268,22 @@ const projectSummary = [
   },
 ];
 
+const systemMapServices = [
+  ['01', 'IDENTITY', 'AUTH', 'login / token', 'authNode'],
+  ['02', 'PROFILE', 'USER', 'profile / settings', 'userNode'],
+  ['03', 'LIVE MARKET', 'MARKET', 'quotes / status', 'marketNode'],
+  ['04', 'CATALOG', 'STOCK', 'symbols / candles', 'stockNode'],
+  ['05', 'WATCHLIST', 'WISHLIST', 'alerts / follows', 'wishlistNode'],
+  ['06', 'COMMAND', 'TRADING', 'orders / fills', 'tradingNode'],
+  ['07', 'READ MODEL', 'PORTFOLIO', 'holdings / EOD', 'portfolioNode'],
+  ['08', 'INSIGHT', 'RANKING', 'leaderboard / cache', 'rankingNode'],
+  ['09', 'GROWTH', 'MISSION', 'goals / rewards', 'missionNode'],
+  ['10', 'EDUCATION', 'LEARNING', 'content / quiz', 'learningNode'],
+  ['11', 'DELIVERY', 'NOTIFICATION', 'push / email', 'notificationNode'],
+  ['12', 'COMMUNITY', 'CHATTING', 'rooms / messages', 'chattingNode'],
+  ['13', 'CONTENT', 'NEWS', 'articles / sync', 'newsNode'],
+];
+
 const serviceGroups = [
   {
     index: 'A',
@@ -392,26 +408,13 @@ export default function Home() {
               <span>SEOUL · KST</span>
             </div>
             <div className={styles.orbit}>
-              <div className={`${styles.serviceNode} ${styles.tradingNode}`}>
-                <small>01 · COMMAND</small>
-                <strong>TRADING</strong>
-                <span>orders · fills</span>
-              </div>
-              <div className={`${styles.serviceNode} ${styles.stockNode}`}>
-                <small>02 · MARKET</small>
-                <strong>STOCK</strong>
-                <span>quotes · candles</span>
-              </div>
-              <div className={`${styles.serviceNode} ${styles.portfolioNode}`}>
-                <small>03 · READ MODEL</small>
-                <strong>PORTFOLIO</strong>
-                <span>holdings · EOD</span>
-              </div>
-              <div className={`${styles.serviceNode} ${styles.rankingNode}`}>
-                <small>04 · INSIGHT</small>
-                <strong>RANKING</strong>
-                <span>history · cache</span>
-              </div>
+              {systemMapServices.map(([number, role, name, detail, className]) => (
+                <div key={name} className={`${styles.serviceNode} ${styles[className]}`}>
+                  <small>{number} · {role}</small>
+                  <strong>{name}</strong>
+                  <span>{detail}</span>
+                </div>
+              ))}
               <div className={styles.orbitLineOne} />
               <div className={styles.orbitLineTwo} />
               <div className={styles.core}>
@@ -421,9 +424,16 @@ export default function Home() {
               </div>
             </div>
             <div className={styles.mapFooter}>
+              <span><i className={styles.springDot} /> Spring Boot</span>
               <span><i className={styles.grpcDot} /> gRPC</span>
-              <span><i className={styles.kafkaDot} /> Kafka / Outbox</span>
+              <span><i className={styles.kafkaDot} /> Redpanda / Kafka</span>
+              <span><i className={styles.outboxDot} /> Outbox</span>
+              <span><i className={styles.redisDot} /> Redis</span>
+              <span><i className={styles.postgresDot} /> PostgreSQL</span>
+              <span><i className={styles.timescaleDot} /> TimescaleDB</span>
               <span><i className={styles.batchDot} /> Spring Batch</span>
+              <span><i className={styles.flywayDot} /> Flyway</span>
+              <span><i className={styles.dockerDot} /> Docker Compose</span>
             </div>
           </div>
         </section>
