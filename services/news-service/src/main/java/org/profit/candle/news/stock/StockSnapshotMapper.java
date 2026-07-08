@@ -9,7 +9,10 @@ final class StockSnapshotMapper {
     }
 
     static StockSnapshot fromProto(StockDetail detail) {
-        Stock stock = detail.getStock();
+        return fromProto(detail.getStock());
+    }
+
+    static StockSnapshot fromProto(Stock stock) {
         return new StockSnapshot(
                 stock.getCode(),
                 stock.getName(),

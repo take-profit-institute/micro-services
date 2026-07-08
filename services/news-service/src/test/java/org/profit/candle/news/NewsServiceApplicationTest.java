@@ -8,9 +8,12 @@ import org.profit.candle.news.target.repository.CollectionTargetJpaRepository;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import javax.sql.DataSource;
+
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = {
+                "spring.grpc.server.enabled=false",
                 "spring.autoconfigure.exclude="
                         + "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
                         + "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,"
@@ -29,6 +32,9 @@ class NewsServiceApplicationTest {
 
     @MockitoBean
     private CollectionLogJpaRepository collectionLogJpaRepository;
+
+    @MockitoBean
+    private DataSource dataSource;
 
     @Test
     void shouldLoadApplicationContext() {
