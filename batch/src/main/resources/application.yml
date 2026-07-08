@@ -65,6 +65,14 @@ batch:
     stock-sync:
       enabled: ${BATCH_STOCK_SYNC_ENABLED:false}
       cron: "${BATCH_STOCK_SYNC_CRON:0 30 16 * * MON-FRI}"
+    # 일봉 캔들 적재(백필). 마감 확정(today-close 22:10)/EOD 전에 그날 일봉을 stock-service에 적재.
+    # 데모 연장 마감(22:00) 직전 21:55에 돌려 마감 확정이 확정할 대상을 확보한다.
+    stock-candle:
+      enabled: ${BATCH_STOCK_CANDLE_INGEST_ENABLED:false}
+      cron: "${BATCH_STOCK_CANDLE_INGEST_CRON:0 55 21 * * MON-FRI}"
+      chunk-size: ${BATCH_STOCK_CANDLE_INGEST_CHUNK_SIZE:50}
+      page-size: ${BATCH_STOCK_CANDLE_INGEST_PAGE_SIZE:100}
+      candle-count: ${BATCH_STOCK_CANDLE_INGEST_CANDLE_COUNT:10}
     market-order-book:
       enabled: ${BATCH_MARKET_ORDER_BOOK_ENABLED:false}
       cron: "${BATCH_MARKET_ORDER_BOOK_CRON:0 */1 * * * MON-FRI}"

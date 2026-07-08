@@ -19,6 +19,7 @@ import org.profit.candle.batch.market.orderbook.job.MarketOrderBookRefreshJobCon
 import org.profit.candle.batch.portfolio.eod.job.PortfolioEodJobConfiguration;
 import org.profit.candle.batch.ranking.job.RankingFinalizeJobConfiguration;
 import org.profit.candle.batch.smoke.job.BatchSmokeJobConfiguration;
+import org.profit.candle.batch.stock.candle.job.StockCandleIngestJobConfiguration;
 import org.profit.candle.batch.stock.sync.job.StockSyncJobConfiguration;
 import org.profit.candle.batch.trading.job.TradingExpireReservationsJobConfiguration;
 import org.profit.candle.batch.trading.job.TradingMarketCloseJobsConfiguration;
@@ -59,6 +60,7 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
             MarketOrderBookRefreshJobConfiguration.JOB_NAME,
             RankingFinalizeJobConfiguration.JOB_NAME,
             StockSyncJobConfiguration.JOB_NAME,
+            StockCandleIngestJobConfiguration.JOB_NAME,
             TradingMorningJobsConfiguration.PREVIOUS_CLOSE_JOB_NAME,
             TradingMorningJobsConfiguration.OPEN_LIMIT_JOB_NAME,
             TradingMarketCloseJobsConfiguration.EXPIRE_PENDING_JOB_NAME,
@@ -107,6 +109,12 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
                         .setDescription("Synchronize KOSPI and KOSDAQ stock catalogs")
                         .addSupportedParameters("runId")
                         .setTriggerable(isRegistered(StockSyncJobConfiguration.JOB_NAME))
+                        .build())
+                .addJobs(BatchJob.newBuilder()
+                        .setName(StockCandleIngestJobConfiguration.JOB_NAME)
+                        .setDescription("Backfill daily candles for listed stocks from Kiwoom")
+                        .addSupportedParameters("runId")
+                        .setTriggerable(isRegistered(StockCandleIngestJobConfiguration.JOB_NAME))
                         .build())
                 .addJobs(BatchJob.newBuilder()
                         .setName(RankingFinalizeJobConfiguration.JOB_NAME)
@@ -248,7 +256,8 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
 
         if (BatchSmokeJobConfiguration.JOB_NAME.equals(jobName)
                 || MarketOrderBookRefreshJobConfiguration.JOB_NAME.equals(jobName)
-                || StockSyncJobConfiguration.JOB_NAME.equals(jobName)) {
+                || StockSyncJobConfiguration.JOB_NAME.equals(jobName)
+                || StockCandleIngestJobConfiguration.JOB_NAME.equals(jobName)) {
             builder.addString("businessDate", input.getOrDefault("businessDate", LocalDate.now(clock).toString()));
             builder.addLong("runId", input.containsKey("runId")
                     ? parseLong(input.get("runId"), "runId")
