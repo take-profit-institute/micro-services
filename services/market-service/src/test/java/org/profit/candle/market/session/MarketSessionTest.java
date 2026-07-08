@@ -34,7 +34,7 @@ class MarketSessionTest {
     @Test
     void status_isClosed_beforeOpenAndAfterClose() {
         assertThat(at("2026-07-03T08:59:59").status()).isEqualTo("CLOSED");
-        assertThat(at("2026-07-03T15:30:00").status()).isEqualTo("CLOSED"); // 마감시각은 이미 CLOSED
+        assertThat(at("2026-07-03T22:00:00").status()).isEqualTo("CLOSED"); // 마감시각(22:00)은 이미 CLOSED
     }
 
     @Test
@@ -68,8 +68,8 @@ class MarketSessionTest {
     void durationUntilNextRegularOpen_skipsWeekendAndHolidays() {
         TradingCalendar holiday = date -> date.equals(LocalDate.of(2026, 7, 6)); // Monday holiday
 
-        assertThat(at("2026-07-03T15:31:00", holiday).durationUntilNextRegularOpen())
-                .isEqualTo(Duration.ofHours(89).plusMinutes(29));
+        assertThat(at("2026-07-03T22:01:00", holiday).durationUntilNextRegularOpen())
+                .isEqualTo(Duration.ofHours(82).plusMinutes(59));
     }
 
     @Test

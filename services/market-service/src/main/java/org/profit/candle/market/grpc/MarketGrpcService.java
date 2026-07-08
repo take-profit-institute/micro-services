@@ -186,7 +186,7 @@ public class MarketGrpcService extends MarketServiceGrpc.MarketServiceImplBase {
     public void getMarketStatus(GetMarketStatusRequest request,
             StreamObserver<GetMarketStatusResponse> observer) {
         // 주말·공휴일·정규장 시간을 모두 반영한 권위 소스(MarketSession).
-        // open = 지금 정규장 체결 가능 시간(거래일 && 09:00~15:30 KST).
+        // open = 지금 정규장 체결 가능 시간(거래일 && 09:00~22:00 KST, 데모 연장).
         String session = marketSession.status(); // "OPEN" | "CLOSED"
         observer.onNext(GetMarketStatusResponse.newBuilder()
                 .setOpen("OPEN".equals(session))

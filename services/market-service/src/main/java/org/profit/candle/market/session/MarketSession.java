@@ -15,7 +15,7 @@ import java.time.Duration;
  * 장 세션 런타임 상태.
  *
  * OPEN/CLOSED 및 연결창 판정은 (현재시각, 오늘 세션창)의 순수 함수이므로 배치가 아니라 여기서
- * 계산한다. 정규장(09:00~15:30 KST) + 주말/휴장일 배제로 거래일을 판정한다. 휴장일은
+ * 계산한다. 정규장(09:00~22:00 KST, 데모 연장) + 주말/휴장일 배제로 거래일을 판정한다. 휴장일은
  * {@link TradingCalendar}(권위 소스 = batch)가 소유한다.
  *
  * @see docs/REALTIME_QUOTE_PIPELINE.md
@@ -25,9 +25,12 @@ public class MarketSession {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final LocalTime REGULAR_OPEN = LocalTime.of(9, 0);
-    private static final LocalTime REGULAR_CLOSE = LocalTime.of(15, 30);
+    // 데모/테스트 목적으로 정규장 마감을 22:00까지 연장한다(실 정규장은 15:30).
+    private static final LocalTime REGULAR_CLOSE = LocalTime.of(22, 0);
 
-    // WS 연결창: 정규장 직전~직후. 시가 형성 첫 틱과 마감 막판 틱을 확보하려고 살짝 넓게 둔다.
+    // WS 연결창: 실제 정규장(15:30) 직전~직후. 시가 형성 첫 틱과 마감 막판 틱을 확보하려고 살짝
+    // 넓게 둔다. 데모용 REGULAR_CLOSE(22:00)와는 분리한다 — 15:30 이후엔 키움 틱이 없어 연결을
+    // 유지할 이유가 없다.
     private static final LocalTime CONNECT_FROM = LocalTime.of(8, 50);
     private static final LocalTime DISCONNECT_AFTER = LocalTime.of(15, 40);
 
