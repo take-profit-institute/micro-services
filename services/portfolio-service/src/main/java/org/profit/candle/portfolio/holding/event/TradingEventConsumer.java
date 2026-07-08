@@ -1,5 +1,7 @@
 package org.profit.candle.portfolio.holding.event;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +29,7 @@ public class TradingEventConsumer {
     public void onOrderFilled(String rawPayload) {
         OrderFilledPayload payload;
         try {
-            payload = objectMapper.readValue(rawPayload, OrderFilledPayload.class);
+            payload = parsePayload(rawPayload);
         } catch (Exception e) {
             log.error("OrderFilled 이벤트 역직렬화 실패. payload={}", rawPayload, e);
             return;
@@ -65,5 +67,23 @@ public class TradingEventConsumer {
             log.error("보유종목 업데이트 실패. orderId={}", payload.orderId(), e);
             throw e;
         }
+    }
+
+    /**
+     * OrderFilled payload를 역직렬화한다.
+     *
+     * <p>발행측(trading-service)의 Kafka value serializer 설정에 따라 payload는 두 형태로 도착할 수 있다:
+     * <ul>
+     *   <li>평문 JSON 객체 — {@code {"orderId":...}}</li>
+     *   <li>이중 인코딩(JSON 문자열로 한 번 더 감싸짐) — {@code "{\"orderId\":...}"}</li>
+     * </ul>
+     * 두 경우를 모두 수용해, producer 직렬화 설정이 바뀌어도 소비가 깨지지 않도록 방어한다.</p>
+     */
+    private OrderFilledPayload parsePayload(String rawPayload) throws JsonProcessingException {
+        JsonNode node = objectMapper.readTree(rawPayload);
+        if (node.isTextual()) { // 이중 인코딩: 문자열 안에 실제 JSON 객체가 들어있다 → 한 번 더 파싱
+            node = objectMapper.readTree(node.asText());
+        }
+        return objectMapper.treeToValue(node, OrderFilledPayload.class);
     }
 }
