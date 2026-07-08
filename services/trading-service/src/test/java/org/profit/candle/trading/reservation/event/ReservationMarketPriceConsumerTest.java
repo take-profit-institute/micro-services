@@ -41,7 +41,7 @@ class ReservationMarketPriceConsumerTest {
     }
 
     private ConsumerRecord<String, String> record(String json) {
-        return new ConsumerRecord<>("market.open-price.v1", 0, 0L, "005930", json);
+        return new ConsumerRecord<>("market.order-book.v1", 0, 0L, "005930", json);
     }
 
     @Test

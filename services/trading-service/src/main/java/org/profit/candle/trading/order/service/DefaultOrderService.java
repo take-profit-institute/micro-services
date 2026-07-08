@@ -57,6 +57,7 @@ public class DefaultOrderService implements OrderService {
 
         AccountEntity account = accountService.getAccount(userId);
 
+
         if (orderRepository.existsByAccountIdAndSymbolAndStatus(
                 account.getId(), command.symbol(), OrderStatusValue.PENDING)) {
             throw new OrderException(OrderErrorCode.DUPLICATE_PENDING_ORDER);
