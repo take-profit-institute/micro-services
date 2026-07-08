@@ -78,7 +78,7 @@ const config = {
           items: [
             {label: 'Batch', to: '/docs/batch/BATCH_ARCHITECTURE'},
             {label: 'Ranking', to: '/docs/ranking/RANKING_SERVICE'},
-            {label: 'Trading', to: '/docs/TRADING_SERVICE'},
+            {label: 'Trading', to: '/docs/trading/TRADING_SERVICE'},
           ],
         },
         {

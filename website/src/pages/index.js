@@ -24,7 +24,7 @@ const documents = [
     tag: 'DOMAIN',
     title: 'Trading Service',
     description: '주문과 예약, 체결, 계좌 상태가 서비스 내부에서 연결되는 흐름을 확인합니다.',
-    link: '/docs/TRADING_SERVICE',
+    link: '/docs/trading/TRADING_SERVICE',
     accent: 'coral',
   },
 ];

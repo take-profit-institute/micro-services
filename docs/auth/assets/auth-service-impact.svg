@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="1200" viewBox="0 0 1500 600" role="img" aria-labelledby="title desc" preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
+  <title id="title">Auth Service impact map</title>
+  <desc id="desc">Auth success and failure impact on downstream services</desc>
+  <defs>
+    <marker id="arrow" markerWidth="15" markerHeight="15" refX="12" refY="7.5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L15 7.5 L0 15 Z" fill="#f6c84c"/>
+    </marker>
+    <style>
+      .bg{fill:#081522}.title{font:800 38px Inter,Arial,sans-serif;fill:#fff}.sub{font:700 16px Inter,Arial,sans-serif;fill:#9fb4c8;letter-spacing:.12em}
+      .box{fill:#132234;stroke:#6d8195;stroke-width:1.8}.auth{fill:#3d3006;stroke:#f6c84c;stroke-width:2.4}.ok{fill:#0d3c31;stroke:#2dd4a3;stroke-width:2}.warn{fill:#3a1d24;stroke:#ff756f;stroke-width:2}.txt{font:800 21px Inter,Arial,sans-serif;fill:#f8fbff}.body{font:600 15px Inter,Arial,sans-serif;fill:#c9d6e3}.line{stroke:#f6c84c;stroke-width:3;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:9 8}
+    </style>
+  </defs>
+  <rect class="bg" width="1500" height="600" rx="30"/>
+  <text x="64" y="72" class="title">AUTH · SERVICE IMPACT</text>
+  <text x="66" y="110" class="sub">AUTH IS THE IDENTITY SOURCE · DOWNSTREAM SERVICES KEEP THEIR OWN PROJECTIONS</text>
+  <rect x="80" y="210" width="310" height="150" rx="26" class="auth"/>
+  <text x="115" y="260" class="txt">AUTH SUCCESS</text>
+  <text x="115" y="296" class="body">oauth_accounts + tokens</text>
+  <text x="115" y="326" class="body">UserCreated outbox</text>
+  <rect x="510" y="145" width="270" height="120" rx="24" class="ok"/>
+  <text x="545" y="190" class="txt">USER</text>
+  <text x="545" y="225" class="body">profile projection</text>
+  <rect x="510" y="315" width="270" height="120" rx="24" class="ok"/>
+  <text x="545" y="360" class="txt">TRADING</text>
+  <text x="545" y="395" class="body">account projection</text>
+  <rect x="900" y="145" width="270" height="120" rx="24" class="ok"/>
+  <text x="935" y="190" class="txt">RANKING</text>
+  <text x="935" y="225" class="body">participant projection</text>
+  <rect x="900" y="315" width="330" height="120" rx="24" class="warn"/>
+  <text x="935" y="360" class="txt">OUTBOX DELAY</text>
+  <text x="935" y="395" class="body">Auth commit stays · relay retries</text>
+  <path d="M390 285 C430 285 455 205 495 205" class="line"/>
+  <path d="M390 285 C430 285 455 375 495 375" class="line"/>
+  <path d="M780 205H885" class="line"/>
+  <path d="M390 330 C560 530 780 520 900 435" class="line dash"/>
+</svg>
