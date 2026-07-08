@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.news.log.repository.CollectionLogJpaRepository;
 import org.profit.candle.news.target.service.CollectionTargetSyncService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(value = "news.collection.scheduler.enabled", havingValue = "true", matchIfMissing = true)
 class NewsCollectionCatchUpRunner {
     private static final List<LocalTime> SLOTS = List.of(
             LocalTime.of(9, 0),
@@ -110,7 +112,7 @@ class NewsCollectionCatchUpRunner {
         try {
             collectionTargetSyncService.syncListedStocksAsAdminTargets();
         } catch (RuntimeException e) {
-            log.warn("Listed stock sync failed. Continue news collection catch-up with existing targets", e);
+            log.error("Listed stock sync failed. Continuing news collection catch-up with existing targets (may be empty)", e);
         }
     }
 

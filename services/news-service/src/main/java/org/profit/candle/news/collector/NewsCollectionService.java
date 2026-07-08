@@ -41,17 +41,28 @@ public class NewsCollectionService {
 
     public NewsCollectionResult collectActiveTargets(String logMessagePrefix) {
         List<CollectionTarget> targets = targetRepository.findByActiveTrueOrderByPriorityAsc();
+        if (targets.isEmpty()) {
+            log.error("News collection skipped: no active targets. Listed-stock sync likely failed, so no news was collected.");
+            collectionWriter.recordLog(0, 0, 0, logMessage(logMessagePrefix, "no active collection targets"));
+            return new NewsCollectionResult(0, 0, 0);
+        }
         int successCount = 0;
         int failCount = 0;
         int consecutiveRateLimitCount = 0;
+        boolean firstRequest = true;
         FailureSummary failureSummary = new FailureSummary();
 
         for (int batchStart = 0; batchStart < targets.size(); batchStart += collectionProperties.batchSize()) {
             int batchEnd = Math.min(batchStart + collectionProperties.batchSize(), targets.size());
-            boolean batchStoppedByRateLimit = false;
 
             for (int index = batchStart; index < batchEnd; index++) {
                 CollectionTarget target = targets.get(index);
+                // Proactive throttle: space out every Naver API call to stay under the rate limit.
+                if (firstRequest) {
+                    firstRequest = false;
+                } else {
+                    sleeper.sleep(collectionProperties.requestDelay());
+                }
                 try {
                     StockSnapshot stock = stockClient.getStock(target.getStockCode());
                     NaverNewsSearchResult searchResult = naverNewsClient.search(new NaverNewsSearchRequest(
@@ -93,13 +104,8 @@ public class NewsCollectionService {
                     );
                     sleeper.sleep(collectionProperties.rateLimitBackoff());
                     consecutiveRateLimitCount = 0;
-                    batchStoppedByRateLimit = true;
                     break;
                 }
-            }
-
-            if (!batchStoppedByRateLimit && hasNextBatch(batchEnd, targets.size())) {
-                sleeper.sleep(collectionProperties.requestDelay());
             }
         }
 
@@ -128,10 +134,6 @@ public class NewsCollectionService {
 
     private boolean shouldBackoff(int consecutiveRateLimitCount) {
         return consecutiveRateLimitCount >= collectionProperties.maxConsecutiveRateLimit();
-    }
-
-    private static boolean hasNextBatch(int batchEnd, int targetCount) {
-        return batchEnd < targetCount;
     }
 
     private static String logMessage(String prefix, String message) {

@@ -37,6 +37,9 @@ stock:
 
 news:
   collection:
+    scheduler:
+      # false 로 두면 정기 스케줄러와 기동 시 catch-up 이 모두 비활성화된다.
+      enabled: ${NEWS_COLLECTION_SCHEDULER_ENABLED:true}
     request-delay: ${NEWS_COLLECTION_REQUEST_DELAY:300ms}
     batch-size: ${NEWS_COLLECTION_BATCH_SIZE:100}
     rate-limit-backoff: ${NEWS_COLLECTION_RATE_LIMIT_BACKOFF:30s}

@@ -44,8 +44,13 @@ public class CollectionTargetSyncService {
             page++;
         }
 
-        log.info("Listed stocks synced to news collection targets. syncedCount={}, pageCount={}",
-                syncedCount, pageCount);
+        if (syncedCount == 0) {
+            log.error("Listed stock sync produced 0 targets. stock-service returned no listed stocks; news collection will have nothing to collect. pageCount={}",
+                    pageCount);
+        } else {
+            log.info("Listed stocks synced to news collection targets. syncedCount={}, pageCount={}",
+                    syncedCount, pageCount);
+        }
         return new CollectionTargetSyncResult(syncedCount, pageCount);
     }
 }

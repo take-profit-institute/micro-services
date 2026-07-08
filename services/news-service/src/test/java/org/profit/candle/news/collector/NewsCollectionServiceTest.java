@@ -129,7 +129,7 @@ class NewsCollectionServiceTest {
     }
 
     @Test
-    void shouldRecordSuccessLogWhenCollectionTargetsAreEmpty() {
+    void shouldRecordFailLogWhenCollectionTargetsAreEmpty() {
         when(targetRepository.findByActiveTrueOrderByPriorityAsc()).thenReturn(List.of());
         List<CollectionLog> logs = captureLogs();
 
@@ -141,8 +141,8 @@ class NewsCollectionServiceTest {
         assertThat(logs).singleElement()
                 .satisfies(log -> {
                     assertThat(log.getTargetCount()).isZero();
-                    assertThat(log.getStatus()).isEqualTo(CollectionStatusType.success);
-                    assertThat(log.getMessage()).isEqualTo("collection completed");
+                    assertThat(log.getStatus()).isEqualTo(CollectionStatusType.fail);
+                    assertThat(log.getMessage()).isEqualTo("no active collection targets");
                 });
         verify(stockClient, never()).getStock(any());
         verify(naverNewsClient, never()).search(any());
@@ -395,7 +395,7 @@ class NewsCollectionServiceTest {
     }
 
     @Test
-    void shouldApplyRequestDelayOnlyBetweenBatches() {
+    void shouldApplyRequestDelayBetweenEveryRequest() {
         NewsCollectionWriter writer = new NewsCollectionWriter(
                 articleRepository,
                 mappingRepository,
@@ -433,7 +433,8 @@ class NewsCollectionServiceTest {
         NewsCollectionResult result = service.collectActiveTargets();
 
         assertThat(result.successCount()).isEqualTo(5);
-        verify(sleeper, times(2)).sleep(requestDelay);
+        // 5 targets → throttle sleep before every request except the first (4 sleeps), regardless of batch size.
+        verify(sleeper, times(4)).sleep(requestDelay);
         verify(sleeper, never()).sleep(Duration.ofSeconds(30));
     }
 

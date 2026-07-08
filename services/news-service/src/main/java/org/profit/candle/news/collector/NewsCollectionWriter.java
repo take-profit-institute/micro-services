@@ -47,7 +47,7 @@ class NewsCollectionWriter {
                 targetCount,
                 successCount,
                 failCount,
-                status(successCount, failCount),
+                status(targetCount, successCount, failCount),
                 message
         ));
     }
@@ -77,7 +77,11 @@ class NewsCollectionWriter {
         return value != null && value.toLowerCase(Locale.ROOT).contains(keyword);
     }
 
-    private static CollectionStatusType status(int successCount, int failCount) {
+    private static CollectionStatusType status(int targetCount, int successCount, int failCount) {
+        if (targetCount == 0) {
+            // No active targets means listed-stock sync did not populate anything: treat as failure, not success.
+            return CollectionStatusType.fail;
+        }
         if (failCount == 0) {
             return CollectionStatusType.success;
         }

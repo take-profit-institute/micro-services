@@ -3,12 +3,14 @@ package org.profit.candle.news.collector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.profit.candle.news.target.service.CollectionTargetSyncService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(value = "news.collection.scheduler.enabled", havingValue = "true", matchIfMissing = true)
 public class NewsCollectionScheduler {
     private final NewsCollectionService newsCollectionService;
     private final CollectionTargetSyncService collectionTargetSyncService;
@@ -42,7 +44,7 @@ public class NewsCollectionScheduler {
         try {
             collectionTargetSyncService.syncListedStocksAsAdminTargets();
         } catch (RuntimeException e) {
-            log.warn("Listed stock sync failed. Continue news collection with existing targets", e);
+            log.error("Listed stock sync failed. Continuing news collection with existing targets (may be empty)", e);
         }
     }
 }
