@@ -3,5 +3,5 @@ package org.profit.candle.portfolio.holding.event;
 public final class ConsumedTopics {
     private ConsumedTopics() {}
 
-    public static final String TRADING_ORDER_FILLED = "orderFilled";
+    public static final String TRADING_ORDER_FILLED = "OrderFilled";
 }
