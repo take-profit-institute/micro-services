@@ -34,3 +34,10 @@ naver:
 stock:
   grpc:
     deadline: ${STOCK_GRPC_DEADLINE:3s}
+
+news:
+  collection:
+    request-delay: ${NEWS_COLLECTION_REQUEST_DELAY:300ms}
+    batch-size: ${NEWS_COLLECTION_BATCH_SIZE:100}
+    rate-limit-backoff: ${NEWS_COLLECTION_RATE_LIMIT_BACKOFF:30s}
+    max-consecutive-rate-limit: ${NEWS_COLLECTION_MAX_CONSECUTIVE_RATE_LIMIT:3}

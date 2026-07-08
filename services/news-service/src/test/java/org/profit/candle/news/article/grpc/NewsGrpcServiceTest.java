@@ -60,6 +60,22 @@ class NewsGrpcServiceTest {
     }
 
     @Test
+    void shouldReturnInvalidArgumentWhenStockCodeIsBlank() {
+        NewsGrpcService service = new NewsGrpcService(stockCode -> {
+            throw new AssertionError("query service should not be called");
+        });
+        RecordingObserver<GetStockNewsResponse> observer = new RecordingObserver<>();
+
+        service.getStockNews(GetStockNewsRequest.newBuilder()
+                .setStockCode(" ")
+                .build(), observer);
+
+        StatusRuntimeException error = (StatusRuntimeException) observer.error;
+        assertThat(Status.fromThrowable(error).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+        assertThat(error.getStatus().getDescription()).isEqualTo("NEWS_INVALID_STOCK_CODE");
+    }
+
+    @Test
     void shouldReturnInternalWhenQueryFails() {
         NewsGrpcService service = new NewsGrpcService(stockCode -> {
             throw new IllegalStateException("database unavailable");
