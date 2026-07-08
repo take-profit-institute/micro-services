@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="1500" viewBox="0 0 1600 750" role="img" aria-labelledby="title desc" preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
+  <title id="title">Auth Service architecture overview</title>
+  <desc id="desc">Auth service login, token, outbox and event flow</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#071521"/>
+      <stop offset="1" stop-color="#121025"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" x2="1">
+      <stop offset="0" stop-color="#6a4a04"/>
+      <stop offset="1" stop-color="#f6c84c"/>
+    </linearGradient>
+    <marker id="arrowGold" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L16 8 L0 16 Z" fill="#f6c84c"/>
+    </marker>
+    <marker id="arrowCoral" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L16 8 L0 16 Z" fill="#ff756f"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L16 8 L0 16 Z" fill="#2dd4a3"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L16 8 L0 16 Z" fill="#55a7ff"/>
+    </marker>
+    <style>
+      .bg{fill:url(#bg)}
+      .grid{stroke:#1c3447;stroke-width:1;opacity:.34}
+      .title{font:800 42px Inter,Arial,sans-serif;fill:#f8fbff;letter-spacing:.02em}
+      .sub{font:700 17px Inter,Arial,sans-serif;fill:#9fb4c8;letter-spacing:.16em}
+      .label{font:800 20px Inter,Arial,sans-serif;fill:#f8fbff}
+      .body{font:600 15px Inter,Arial,sans-serif;fill:#c9d6e3}
+      .small{font:700 12px Inter,Arial,sans-serif;fill:#aebfd0}
+      .chipText{font:800 13px Inter,Arial,sans-serif;fill:#fff1b8}
+      .panel{fill:#102234;stroke:#6d8195;stroke-width:1.5}
+      .auth{fill:#3d3006;stroke:#f6c84c;stroke-width:2.5}
+      .api{fill:#3b1c24;stroke:#ff756f;stroke-width:2.2}
+      .token{fill:#0c3a30;stroke:#2dd4a3;stroke-width:2.2}
+      .db{fill:#112d46;stroke:#55a7ff;stroke-width:2.2}
+      .event{fill:#3a2456;stroke:#b48cff;stroke-width:2.2}
+      .lineGold{stroke:#f6c84c;stroke-width:3;fill:none;marker-end:url(#arrowGold)}
+      .lineCoral{stroke:#ff756f;stroke-width:3;fill:none;marker-end:url(#arrowCoral)}
+      .lineGreen{stroke:#2dd4a3;stroke-width:3;fill:none;marker-end:url(#arrowGreen)}
+      .lineBlue{stroke:#55a7ff;stroke-width:3;fill:none;marker-end:url(#arrowBlue)}
+      .dash{stroke-dasharray:8 8}
+    </style>
+  </defs>
+  <rect class="bg" width="1600" height="750" rx="34"/>
+  <g>
+    <path class="grid" d="M80 0V750 M160 0V750 M240 0V750 M320 0V750 M400 0V750 M480 0V750 M560 0V750 M640 0V750 M720 0V750 M800 0V750 M880 0V750 M960 0V750 M1040 0V750 M1120 0V750 M1200 0V750 M1280 0V750 M1360 0V750 M1440 0V750 M1520 0V750"/>
+    <path class="grid" d="M0 90H1600 M0 180H1600 M0 270H1600 M0 360H1600 M0 450H1600 M0 540H1600 M0 630H1600"/>
+  </g>
+  <text x="70" y="78" class="title">CANDLE · AUTH SERVICE</text>
+  <text x="72" y="116" class="sub">LOGIN · TOKEN · USER CREATED OUTBOX</text>
+
+  <rect x="64" y="185" width="250" height="110" rx="24" class="panel"/>
+  <text x="96" y="226" class="label">CLIENT / BFF</text>
+  <text x="96" y="258" class="body">OAuth code · refresh</text>
+
+  <rect x="385" y="125" width="350" height="235" rx="32" class="auth"/>
+  <rect x="420" y="155" width="148" height="34" rx="17" fill="#705915" opacity=".75"/>
+  <circle cx="444" cy="172" r="7" fill="#ffd36a"/>
+  <text x="464" y="177" class="chipText">AUTH OWNER</text>
+  <text x="420" y="230" class="label">AuthController</text>
+  <text x="420" y="263" class="body">providers · login · refresh · logout</text>
+  <text x="420" y="301" class="body">DefaultOAuthLoginService</text>
+  <text x="420" y="330" class="body">OAuth provider fetch + account upsert</text>
+
+  <rect x="815" y="90" width="280" height="140" rx="26" class="api"/>
+  <text x="852" y="136" class="label">OAUTH PROVIDERS</text>
+  <text x="852" y="170" class="body">Google · Kakao · Naver</text>
+  <text x="852" y="200" class="small">authorization code exchange</text>
+
+  <rect x="815" y="280" width="280" height="150" rx="26" class="token"/>
+  <text x="852" y="328" class="label">TOKEN SERVICE</text>
+  <text x="852" y="362" class="body">RS256 access JWT</text>
+  <text x="852" y="392" class="body">hashed refresh token</text>
+
+  <rect x="1160" y="110" width="310" height="185" rx="28" class="db"/>
+  <text x="1200" y="158" class="label">POSTGRES · auth</text>
+  <text x="1200" y="194" class="body">oauth_accounts</text>
+  <text x="1200" y="224" class="body">refresh_tokens</text>
+  <text x="1200" y="254" class="body">admin_accounts</text>
+
+  <rect x="1160" y="365" width="310" height="170" rx="28" class="event"/>
+  <text x="1200" y="412" class="label">OUTBOX · KAFKA</text>
+  <text x="1200" y="448" class="body">outbox_events</text>
+  <text x="1200" y="478" class="body">auth.user-created.v1</text>
+  <text x="1200" y="508" class="small">partition key = userId</text>
+
+  <rect x="385" y="470" width="350" height="140" rx="28" class="panel"/>
+  <text x="420" y="516" class="label">AuthGrpcService</text>
+  <text x="420" y="550" class="body">ListProviders · GetMe · AdminLogin</text>
+  <text x="420" y="580" class="small">internal service contract</text>
+
+  <path d="M314 240H365" class="lineGold"/>
+  <path d="M735 215 C770 215 780 160 805 160" class="lineCoral"/>
+  <path d="M735 282 C775 282 775 355 805 355" class="lineGreen"/>
+  <path d="M1095 160H1145" class="lineBlue"/>
+  <path d="M1095 355 C1125 355 1125 450 1145 450" class="lineBlue dash"/>
+  <path d="M1315 365 V315" class="lineBlue"/>
+  <path d="M735 540 C880 540 980 535 1145 490" class="lineCoral dash"/>
+
+  <text x="70" y="684" class="small">Source of truth: Auth PostgreSQL · Event delivery: Outbox at-least-once · Downstream consumers rebuild their own projections</text>
+</svg>

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="1500" viewBox="0 0 1500 750" role="img" aria-labelledby="title desc" preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
+  <title id="title">Chatting Service architecture overview</title>
+  <desc id="desc">WebSocket room assignment, JWT handshake, Redis room counters and Pub/Sub</desc>
+  <defs>
+    <marker id="arrow" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#2dd4a3"/></marker>
+    <style>
+      .bg{fill:#071521}.grid{stroke:#1a3448;stroke-width:1;opacity:.32}.title{font:800 38px Inter,Arial,sans-serif;fill:#fff}.sub{font:700 15px Inter,Arial,sans-serif;fill:#9fb4c8;letter-spacing:.14em}.box{fill:#112538;stroke:#6d8195;stroke-width:1.7}.chat{fill:#0d3b31;stroke:#2dd4a3;stroke-width:2.4}.auth{fill:#3d3006;stroke:#f6c84c;stroke-width:2.2}.redis{fill:#3b1d24;stroke:#ff756f;stroke-width:2.2}.txt{font:800 22px Inter,Arial,sans-serif;fill:#f8fbff}.body{font:600 15px Inter,Arial,sans-serif;fill:#c9d6e3}.small{font:700 12px Inter,Arial,sans-serif;fill:#aebfd0}.line{stroke:#2dd4a3;stroke-width:3;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:8 8}
+    </style>
+  </defs>
+  <rect class="bg" width="1500" height="750" rx="34"/>
+  <path class="grid" d="M75 0V750 M150 0V750 M225 0V750 M300 0V750 M375 0V750 M450 0V750 M525 0V750 M600 0V750 M675 0V750 M750 0V750 M825 0V750 M900 0V750 M975 0V750 M1050 0V750 M1125 0V750 M1200 0V750 M1275 0V750 M1350 0V750 M1425 0V750 M0 90H1500 M0 180H1500 M0 270H1500 M0 360H1500 M0 450H1500 M0 540H1500 M0 630H1500"/>
+  <text x="64" y="76" class="title">CHATTING SERVICE</text>
+  <text x="66" y="112" class="sub">WEBSOCKET · JWT HANDSHAKE · REDIS PUB/SUB · STATELESS SERVER</text>
+
+  <rect x="70" y="180" width="260" height="135" rx="26" class="box"/>
+  <text x="105" y="230" class="txt">CLIENT</text>
+  <text x="105" y="266" class="body">room assignment</text>
+  <text x="105" y="296" class="body">WebSocket connect</text>
+
+  <rect x="430" y="130" width="320" height="170" rx="28" class="chat"/>
+  <text x="470" y="180" class="txt">RoomController</text>
+  <text x="470" y="216" class="body">GET /chat/rooms</text>
+  <text x="470" y="246" class="body">capacity-based room</text>
+
+  <rect x="430" y="390" width="320" height="185" rx="28" class="chat"/>
+  <text x="470" y="440" class="txt">ChatWebSocketHandler</text>
+  <text x="470" y="476" class="body">authenticate token</text>
+  <text x="470" y="506" class="body">enter / publish / subscribe</text>
+  <text x="470" y="536" class="body">leave on disconnect</text>
+
+  <rect x="870" y="145" width="280" height="135" rx="26" class="auth"/>
+  <text x="910" y="195" class="txt">AUTH JWKS</text>
+  <text x="910" y="231" class="body">RS256 token verify</text>
+
+  <rect x="870" y="360" width="300" height="190" rx="28" class="redis"/>
+  <text x="910" y="410" class="txt">REDIS</text>
+  <text x="910" y="446" class="body">room counters</text>
+  <text x="910" y="476" class="body">room max index</text>
+  <text x="910" y="506" class="body">chat Pub/Sub channels</text>
+
+  <rect x="1260" y="405" width="170" height="100" rx="24" class="box"/>
+  <text x="1290" y="448" class="txt">NO DB</text>
+  <text x="1290" y="480" class="body">ephemeral chat</text>
+
+  <path d="M330 245H415" class="line"/>
+  <path d="M330 285 C380 285 380 482 415 482" class="line"/>
+  <path d="M750 482H855" class="line"/>
+  <path d="M750 430 C790 430 815 212 855 212" class="line dash"/>
+  <path d="M1170 455H1245" class="line dash"/>
+  <text x="70" y="690" class="small">No message persistence · Redis counters and Pub/Sub only · JWT verified during WebSocket handshake</text>
+</svg>

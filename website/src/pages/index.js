@@ -1,4 +1,5 @@
 import Link from '@docusaurus/Link';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import Layout from '@theme/Layout';
 import styles from './index.module.css';
 
@@ -14,18 +15,172 @@ const documents = [
   {
     number: '02',
     tag: 'DOMAIN',
+    title: 'Auth Service',
+    description: 'OAuth 로그인, 토큰 발급, 신규 사용자 이벤트 발행 흐름을 설명합니다.',
+    link: '/docs/auth/AUTH_SERVICE',
+    accent: 'mint',
+  },
+  {
+    number: '03',
+    tag: 'DOMAIN',
+    title: 'User Service',
+    description: '프로필 생성·조회·수정과 사용자 이벤트 투영 흐름을 설명합니다.',
+    link: '/docs/user/USER_SERVICE',
+    accent: 'blue',
+  },
+  {
+    number: '04',
+    tag: 'DOMAIN',
     title: 'Ranking Service',
     description: '이벤트 투영, 일별 순위 확정, Redis fallback과 멱등성 경계를 설명합니다.',
     link: '/docs/ranking/RANKING_SERVICE',
     accent: 'violet',
   },
   {
-    number: '03',
+    number: '05',
     tag: 'DOMAIN',
     title: 'Trading Service',
     description: '주문과 예약, 체결, 계좌 상태가 서비스 내부에서 연결되는 흐름을 확인합니다.',
     link: '/docs/trading/TRADING_SERVICE',
     accent: 'coral',
+  },
+  {
+    number: '06',
+    tag: 'DOMAIN',
+    title: 'News Service',
+    description: '종목별 뉴스 수집, Stock 연동, Naver News API 저장 흐름을 설명합니다.',
+    link: '/docs/news/NEWS_SERVICE',
+    accent: 'gold',
+  },
+  {
+    number: '07',
+    tag: 'DOMAIN',
+    title: 'Notification Service',
+    description: '알림 생성, FCM 발송, 읽음 처리, 멱등성 저장 흐름을 설명합니다.',
+    link: '/docs/notification/NOTIFICATION_SERVICE',
+    accent: 'violet',
+  },
+  {
+    number: '08',
+    tag: 'DOMAIN',
+    title: 'Chatting Service',
+    description: 'WebSocket 채팅방, JWT 핸드셰이크, Redis Pub/Sub 구조를 설명합니다.',
+    link: '/docs/chatting/CHATTING_SERVICE',
+    accent: 'mint',
+  },
+  {
+    number: '09',
+    tag: 'DOMAIN',
+    title: 'Wishlist Service',
+    description: '관심종목, 가격 알림, Market 구독 수요 이벤트 흐름을 설명합니다.',
+    link: '/docs/wishlist/WISHLIST_SERVICE',
+    accent: 'coral',
+  },
+  {
+    number: '10',
+    tag: 'BATCH',
+    title: 'Trading Batch',
+    description: '예약·주문 배치 실행 순서와 수동 운영 방법을 설명합니다.',
+    link: '/docs/batch/TRADING_BATCH',
+    accent: 'coral',
+  },
+  {
+    number: '11',
+    tag: 'BATCH',
+    title: 'Portfolio EOD Batch',
+    description: '장 마감 포트폴리오 스냅샷 생성과 gRPC 연동 흐름을 설명합니다.',
+    link: '/docs/batch/PORTFOLIO_EOD_BATCH',
+    accent: 'blue',
+  },
+  {
+    number: '12',
+    tag: 'BATCH',
+    title: 'Ranking Batch',
+    description: 'Portfolio EOD 완료 후 일별 랭킹 확정 배치 흐름을 설명합니다.',
+    link: '/docs/batch/RANKING_BATCH',
+    accent: 'violet',
+  },
+  {
+    number: '13',
+    tag: 'BATCH',
+    title: 'Stock Sync Batch',
+    description: 'Stock Service 종목 마스터 동기화 배치와 운영 정책을 설명합니다.',
+    link: '/docs/batch/STOCK_SYNC_BATCH',
+    accent: 'mint',
+  },
+  {
+    number: '14',
+    tag: 'OPS',
+    title: 'Batch Manual Operation',
+    description: '전체 Batch Job 목록, 수동 실행 명령, DB 확인 방법을 설명합니다.',
+    link: '/docs/batch/BATCH_MANUAL_OPERATION',
+    accent: 'gold',
+  },
+];
+
+const domainArchitectures = [
+  {
+    name: 'Batch',
+    eyebrow: 'ORCHESTRATION',
+    image: '/img/domain-architecture/batch-architecture-overview.svg',
+    link: '/docs/batch/BATCH_ARCHITECTURE',
+    description: 'Trading, EOD, Ranking, Stock Sync를 시간 순서와 선행 조건으로 묶는 운영 오케스트레이션입니다.',
+  },
+  {
+    name: 'Auth',
+    eyebrow: 'IDENTITY',
+    image: '/img/domain-architecture/auth-architecture-overview.svg',
+    link: '/docs/auth/AUTH_SERVICE',
+    description: 'OAuth 로그인, JWT·refresh token, 신규 사용자 생성 Outbox를 소유하는 인증 진입점입니다.',
+  },
+  {
+    name: 'User',
+    eyebrow: 'PROFILE',
+    image: '/img/domain-architecture/user-architecture-overview.svg',
+    link: '/docs/user/USER_SERVICE',
+    description: 'Auth 이벤트로 기본 프로필을 만들고, 멱등한 프로필 수정과 UserProfileUpdated 이벤트를 처리합니다.',
+  },
+  {
+    name: 'Trading',
+    eyebrow: 'ORDER CORE',
+    image: '/img/domain-architecture/trading-architecture-overview.png',
+    link: '/docs/trading/TRADING_SERVICE',
+    description: '계좌, 주문, 예약 주문, 체결과 Outbox를 소유하는 투자 거래의 핵심 도메인입니다.',
+  },
+  {
+    name: 'Ranking',
+    eyebrow: 'PERFORMANCE',
+    image: '/img/domain-architecture/ranking-architecture-overview.svg',
+    link: '/docs/ranking/RANKING_SERVICE',
+    description: 'Portfolio EOD 수익률을 기준으로 일별 순위를 확정하고 Redis cache-aside 조회를 제공합니다.',
+  },
+  {
+    name: 'News',
+    eyebrow: 'CONTENT',
+    image: '/img/domain-architecture/news-architecture-overview.svg',
+    link: '/docs/news/NEWS_SERVICE',
+    description: 'Stock gRPC와 Naver News API를 결합해 종목별 최신 뉴스를 수집하고 DB에서 조회합니다.',
+  },
+  {
+    name: 'Notification',
+    eyebrow: 'DELIVERY',
+    image: '/img/domain-architecture/notification-architecture-overview.svg',
+    link: '/docs/notification/NOTIFICATION_SERVICE',
+    description: '알림 생성, 기기 토큰, 읽음 처리, FCM 발송 결과와 멱등성 기록을 관리합니다.',
+  },
+  {
+    name: 'Chatting',
+    eyebrow: 'REALTIME',
+    image: '/img/domain-architecture/chatting-architecture-overview.svg',
+    link: '/docs/chatting/CHATTING_SERVICE',
+    description: 'WebSocket 연결, JWT 핸드셰이크, Redis 방 카운터와 Pub/Sub로 실시간 종목 채팅을 제공합니다.',
+  },
+  {
+    name: 'Wishlist',
+    eyebrow: 'WATCHLIST',
+    image: '/img/domain-architecture/wishlist-architecture-overview.svg',
+    link: '/docs/wishlist/WISHLIST_SERVICE',
+    description: '관심 종목 관리, 실시간 시세 기반 가격 알림, Market 구독 수요 이벤트를 연결합니다.',
   },
 ];
 
@@ -120,6 +275,24 @@ const productJourneys = [
   },
 ];
 
+function ArchitectureCard({domain}) {
+  const imageUrl = useBaseUrl(domain.image);
+
+  return (
+    <article className={styles.architectureCard}>
+      <div className={styles.architectureImageWrap}>
+        <img src={imageUrl} alt={`${domain.name} architecture overview`} loading="lazy" />
+      </div>
+      <div className={styles.architectureBody}>
+        <span>{domain.eyebrow}</span>
+        <h3>{domain.name}</h3>
+        <p>{domain.description}</p>
+        <Link to={domain.link}>자세한 docs 보기 <b>↗</b></Link>
+      </div>
+    </article>
+  );
+}
+
 export default function Home() {
   return (
     <Layout
@@ -147,9 +320,9 @@ export default function Home() {
               <Link className={styles.primaryAction} to="/docs/batch/BATCH_ARCHITECTURE">
                 전체 아키텍처 보기 <span aria-hidden="true">↗</span>
               </Link>
-              <Link className={styles.secondaryAction} to="/docs/CONVENTIONS">
-                구현 규칙 살펴보기 <span aria-hidden="true">→</span>
-              </Link>
+              <a className={styles.secondaryAction} href="#domain-architecture">
+                도메인별 도식화 보기 <span aria-hidden="true">→</span>
+              </a>
             </div>
           </div>
 
@@ -192,6 +365,24 @@ export default function Home() {
               <span><i className={styles.kafkaDot} /> Kafka / Outbox</span>
               <span><i className={styles.batchDot} /> Spring Batch</span>
             </div>
+          </div>
+        </section>
+
+        <section id="domain-architecture" className={styles.architectureSection} aria-labelledby="domain-architecture-title">
+          <div className={styles.architectureHeading}>
+            <div>
+              <span className={styles.kicker}>DOMAIN ARCHITECTURE</span>
+              <h2 id="domain-architecture-title">각 도메인의 전체 구조를<br />한 장의 그림으로 먼저 봅니다.</h2>
+            </div>
+            <p>
+              메인에서는 서비스별 핵심 흐름만 빠르게 파악하고, 세부 RPC·이벤트·테이블·테스트 방법은
+              각 문서에서 이어서 확인합니다.
+            </p>
+          </div>
+          <div className={styles.architectureGrid}>
+            {domainArchitectures.map((domain) => (
+              <ArchitectureCard key={domain.name} domain={domain} />
+            ))}
           </div>
         </section>
 
@@ -362,7 +553,7 @@ export default function Home() {
         <section className={styles.finalCta}>
           <span className={styles.kicker}>START EXPLORING</span>
           <h2>코드의 맥락을 잃지 않는<br />Candle의 단일 문서 허브.</h2>
-          <Link className={styles.primaryAction} to="/docs/CONVENTIONS">
+          <Link className={styles.primaryAction} to="/docs/batch/BATCH_ARCHITECTURE">
             ENGINEERING DOCS <span aria-hidden="true">↗</span>
           </Link>
         </section>

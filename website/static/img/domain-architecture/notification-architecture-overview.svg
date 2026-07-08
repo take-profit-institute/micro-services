@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="1500" viewBox="0 0 1500 750" role="img" aria-labelledby="title desc" preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
+  <title id="title">Notification Service architecture overview</title>
+  <desc id="desc">Notification gRPC, idempotency, PostgreSQL, Outbox and FCM delivery flow</desc>
+  <defs>
+    <marker id="arrow" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#b48cff"/></marker>
+    <marker id="green" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#2dd4a3"/></marker>
+    <style>
+      .bg{fill:#081522}.grid{stroke:#1a3448;stroke-width:1;opacity:.32}.title{font:800 38px Inter,Arial,sans-serif;fill:#fff}.sub{font:700 15px Inter,Arial,sans-serif;fill:#9fb4c8;letter-spacing:.14em}.box{fill:#112538;stroke:#6d8195;stroke-width:1.7}.noti{fill:#2d1c4f;stroke:#b48cff;stroke-width:2.4}.db{fill:#102f4d;stroke:#55a7ff;stroke-width:2.2}.fcm{fill:#0d3b31;stroke:#2dd4a3;stroke-width:2.2}.outbox{fill:#4a2508;stroke:#ff9a2f;stroke-width:2.2}.txt{font:800 22px Inter,Arial,sans-serif;fill:#f8fbff}.body{font:600 15px Inter,Arial,sans-serif;fill:#c9d6e3}.small{font:700 12px Inter,Arial,sans-serif;fill:#aebfd0}.line{stroke:#b48cff;stroke-width:3;fill:none;marker-end:url(#arrow)}.lineGreen{stroke:#2dd4a3;stroke-width:3;fill:none;marker-end:url(#green)}.dash{stroke-dasharray:8 8}
+    </style>
+  </defs>
+  <rect class="bg" width="1500" height="750" rx="34"/>
+  <path class="grid" d="M75 0V750 M150 0V750 M225 0V750 M300 0V750 M375 0V750 M450 0V750 M525 0V750 M600 0V750 M675 0V750 M750 0V750 M825 0V750 M900 0V750 M975 0V750 M1050 0V750 M1125 0V750 M1200 0V750 M1275 0V750 M1350 0V750 M1425 0V750 M0 90H1500 M0 180H1500 M0 270H1500 M0 360H1500 M0 450H1500 M0 540H1500 M0 630H1500"/>
+  <text x="64" y="76" class="title">NOTIFICATION SERVICE</text>
+  <text x="66" y="112" class="sub">gRPC COMMANDS · IDEMPOTENCY · FCM DELIVERY STATUS</text>
+
+  <rect x="70" y="235" width="250" height="130" rx="24" class="box"/>
+  <text x="105" y="285" class="txt">CLIENT / SERVICE</text>
+  <text x="105" y="320" class="body">create · read · delete</text>
+
+  <rect x="415" y="160" width="330" height="240" rx="30" class="noti"/>
+  <text x="455" y="212" class="txt">NotificationGrpcService</text>
+  <text x="455" y="250" class="body">RegisterDeviceToken</text>
+  <text x="455" y="282" class="body">CreateNotification</text>
+  <text x="455" y="314" class="body">List / Read / Delete</text>
+  <text x="455" y="346" class="body">IdempotencyExecutor</text>
+
+  <rect x="850" y="130" width="280" height="185" rx="28" class="db"/>
+  <text x="890" y="180" class="txt">POSTGRES</text>
+  <text x="890" y="216" class="body">notifications</text>
+  <text x="890" y="246" class="body">device_tokens</text>
+  <text x="890" y="276" class="body">deliveries · idempotency</text>
+
+  <rect x="850" y="390" width="280" height="135" rx="28" class="outbox"/>
+  <text x="890" y="440" class="txt">OUTBOX TABLE</text>
+  <text x="890" y="476" class="body">record only</text>
+
+  <rect x="1210" y="245" width="230" height="150" rx="28" class="fcm"/>
+  <text x="1245" y="296" class="txt">FCM</text>
+  <text x="1245" y="332" class="body">Firebase Admin SDK</text>
+  <text x="1245" y="362" class="body">message result</text>
+
+  <path d="M320 300H400" class="line"/>
+  <path d="M745 245H835" class="line"/>
+  <path d="M745 330 C785 330 800 457 835 457" class="line dash"/>
+  <path d="M1130 310H1195" class="lineGreen"/>
+  <path d="M1210 360 C1140 560 970 570 990 525" class="lineGreen dash"/>
+  <text x="70" y="690" class="small">State-changing RPCs use idempotency · FCM is called directly · Kafka relay is not implemented yet</text>
+</svg>

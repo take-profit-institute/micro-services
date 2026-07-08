@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="1500" viewBox="0 0 1500 750" role="img" aria-labelledby="title desc" preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
+  <title id="title">Wishlist Service architecture overview</title>
+  <desc id="desc">Wishlist gRPC, Redis market quote subscription, notification gRPC client, and Kafka Outbox subscription demand</desc>
+  <defs>
+    <marker id="arrow" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#f6c84c"/></marker>
+    <marker id="green" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#2dd4a3"/></marker>
+    <style>
+      .bg{fill:#071521}.grid{stroke:#1a3448;stroke-width:1;opacity:.32}.title{font:800 38px Inter,Arial,sans-serif;fill:#fff}.sub{font:700 15px Inter,Arial,sans-serif;fill:#9fb4c8;letter-spacing:.14em}.box{fill:#112538;stroke:#6d8195;stroke-width:1.7}.wish{fill:#3a3008;stroke:#f6c84c;stroke-width:2.4}.alert{fill:#3b1d24;stroke:#ff756f;stroke-width:2.2}.db{fill:#102f4d;stroke:#55a7ff;stroke-width:2.2}.external{fill:#0d3b31;stroke:#2dd4a3;stroke-width:2.2}.txt{font:800 22px Inter,Arial,sans-serif;fill:#f8fbff}.body{font:600 15px Inter,Arial,sans-serif;fill:#c9d6e3}.small{font:700 12px Inter,Arial,sans-serif;fill:#aebfd0}.line{stroke:#f6c84c;stroke-width:3;fill:none;marker-end:url(#arrow)}.lineGreen{stroke:#2dd4a3;stroke-width:3;fill:none;marker-end:url(#green)}.dash{stroke-dasharray:8 8}
+    </style>
+  </defs>
+  <rect class="bg" width="1500" height="750" rx="34"/>
+  <path class="grid" d="M75 0V750 M150 0V750 M225 0V750 M300 0V750 M375 0V750 M450 0V750 M525 0V750 M600 0V750 M675 0V750 M750 0V750 M825 0V750 M900 0V750 M975 0V750 M1050 0V750 M1125 0V750 M1200 0V750 M1275 0V750 M1350 0V750 M1425 0V750 M0 90H1500 M0 180H1500 M0 270H1500 M0 360H1500 M0 450H1500 M0 540H1500 M0 630H1500"/>
+  <text x="64" y="76" class="title">WISHLIST SERVICE</text>
+  <text x="66" y="112" class="sub">WATCHLIST COMMANDS · PRICE ALERTS · MARKET SUBSCRIPTION DEMAND</text>
+
+  <rect x="70" y="240" width="245" height="130" rx="24" class="box"/>
+  <text x="105" y="290" class="txt">CLIENT / BFF</text>
+  <text x="105" y="326" class="body">add · remove · list</text>
+
+  <rect x="395" y="145" width="330" height="185" rx="28" class="wish"/>
+  <text x="435" y="195" class="txt">WishlistGrpcService</text>
+  <text x="435" y="231" class="body">DefaultWishlistService</text>
+  <text x="435" y="261" class="body">soft delete watchlist</text>
+  <text x="435" y="291" class="body">subscription demand Outbox</text>
+
+  <rect x="395" y="430" width="330" height="160" rx="28" class="alert"/>
+  <text x="435" y="480" class="txt">PriceAlertService</text>
+  <text x="435" y="516" class="body">Redis quote tick evaluate</text>
+  <text x="435" y="546" class="body">threshold → notification</text>
+
+  <rect x="835" y="145" width="260" height="170" rx="26" class="db"/>
+  <text x="875" y="195" class="txt">POSTGRES</text>
+  <text x="875" y="231" class="body">wishlist_items</text>
+  <text x="875" y="261" class="body">price_alerts</text>
+  <text x="875" y="291" class="body">outbox_events</text>
+
+  <rect x="835" y="430" width="260" height="140" rx="26" class="external"/>
+  <text x="875" y="480" class="txt">MARKET REDIS</text>
+  <text x="875" y="516" class="body">quote Pub/Sub</text>
+
+  <rect x="1190" y="175" width="240" height="125" rx="24" class="external"/>
+  <text x="1225" y="225" class="txt">MARKET KAFKA</text>
+  <text x="1225" y="261" class="body">subscribe / unsubscribe</text>
+
+  <rect x="1190" y="440" width="240" height="125" rx="24" class="external"/>
+  <text x="1225" y="490" class="txt">NOTIFICATION</text>
+  <text x="1225" y="526" class="body">CreateNotification</text>
+
+  <path d="M315 305H380" class="line"/>
+  <path d="M725 236H820" class="line"/>
+  <path d="M725 286 C945 360 1030 238 1175 238" class="line dash"/>
+  <path d="M835 500H740" class="lineGreen"/>
+  <path d="M725 510H1175" class="lineGreen"/>
+  <path d="M560 330V415" class="line"/>
+  <text x="70" y="690" class="small">Wishlist owns user watchlist and alert records · Market quote input via Redis · Market subscription demand via Outbox/Kafka</text>
+</svg>
