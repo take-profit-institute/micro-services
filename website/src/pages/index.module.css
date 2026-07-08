@@ -4,9 +4,21 @@
   --coral: #ff7474;
   --blue: #54a7ff;
   --violet: #b88cff;
+  --ifm-font-color-base: #d6e2eb;
+  --ifm-heading-color: #f8fbff;
+  --ifm-link-color: #f8d980;
   overflow: hidden;
   background: #06131e;
-  color: #f5f8fa;
+  color: var(--ifm-font-color-base);
+  color-scheme: dark;
+}
+
+.main h1,
+.main h2,
+.main h3,
+.main h4,
+.main strong {
+  color: var(--ifm-heading-color);
 }
 
 .hero {
@@ -735,6 +747,7 @@
 
 .architectureBody h3 {
   margin: 0.55rem 0 0.75rem;
+  color: #f8fbff;
   font-size: 1.55rem;
   letter-spacing: -0.04em;
 }
@@ -862,6 +875,7 @@
   position: relative;
   z-index: 1;
   margin: 0 0 1rem;
+  color: #f8fbff;
   font-size: clamp(1.65rem, 2.5vw, 2.4rem);
   letter-spacing: -0.04em;
 }

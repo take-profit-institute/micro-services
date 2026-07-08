@@ -94,6 +94,22 @@ const documents = [
   },
   {
     number: '12',
+    tag: 'DOMAIN',
+    title: 'Portfolio Service',
+    description: '체결 이벤트로 보유 자산을 투영하고 조회·EOD 스냅샷을 제공하는 흐름을 설명합니다.',
+    link: '/docs/portfolio/PORTFOLIO_SERVICE',
+    accent: 'blue',
+  },
+  {
+    number: '13',
+    tag: 'DOMAIN',
+    title: 'Stock Service',
+    description: '종목 마스터, 캔들 조회·백필, 일봉 확정과 Outbox 발행 흐름을 설명합니다.',
+    link: '/docs/stock/STOCK_SERVICE',
+    accent: 'mint',
+  },
+  {
+    number: '14',
     tag: 'BATCH',
     title: 'Trading Batch',
     description: '예약·주문 배치 실행 순서와 수동 운영 방법을 설명합니다.',
@@ -101,7 +117,7 @@ const documents = [
     accent: 'coral',
   },
   {
-    number: '13',
+    number: '15',
     tag: 'BATCH',
     title: 'Portfolio EOD Batch',
     description: '장 마감 포트폴리오 스냅샷 생성과 gRPC 연동 흐름을 설명합니다.',
@@ -109,7 +125,7 @@ const documents = [
     accent: 'blue',
   },
   {
-    number: '14',
+    number: '16',
     tag: 'BATCH',
     title: 'Ranking Batch',
     description: 'Portfolio EOD 완료 후 일별 랭킹 확정 배치 흐름을 설명합니다.',
@@ -117,7 +133,7 @@ const documents = [
     accent: 'violet',
   },
   {
-    number: '15',
+    number: '17',
     tag: 'BATCH',
     title: 'Stock Sync Batch',
     description: 'Stock Service 종목 마스터 동기화 배치와 운영 정책을 설명합니다.',
@@ -125,7 +141,7 @@ const documents = [
     accent: 'mint',
   },
   {
-    number: '16',
+    number: '18',
     tag: 'OPS',
     title: 'Batch Manual Operation',
     description: '전체 Batch Job 목록, 수동 실행 명령, DB 확인 방법을 설명합니다.',
@@ -211,6 +227,20 @@ const domainArchitectures = [
     image: '/img/domain-architecture/wishlist-architecture-overview.svg',
     link: '/docs/wishlist/WISHLIST_SERVICE',
     description: '관심 종목 관리, 실시간 시세 기반 가격 알림, Market 구독 수요 이벤트를 연결합니다.',
+  },
+  {
+    name: 'Portfolio',
+    eyebrow: 'ASSET READ MODEL',
+    image: '/img/domain-architecture/portfolio-service-flow.svg',
+    link: '/docs/portfolio/PORTFOLIO_SERVICE',
+    description: 'Trading 체결 이벤트를 보유 자산으로 투영하고 분석 조회와 일별 EOD 스냅샷을 제공합니다.',
+  },
+  {
+    name: 'Stock',
+    eyebrow: 'REFERENCE DATA',
+    image: '/img/domain-architecture/stock-service-flow.svg',
+    link: '/docs/stock/STOCK_SERVICE',
+    description: '종목 마스터와 캔들을 저장하고 Kiwoom 백필, 일봉 확정, Outbox 발행을 담당합니다.',
   },
 ];
 
