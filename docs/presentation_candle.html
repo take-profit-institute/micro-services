@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candle 서비스 프로젝트 발표 자료</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #050508;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --text-soft: #cbd5e1;
+            --text-faint: #475569;
+            --card-bg: rgba(15, 15, 25, 0.6);
+            --card-border: rgba(255, 255, 255, 0.04);
+            --card-hover-bg: rgba(20, 20, 30, 0.85);
+            --flow-card-bg: rgba(15, 15, 25, 0.5);
+            --flow-card-hover-bg: rgba(20, 20, 30, 0.7);
+            --spec-bg: rgba(8, 8, 12, 0.85);
+            --nav-bg: rgba(10, 10, 15, 0.85);
+            --nav-btn-bg: rgba(255, 255, 255, 0.02);
+            --nav-btn-border: rgba(255, 255, 255, 0.08);
+            --dot-bg: rgba(255, 255, 255, 0.12);
+            --cover-tag-bg: rgba(255, 126, 71, 0.03);
+            --cover-tag-color: #e2e8f0;
+            --table-border: rgba(255, 255, 255, 0.05);
+        }
+
+        [data-theme="light"] {
+            --bg: #f4f5f9;
+            --text: #14151a;
+            --text-muted: #52596b;
+            --text-dim: #6b7280;
+            --text-soft: #333844;
+            --text-faint: #94a3b8;
+            --card-bg: rgba(255, 255, 255, 0.75);
+            --card-border: rgba(15, 15, 25, 0.08);
+            --card-hover-bg: rgba(255, 255, 255, 0.97);
+            --flow-card-bg: rgba(255, 255, 255, 0.7);
+            --flow-card-hover-bg: rgba(255, 255, 255, 0.95);
+            --spec-bg: rgba(255, 255, 255, 0.92);
+            --nav-bg: rgba(255, 255, 255, 0.85);
+            --nav-btn-bg: rgba(0, 0, 0, 0.03);
+            --nav-btn-border: rgba(0, 0, 0, 0.1);
+            --dot-bg: rgba(0, 0, 0, 0.15);
+            --cover-tag-bg: rgba(255, 126, 71, 0.07);
+            --cover-tag-color: #3a3f4b;
+            --table-border: rgba(0, 0, 0, 0.07);
+        }
+
+        body {
+            font-family: 'Noto Sans KR', 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            user-select: none;
+            transition: background .4s, color .4s;
+        }
+
+        .slide {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 80px;
+            opacity: 0;
+            transform: translateX(80px);
+            transition: all .6s cubic-bezier(.4, 0, .2, 1);
+            pointer-events: none;
+            background: var(--bg);
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+        }
+
+        .slide.prev {
+            opacity: 0;
+            transform: translateX(-80px);
+        }
+
+        /* Background Effects - Candle Flame and Chart Glow */
+        .cover-bg {
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse at 30% 20%, rgba(255, 126, 71, 0.12), transparent 45%), 
+                radial-gradient(ellipse at 80% 70%, rgba(0, 180, 216, 0.1), transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.05), transparent 40%);
+            z-index: 0;
+        }
+
+        /* Navigation Buttons */
+        .nav {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+            background: var(--nav-bg);
+            padding: 8px 20px;
+            border-radius: 40px;
+            border: 1px solid rgba(255, 126, 71, 0.15);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 30px -5px rgba(255, 126, 71, 0.1);
+            transition: background .4s;
+        }
+
+        .nav button {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 1px solid var(--nav-btn-border);
+            background: var(--nav-btn-bg);
+            color: var(--text);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all .3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            outline: none;
+        }
+
+        .nav button:hover:not(:disabled) {
+            background: rgba(255, 126, 71, 0.3);
+            border-color: rgba(255, 126, 71, 0.6);
+            box-shadow: 0 0 15px rgba(255, 126, 71, 0.4);
+            transform: scale(1.05);
+        }
+
+        .nav button:disabled {
+            opacity: 0.2;
+            cursor: not-allowed;
+        }
+
+        .nav .page {
+            color: var(--text-muted);
+            font-size: .85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: 1.5px;
+        }
+
+        /* Dots Indicator */
+        .dots {
+            position: fixed;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--dot-bg);
+            cursor: pointer;
+            transition: all .3s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        .dot.active {
+            background: linear-gradient(135deg, #ff7e47, #ef4444);
+            transform: scale(1.8);
+            box-shadow: 0 0 10px rgba(255, 126, 71, 0.8);
+        }
+
+        /* Typography */
+        .cover-title {
+            font-size: clamp(2.2rem, 4.8vw, 3.8rem);
+            font-weight: 900;
+            text-align: center;
+            line-height: 1.3;
+            margin-bottom: 25px;
+            letter-spacing: -1.5px;
+            z-index: 1;
+        }
+
+        .cover-title span {
+            background: linear-gradient(135deg, #ff7e47, #ef4444, #00b4d8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 40px rgba(255, 126, 71, 0.15);
+        }
+
+        .cover-sub {
+            font-size: clamp(1rem, 1.8vw, 1.3rem);
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 45px;
+            font-weight: 400;
+            z-index: 1;
+        }
+
+        .cover-tags {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            z-index: 1;
+            max-width: 900px;
+        }
+
+        .cover-tag {
+            padding: 8px 18px;
+            border-radius: 30px;
+            font-size: .8rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            border: 1px solid rgba(255, 126, 71, 0.2);
+            background: var(--cover-tag-bg);
+            color: var(--cover-tag-color);
+            backdrop-filter: blur(8px);
+            transition: all 0.3s;
+        }
+        
+        .cover-tag:hover {
+            border-color: rgba(255, 126, 71, 0.6);
+            background: rgba(255, 126, 71, 0.08);
+            box-shadow: 0 0 10px rgba(255, 126, 71, 0.2);
+        }
+
+        .s-title {
+            font-size: clamp(1.8rem, 3.2vw, 2.3rem);
+            font-weight: 850;
+            margin-bottom: 8px;
+            text-align: center;
+            letter-spacing: -0.5px;
+            z-index: 1;
+        }
+
+        .s-title span {
+            background: linear-gradient(135deg, #ff7e47, #ef4444);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .s-subtitle {
+            color: var(--text-dim);
+            font-size: .95rem;
+            text-align: center;
+            margin-bottom: 30px;
+            font-weight: 400;
+            z-index: 1;
+        }
+
+        /* Glassmorphism Cards & Grids - Candle Custom */
+        .feat-grid {
+            display: grid;
+            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            width: 100%;
+            max-width: 1100px;
+            z-index: 1;
+        }
+
+        .feat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px 22px;
+            transition: all .4s cubic-bezier(.4, 0, .2, 1);
+            backdrop-filter: blur(16px);
+        }
+
+        .feat-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 126, 71, 0.35);
+            background: var(--card-hover-bg);
+            box-shadow: 0 15px 30px -10px rgba(255, 126, 71, 0.15);
+        }
+
+        .feat-card h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feat-card h3 span {
+            color: #ff7e47;
+        }
+
+        .feat-card p {
+            font-size: .85rem;
+            color: var(--text-muted);
+            line-height: 1.55;
+        }
+
+        /* Flow Cards & Rows */
+        .flow-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: stretch;
+            max-width: 1200px;
+            width: 100%;
+            z-index: 1;
+        }
+
+        .flow-card {
+            background: var(--flow-card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px 16px;
+            width: 185px;
+            text-align: center;
+            transition: all .4s;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        .flow-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(0, 180, 216, 0.35);
+            background: var(--flow-card-hover-bg);
+            box-shadow: 0 10px 20px -5px rgba(0, 180, 216, 0.15);
+        }
+
+        .flow-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .flow-label {
+            font-weight: 700;
+            font-size: .95rem;
+            margin-bottom: 6px;
+            color: var(--text);
+        }
+
+        .flow-desc {
+            font-size: .75rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+        }
+
+        .flow-arrow {
+            font-size: 1.3rem;
+            color: var(--text-faint);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: arrowAnim 1.5s ease-in-out infinite;
+        }
+
+        @keyframes arrowAnim {
+            0%, 100% {
+                transform: translateX(0);
+                opacity: .3;
+            }
+            50% {
+                transform: translateX(5px);
+                opacity: 1;
+            }
+        }
+
+        /* Structured Spec Display (Alternative to Code Blocks) */
+        .spec-container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--spec-bg);
+            border: 1px solid rgba(255, 126, 71, 0.15);
+            border-radius: 14px;
+            padding: 20px 25px;
+            margin-top: 10px;
+            font-size: 0.88rem;
+            line-height: 1.6;
+            color: var(--text-soft);
+            text-align: left;
+            z-index: 1;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 8px rgba(255, 126, 71, 0.05);
+        }
+
+        .spec-header {
+            font-weight: 700;
+            color: #ff7e47;
+            border-bottom: 1px solid rgba(255, 126, 71, 0.2);
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .spec-item {
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .spec-item-title {
+            color: var(--text);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .spec-item-desc {
+            color: var(--text-muted);
+            padding-left: 15px;
+            font-size: 0.82rem;
+        }
+
+        /* General Highlights */
+        .accent {
+            color: #ff7e47;
+            font-weight: 600;
+        }
+
+        .accent-blue {
+            color: #00b4d8;
+            font-weight: 600;
+        }
+        
+        .highlight {
+            color: #ef4444;
+            font-weight: 600;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            background: rgba(255, 126, 71, 0.1);
+            color: #ff7e47;
+            border: 1px solid rgba(255, 126, 71, 0.25);
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        footer {
+            position: absolute;
+            bottom: 20px;
+            left: 40px;
+            font-size: 0.7rem;
+            color: var(--text-faint);
+            z-index: 50;
+            letter-spacing: 0.5px;
+        }
+
+        /* Two columns layout */
+        .layout-columns {
+            display: flex;
+            gap: 30px;
+            width: 100%;
+            max-width: 1100px;
+            z-index: 1;
+            align-items: center;
+        }
+
+        .layout-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .list-styled {
+            list-style: none;
+            margin-top: 10px;
+        }
+
+        .list-styled li {
+            position: relative;
+            padding-left: 20px;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: var(--text-soft);
+            line-height: 1.5;
+        }
+
+        .list-styled li::before {
+            content: "🔥";
+            position: absolute;
+            left: 0;
+            font-size: 0.75rem;
+        }
+
+        .closing-icons {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 25px;
+            z-index: 1;
+        }
+
+        .closing-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ci {
+            font-size: 2.8rem;
+            animation: float 3s ease-in-out infinite alternate;
+        }
+
+        .closing-icon span {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .closing-msg {
+            text-align: center;
+            font-size: 1.15rem;
+            line-height: 1.7;
+            color: var(--text-soft);
+            margin-top: 5px;
+            z-index: 1;
+        }
+
+        /* Custom Table Styling */
+        .spec-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+        }
+
+        .spec-table th, .spec-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--table-border);
+            font-size: 0.8rem;
+        }
+
+        .spec-table th {
+            color: #ff7e47;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(255, 126, 71, 0.2);
+        }
+
+        .spec-table td {
+            color: var(--text-soft);
+        }
+
+        /* Theme toggle button */
+        .theme-toggle {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 1px solid var(--nav-btn-border);
+            background: var(--nav-btn-bg);
+            color: var(--text);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .3s;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 126, 71, 0.3);
+            border-color: rgba(255, 126, 71, 0.6);
+            box-shadow: 0 0 15px rgba(255, 126, 71, 0.4);
+            transform: scale(1.05);
+        }
+
+        .docs-link {
+            position: fixed;
+            top: 25px;
+            right: 30px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 30px;
+            background: var(--nav-bg);
+            border: 1px solid rgba(255, 126, 71, 0.2);
+            color: var(--text-soft);
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-decoration: none;
+            backdrop-filter: blur(20px);
+            transition: all .3s;
+        }
+
+        .docs-link:hover {
+            border-color: rgba(255, 126, 71, 0.6);
+            color: #ff7e47;
+            box-shadow: 0 0 15px rgba(255, 126, 71, 0.25);
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-8px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.85; }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Slide 1: Cover -->
+    <div class="slide active" id="s1">
+        <div class="cover-bg"></div>
+        <div class="center" style="display: flex; flex-direction: column; align-items: center; z-index: 1;">
+            <div class="badge">TAKE-PROFIT-INSTITUTE</div>
+            <div class="cover-title">
+                <span>Candle 서비스 프로젝트</span>
+            </div>
+            <div class="cover-sub">
+                MSA 기반 모의 투자 & 투자 교육 플랫폼 개발 및 아키텍처 설계
+            </div>
+            <div class="cover-tags">
+                <div class="cover-tag">🕯️ Spring Boot & gRPC</div>
+                <div class="cover-tag">📦 Monorepo Multi-Module</div>
+                <div class="cover-tag">⚡ Kafka Event-Driven</div>
+                <div class="cover-tag">🛡️ Idempotency & Outbox Pattern</div>
+                <div class="cover-tag">⚙️ Independent Spring Batch</div>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 2: TOC -->
+    <div class="slide" id="s2">
+        <div class="s-title">📅 <span>발표 목차</span></div>
+        <p class="s-subtitle">전체 세션 발표 순서</p>
+        <div class="feat-grid" style="grid-template-columns: repeat(2, 1fr); max-width: 950px;">
+            <div class="feat-card" style="border-left: 4px solid #ff7e47;">
+                <h3><span>01.</span> 프로젝트 개요 및 아키텍처</h3>
+                <p>배경 및 목적, 13개 마이크로서비스 도메인 역할 구성 및 모노레포 패키지 구조 분석</p>
+            </div>
+            <div class="feat-card" style="border-left: 4px solid #ef4444;">
+                <h3><span>02.</span> 핵심 통신 및 정합성 설계</h3>
+                <p>gRPC 동기식 호출 계약, Kafka 비동기 이벤트 분배, Trading 잔고 예약 및 Outbox/멱등성 방어벽</p>
+            </div>
+            <div class="feat-card" style="border-left: 4px solid #00b4d8;">
+                <h3><span>03.</span> 13개 서비스별 기술 분석</h3>
+                <p>각 핵심 서비스들이 채택한 대표 기술과 그에 대한 구체적인 비즈니스 도입 타당성 정리</p>
+            </div>
+            <div class="feat-card" style="border-left: 4px solid #3b82f6;">
+                <h3><span>04.</span> 배치 아키텍처 & 로드맵</h3>
+                <p>Spring Batch 기반 데이터 벌크 격리 처리(EOD snapshot), 개발 인프라 환경 및 고도화 계획</p>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 3: Background & Goal -->
+    <div class="slide" id="s3">
+        <div class="s-title">💡 <span>프로젝트 배경 및 목적</span></div>
+        <p class="s-subtitle">투자 교육 및 가상 투자 서비스의 핵심 비즈니스 해결 과제</p>
+        <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="feat-card">
+                <div style="font-size: 2rem; margin-bottom: 10px;">📉</div>
+                <h3>초보자 투자 장벽 완화</h3>
+                <p>복잡하고 난해한 실제 금융 환경에서 탈피하여, 쉬운 모의 투자 인터페이스와 풍부한 퀴즈 기반 투자 교육 기능 연동</p>
+            </div>
+            <div class="feat-card">
+                <div style="font-size: 2rem; margin-bottom: 10px;">🚀</div>
+                <h3>대용량 트래픽 가용성</h3>
+                <p>주식 시장 변동에 따른 급격한 트래픽 증가 상황에서 서비스 확장성을 극대화하기 위해 유연한 독립 배포(MSA) 구조 확보</p>
+            </div>
+            <div class="feat-card">
+                <div style="font-size: 2rem; margin-bottom: 10px;">🛡️</div>
+                <h3>금융 정합성 신뢰 확보</h3>
+                <p>거래 체결 및 잔고 예약 등 네트워크 타임아웃 발생 시 분산 환경에서 완벽한 정합성을 지키는 아키텍처 방어벽 구축</p>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 4: Micro-services Overview -->
+    <div class="slide" id="s4">
+        <div class="s-title">📦 <span>서비스 도메인 개요</span></div>
+        <p class="s-subtitle">독립적이고 응집도 높은 13개의 핵심 마이크로서비스 기술 구성</p>
+        <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr); font-size: 0.8rem; gap: 12px;">
+            <div class="feat-card" style="padding: 16px 14px;">
+                <h3>🔑 인증 및 회원</h3>
+                <p><span class="accent">auth-service</span>: OAuth 2.0 & JWT 인증<br><span class="accent">user-service</span>: 회원 프로필 및 포인트 관리</p>
+            </div>
+            <div class="feat-card" style="padding: 16px 14px;">
+                <h3>📈 시세 및 주문</h3>
+                <p><span class="accent">market-service</span>: 실시간 체결가/호가 분배<br><span class="accent">trading-service</span>: 주문 접수 및 잔고 제어</p>
+            </div>
+            <div class="feat-card" style="padding: 16px 14px;">
+                <h3>📊 자산 분석 및 정보</h3>
+                <p><span class="accent">portfolio-service</span>: 실시간 평가 손익 분석<br><span class="accent">stock-service</span>: 마스터 종목 원장 보관</p>
+            </div>
+            <div class="feat-card" style="padding: 16px 14px;">
+                <h3>🎮 교육 및 게임화</h3>
+                <p><span class="accent">learning-service</span>: 투자 상식 퀴즈 검증<br><span class="accent">mission-service</span>: 행동 기반 이벤트 미션 평가</p>
+            </div>
+            <div class="feat-card" style="padding: 16px 14px;">
+                <h3>🏆 랭킹 및 소셜</h3>
+                <p><span class="accent">ranking-service</span>: 수익률 순위 산출<br><span class="accent">chatting-service</span>: 종목별 실시간 대화 지원</p>
+            </div>
+            <div class="feat-card" style="padding: 16px 14px;">
+                <h3>⚙️ 유틸리티 및 기타</h3>
+                <p><span class="accent">wishlist-service</span>: 관심 종목 스크랩<br><span class="accent">news-service</span>: 수집된 금융 기사 공급<br><span class="accent">notification-service</span>: 메일/앱 푸시</p>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 5: System Architecture -->
+    <div class="slide" id="s5">
+        <div class="s-title">🌐 <span>전체 시스템 아키텍처</span></div>
+        <p class="s-subtitle">CloudFront → API Gateway → BFF → Istio Mesh(EKS)까지 이어지는 요청 경로와 인프라 전 구성</p>
+
+        <!-- Tier 1: Edge request path -->
+        <div class="flow-row" style="margin-bottom: 10px;">
+            <div class="flow-card" style="width: 118px; padding: 12px 8px;">
+                <div class="flow-icon" style="font-size: 1.5rem; margin-bottom: 4px;">📱</div>
+                <div class="flow-label" style="font-size: .85rem;">Client</div>
+                <div class="flow-desc" style="font-size: .72rem;">Web / App</div>
+            </div>
+            <div class="flow-arrow" style="font-size: 1rem;">➔</div>
+            <div class="flow-card" style="width: 130px; padding: 12px 8px;">
+                <div class="flow-icon" style="font-size: 1.5rem; margin-bottom: 4px;">🛡️</div>
+                <div class="flow-label" style="font-size: .85rem;">CloudFront+WAF</div>
+                <div class="flow-desc" style="font-size: .72rem;">Edge 캐시·방화벽</div>
+            </div>
+            <div class="flow-arrow" style="font-size: 1rem;">➔</div>
+            <div class="flow-card" style="width: 118px; padding: 12px 8px;">
+                <div class="flow-icon" style="font-size: 1.5rem; margin-bottom: 4px;">⚖️</div>
+                <div class="flow-label" style="font-size: .85rem;">ALB</div>
+                <div class="flow-desc" style="font-size: .72rem;">L7 Load Balancer</div>
+            </div>
+            <div class="flow-arrow" style="font-size: 1rem;">➔</div>
+            <div class="flow-card" style="width: 150px; padding: 12px 8px; border-color: rgba(0,180,216,.3);">
+                <div class="flow-icon" style="font-size: 1.5rem; margin-bottom: 4px;">🚪</div>
+                <div class="flow-label" style="font-size: .85rem;">API Gateway</div>
+                <div class="flow-desc" style="font-size: .72rem;">라우팅·JWT 검증·Rate Limit</div>
+            </div>
+            <div class="flow-arrow" style="font-size: 1rem;">➔</div>
+            <div class="flow-card" style="width: 150px; padding: 12px 8px; border-color: rgba(255,126,71,.35);">
+                <div class="flow-icon" style="font-size: 1.5rem; margin-bottom: 4px;">🔥</div>
+                <div class="flow-label" style="font-size: .85rem;">BFF Layer</div>
+                <div class="flow-desc" style="font-size: .72rem;">화면별 데이터 조합·병렬 gRPC</div>
+            </div>
+        </div>
+
+        <!-- Tier 2: EKS / Istio Mesh services -->
+        <div style="width: 100%; max-width: 1180px; border: 1px solid rgba(148,163,184,.18); border-radius: 14px; padding: 10px 14px 12px; margin-bottom: 10px;">
+            <div style="font-size: .72rem; color: var(--text-faint); margin-bottom: 6px; letter-spacing: .5px;">EKS Cluster (Private Subnet) · Istio Service Mesh — East-West mTLS</div>
+            <div style="display: flex; gap: 8px; align-items: stretch;">
+                <div style="flex: 1;">
+                    <div style="font-size: .74rem; color: #ff7e47; font-weight: 700; margin-bottom: 4px;">🟠 Core Services · 병렬 gRPC 동기 호출</div>
+                    <div class="feat-grid" style="grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                        <div class="feat-card" style="padding: 8px 6px; text-align: center;">
+                            <h3 style="font-size: .85rem; justify-content: center; margin-bottom: 2px;">Auth Service</h3>
+                            <p style="font-size: .72rem;">OAuth·JWT 발급</p>
+                        </div>
+                        <div class="feat-card" style="padding: 8px 6px; text-align: center;">
+                            <h3 style="font-size: .85rem; justify-content: center; margin-bottom: 2px;">Trading Service</h3>
+                            <p style="font-size: .72rem;">매수·매도·수익률</p>
+                        </div>
+                        <div class="feat-card" style="padding: 8px 6px; text-align: center;">
+                            <h3 style="font-size: .85rem; justify-content: center; margin-bottom: 2px;">Market Data</h3>
+                            <p style="font-size: .72rem;">실시간 시세·종목 검색</p>
+                        </div>
+                        <div class="feat-card" style="padding: 8px 6px; text-align: center;">
+                            <h3 style="font-size: .85rem; justify-content: center; margin-bottom: 2px;">Account Service</h3>
+                            <p style="font-size: .72rem;">계좌·잔고·보유종목</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="flex: 0 0 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+                    <div style="font-size: .68rem; color: var(--text-faint);">발행/소비</div>
+                    <div class="flow-arrow" style="font-size: 1.1rem; transform: rotate(0deg);">⇄</div>
+                    <div class="feat-card" style="padding: 8px 4px; text-align: center; border-top: 3px solid #ff9f43; width: 100%;">
+                        <div style="font-size: 1.3rem;">📨</div>
+                        <h3 style="font-size: .72rem; justify-content: center; margin: 2px 0 0;">MSK · Kafka</h3>
+                        <p style="font-size: .6rem;">TradeExecuted<br>UserCreated<br>MissionAchieved</p>
+                    </div>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-size: .74rem; color: #00b4d8; font-weight: 700; margin-bottom: 4px;">🟣 Feature Services · Kafka 비동기 이벤트 소비</div>
+                    <div class="feat-grid" style="grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                        <div class="feat-card" style="padding: 8px 6px; text-align: center;">
+                            <h3 style="font-size: .85rem; justify-content: center; margin-bottom: 2px;">Ranking</h3>
+                            <p style="font-size: .72rem;">리더보드 집계</p>
+                        </div>
+                        <div class="feat-card" style="padding: 8px 6px; text-align: center;">
+                            <h3 style="font-size: .85rem; justify-content: center; margin-bottom: 2px;">Notification</h3>
+                            <p style="font-size: .72rem;">알림 발송</p>
+                        </div>
+                        <div class="feat-card" style="padding: 8px 6px; text-align: center;">
+                            <h3 style="font-size: .85rem; justify-content: center; margin-bottom: 2px;">Mission</h3>
+                            <p style="font-size: .72rem;">챌린지·보상</p>
+                        </div>
+                        <div class="feat-card" style="padding: 8px 6px; text-align: center;">
+                            <h3 style="font-size: .85rem; justify-content: center; margin-bottom: 2px;">Learning</h3>
+                            <p style="font-size: .72rem;">투자 콘텐츠·퀴즈</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tier 3: Supporting infra tag rows -->
+        <div style="display: flex; gap: 8px; width: 100%; max-width: 1180px; justify-content: center; flex-wrap: wrap;">
+            <div style="padding: 6px 12px; background: rgba(255,126,71,.06); border: 1px solid rgba(255,126,71,.2); border-radius: 10px; font-size: .74rem;">📦 <strong>Data Layer</strong>: PostgreSQL(서비스별 스키마 분리) · ElastiCache Redis(시세 TTL 1s · Ranking Sorted Set)</div>
+            <div style="padding: 6px 12px; background: rgba(0,180,216,.06); border: 1px solid rgba(0,180,216,.2); border-radius: 10px; font-size: .74rem;">🌍 <strong>External</strong>: 네이버/카카오 OAuth · 증권사 실시간 시세 API · AWS SES · FCM</div>
+            <div style="padding: 6px 12px; background: rgba(148,163,184,.08); border: 1px solid rgba(148,163,184,.2); border-radius: 10px; font-size: .74rem;">📊 <strong>Observability</strong>: Jaeger 트레이싱 · Loki 로그 · Prometheus/Grafana 메트릭</div>
+            <div style="padding: 6px 12px; background: rgba(139,92,246,.08); border: 1px solid rgba(139,92,246,.25); border-radius: 10px; font-size: .74rem;">🚀 <strong>GitOps/CI-CD</strong>: GitHub Actions → ECR → k8s manifests → ArgoCD → EKS 자동 배포</div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 6: Monorepo & Packaging -->
+    <div class="slide" id="s6">
+        <div class="s-title">📂 <span>모노레포 및 패키지 구조</span></div>
+        <p class="s-subtitle">의존성을 철저히 분리한 도메인 중심 디렉토리 설계</p>
+        
+        <div class="layout-columns">
+            <div class="layout-col">
+                <div class="feat-card" style="margin-bottom: 12px;">
+                    <h3><span>📦</span> 모노레포 멀티프로젝트 모듈 규칙</h3>
+                    <p>각 서비스는 독자적으로 배포 가능한 격리 폴더로 구성되며, 타 서비스 모듈의 코드나 직접적인 데이터베이스 참조를 완전히 금지(의존성 0%)하여 독립 빌드/배포 속도를 극대화합니다.</p>
+                </div>
+                <div class="feat-card">
+                    <h3><span>📦</span> <code>common</code> 공유 라이브러리 최소화</h3>
+                    <p>공통 모듈은 배포되지 않는 순수 도구 모듈이며, 비즈니스 오염을 차단하기 위해 오류 메시지 포맷과 단순 밸류 유틸 외에는 절대 도메인 엔티티를 포함하지 않습니다.</p>
+                </div>
+            </div>
+            <div class="layout-col">
+                <div class="spec-container" style="font-size: 0.8rem;">
+                    <div class="spec-header">
+                        <span>도메인 중심의 패키지 분리 규칙</span>
+                        <span>org.profit.candle.trading</span>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">📁 account (계좌 도메인 바운더리)</div>
+                        <div class="spec-item-desc">JPA 엔티티, 계좌 금액 차감/예약 서비스, gRPC 엔드포인트 수용</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">📁 order (주문 도메인 바운더리)</div>
+                        <div class="spec-item-desc">주문 접수, 매수/매도 대기 체결, 주문 상태 전이 처리 서비스</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">📁 support (공통 인프라 지원)</div>
+                        <div class="spec-item-desc">gRPC 멱등성 필터 및 트랜잭션 롤백 추적을 위한 인터셉터 구성</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 7: gRPC & Proto-based Contract -->
+    <div class="slide" id="s7">
+        <div class="s-title">🤝 <span>gRPC 도입 및 계약 중심 설계</span></div>
+        <p class="s-subtitle">REST를 넘어선 고성능 계약 중심 협업 모델</p>
+        
+        <div class="layout-columns">
+            <div class="layout-col">
+                <ul class="list-styled">
+                    <li><span class="accent">네트워크 오버헤드 축소</span>: HTTP/2 프로토콜 위에서 바이너리(이진) 직렬화를 통해 전송 크기를 줄이고 통신 처리 속도를 REST API 대비 비약적으로 단축합니다.</li>
+                    <li><span class="accent">컴파일 단 안정성 확보</span>: <code>.proto</code> 명세 파일이 마이크로서비스 간의 강력한 API 스키마 역할을 하며, 구조적 불일치가 생길 경우 빌드 단계에서 조기에 검증 및 차단합니다.</li>
+                    <li><span class="accent">다국어 스텁 코드 바인딩</span>: 자바 기반 백엔드 서비스와 Node.js 기반 Fastify BFF 웹 서버가 수작업 변환 없이 빌드 시 자동 생성된 gRPC 클라이언트를 호출해 타입 안전하게 연동합니다.</li>
+                </ul>
+            </div>
+            <div class="layout-col">
+                <div class="spec-container">
+                    <div class="spec-header">
+                        <span>gRPC 인터페이스 명세서 개념 구조</span>
+                        <span>trading.proto</span>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">⚙️ TradingService (주문 처리 서비스)</div>
+                        <div class="spec-item-desc">
+                            - <strong>PlaceOrder</strong> (주문 접수)<br>
+                            &nbsp;&nbsp;* 입력 파라미터: 사용자 ID, 종목 코드, 매수/매도 구분, 주문 수량, 타깃 단가<br>
+                            &nbsp;&nbsp;* 출력 파라미터: 주문 성공 ID, 접수 시각, 처리 상태 코드<br>
+                            - <strong>GetBalance</strong> (자산 잔고 실시간 동기화)<br>
+                            &nbsp;&nbsp;* 입력 파라미터: 사용자 ID, 통화 구분<br>
+                            &nbsp;&nbsp;* 출력 파라미터: 가용 예수금, 예약 묶임 금액
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 8: Event-Driven Architecture -->
+    <div class="slide" id="s8">
+        <div class="s-title">📡 <span>이벤트 기반 비동기 아키텍처</span></div>
+        <p class="s-subtitle">Kafka를 활용한 장애 고립과 유연한 도메인 확장성</p>
+        
+        <div class="flow-row" style="margin-top: 15px; margin-bottom: 25px;">
+            <div class="flow-card">
+                <div class="flow-icon">💻</div>
+                <div class="flow-label">Trading Service</div>
+                <div class="flow-desc">주문 매수 체결 성공 처리</div>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-card" style="border-color: rgba(255, 126, 71, 0.4);">
+                <div class="flow-icon">💬</div>
+                <div class="flow-label">Kafka Broker</div>
+                <div class="flow-desc">주문 발행 이벤트 적재<br>[OrderPlacedEvent]</div>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-card">
+                <div class="flow-icon">📊</div>
+                <div class="flow-label">Portfolio Service</div>
+                <div class="flow-desc">보유 종목 원장 갱신 및 수익률 재산출</div>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-card">
+                <div class="flow-icon">🎯</div>
+                <div class="flow-label">Mission Service</div>
+                <div class="flow-desc">첫 매수 주문 퀘스트 달성 여부 조건식 검사</div>
+            </div>
+        </div>
+        
+        <ul class="list-styled" style="max-width: 900px; font-size: 0.9rem;">
+            <li><span class="accent">장애 전파 격리 (Fault Isolation)</span>: 주문 완료 처리 시 알림, 미션, 랭킹 등 부가 서비스가 다운되어 일시 지연되더라도 핵심 거래는 지장 없이 성공하게끔 물리적으로 분리합니다.</li>
+            <li><span class="accent">정확히 한번 전파를 향한 최종 일관성</span>: 컨슈머(Consumer) 장애 복구 시 미완료된 이벤트 메시지를 카프카 오프셋 기반으로 역추적해 누락 없이 확실하게 복구 작업을 실행합니다.</li>
+        </ul>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 9: Trading Flow Details -->
+    <div class="slide" id="s9">
+        <div class="s-title">📉 <span>핵심 기능 흐름 - Trading Service</span></div>
+        <p class="s-subtitle">안정적 자산 예약 및 수수료 계산 주문 프로세스</p>
+        
+        <div class="layout-columns">
+            <div class="layout-col">
+                <div class="feat-card" style="margin-bottom: 12px;">
+                    <h3><span>💵</span> 매수(BUY) 자산 예약 공식</h3>
+                    <p>주문 생성 시 즉시 총자산을 차감하면 체결 거부 및 취소 시 복구가 어렵습니다. 가용 금액에서 <strong>주문 원금 + 수수료(0.015%)</strong> 만큼 계산하여 <strong>예약(Reserved)</strong> 상태로 전환해 이중 지출을 원천 방지합니다.</p>
+                </div>
+                <div class="feat-card">
+                    <h3><span>🚫</span> 대기 주문 단일화 룰</h3>
+                    <p>특정 유저가 특정 종목에 대해 미체결(Pending) 대기 주문을 가진 경우, 시장가 급변 시 중복 거래 체결 위험이 있으므로 새로운 대기 주문 진입을 도메인 유효성 검증 레벨에서 사전 기각합니다.</p>
+                </div>
+            </div>
+            <div class="layout-col">
+                <div class="spec-container">
+                    <div class="spec-header">
+                        <span>매수(BUY) 주문 비즈니스 계산 로직</span>
+                        <span>거래 안전 원칙</span>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">1. 거래 원금 산출</div>
+                        <div class="spec-item-desc">체결 요청 수량(Quantity) × 목표 단가(Price) = 매수 원금 (Amount)</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">2. 거래 수수료 계산</div>
+                        <div class="spec-item-desc">매수 원금 × 수수료율 (0.00015) = 수수료액 (Fee) (원 단위 반올림 처리)</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">3. 가용 자산 예약 검증</div>
+                        <div class="spec-item-desc">
+                            - 필요 자산 합계: 매수 원금 + 수수료액<br>
+                            - <strong>[검증 조건]</strong>: 유저 계좌의 가용 예수금 &lt; 필요 자산 합계 일 경우, 즉각 <strong>'잔고 부족 조건 불일치(FAILED_PRECONDITION)'</strong> 오류를 전사 반환하고 프로세스를 조기 종료.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 10: Distributed Consistency Problems -->
+    <div class="slide" id="s10">
+        <div class="s-title">🔥 <span>분산 정합성 문제와 실태</span></div>
+        <p class="s-subtitle">신뢰할 수 없는 분산 환경에서의 데이터 손실 요인</p>
+        
+        <div class="feat-grid" style="grid-template-columns: repeat(2, 1fr); max-width: 950px;">
+            <div class="feat-card" style="border-left: 4px solid #ef4444;">
+                <h3>👻 네트워크 일시 타임아웃 오류</h3>
+                <p>BFF가 주문을 접수하고 마이크로서비스에 gRPC로 전달하여 DB 커밋은 성공했으나, 회신용 네트워크 선로가 불안정하여 타임아웃 오류가 발생하면 유저는 주문 실패로 오인하고 동일 주문을 연속 재시도하여 중복 주문이 체결되는 대형 사고가 발생합니다.</p>
+            </div>
+            <div class="feat-card" style="border-left: 4px solid #ef4444;">
+                <h3>👻 RDBMS와 외부 카프카의 원자성 결여</h3>
+                <p>주문 내역을 데이터베이스에 정상적으로 Insert 했으나, 카프카 브로커에 메시지를 전송하려는 순간 네트워크 끊김이나 장비 장애가 발생하여 이벤트 발행에 실패할 경우 주문은 체결되었지만 포트폴리오 갱신 및 미션 클리어가 누락되어 서비스 일관성이 파괴됩니다.</p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 25px; text-align: center; font-size: 0.9rem;" class="accent">
+            🛡️ Candle의 핵심 설계 대안: 멱등성 서버 인터셉터(Idempotency) 및 트랜잭셔널 아웃박스(Outbox) 복구 엔진
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 11: Idempotency Pattern -->
+    <div class="slide" id="s11">
+        <div class="s-title">🛡️ <span>해결책 1 - 멱등성(Idempotency)</span></div>
+        <p class="s-subtitle">네트워크 재시도 중복 트랜잭션을 완벽하게 감지하고 차단</p>
+        
+        <div class="flow-row" style="margin-bottom: 25px;">
+            <div class="flow-card" style="width: 250px;">
+                <div class="flow-icon">🔑</div>
+                <div class="flow-label">요청 + Idempotency-Key</div>
+                <div class="flow-desc">클라이언트가 발급한 UUID 키를 gRPC 메타데이터에 주입</div>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-card" style="width: 320px; border-color: rgba(255, 126, 71, 0.4);">
+                <div class="flow-icon">🔎</div>
+                <div class="flow-label">gRPC Server Interceptor</div>
+                <div class="flow-desc">비즈니스 로직 진입 전에 공통 DB/캐시에서 중복 키 존재여부 탐색</div>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-card" style="width: 350px;">
+                <div class="flow-icon">💾</div>
+                <div class="flow-label">과거 처리결과 캐시 반환</div>
+                <div class="flow-desc"><strong>신규</strong>: 요청 이력 저장 및 정상 트랜잭션 수행<br><strong>중복</strong>: 작업 무시, 이전 성공 응답 메시지를 즉시 로드해 반환</div>
+            </div>
+        </div>
+        
+        <ul class="list-styled" style="max-width: 900px; font-size: 0.88rem;">
+            <li><span class="accent">분산 분산 락 연계</span>: 동일한 멱등성 키를 가지고 1초 안에 여러 차례 동시 유입된 무차별 API 요청들은 락(Locks) 처리를 통해 진입 단계에서 안전하게 중복 호출을 배제합니다.</li>
+            <li><span class="accent">물리 Unique 인덱스 최후 방어선</span>: 시스템 장애로 WAS 스레드가 비정상 동작하더라도 데이터베이스 레벨의 고유 인덱스 계약에 의해 데이터 복제 생성을 구조적으로 차단합니다.</li>
+        </ul>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 12: Transactional Outbox Pattern -->
+    <div class="slide" id="s12">
+        <div class="s-title">📦 <span>해결책 2 - Transactional Outbox</span></div>
+        <p class="s-subtitle">로컬 트랜잭션을 활용하여 DB 쓰기와 이벤트 발행을 동기화</p>
+        
+        <div class="layout-columns">
+            <div class="layout-col">
+                <div class="feat-card" style="margin-bottom: 12px; border-left: 3px solid #ff7e47;">
+                    <h3><span>1.</span> 로컬 트랜잭션 내 원자적 동시 저장</h3>
+                    <p>비즈니스 테이블(주문 원장 등)을 갱신하는 쿼리와, 외부로 전송할 카프카 발행 대기 이벤트 기록(Outbox Record)을 <strong>동일한 RDBMS 로컬 트랜잭션 <code>@Transactional</code> 범위</strong> 안에서 동시에 Insert 함으로써 둘의 저장 상태를 하나로 결합합니다.</p>
+                </div>
+                <div class="feat-card" style="border-left: 3px solid #00b4d8;">
+                    <h3><span>2.</span> Message Relay 프로세스의 비동기 발송</h3>
+                    <p>백그라운드에서 동작하는 메시지 릴레이 데몬이 Outbox 테이블을 주기적으로 스캔하여 미발행 상태의 메시지를 Kafka Broker로 안전하게 푸시한 뒤, 발행 완료 상태로 전환시킵니다.</p>
+                </div>
+            </div>
+            <div class="layout-col" style="align-items: center;">
+                <div style="padding: 22px; background: rgba(15, 15, 25, 0.8); border: 1px solid rgba(255, 126, 71, 0.2); border-radius: 16px; font-size: 0.82rem; line-height: 1.55;">
+                    <div style="font-weight: bold; color: #ff7e47; margin-bottom: 8px; text-align: center;">⚡ Kafka 장애극복 최종 일관성 보장 시나리오</div>
+                    카프카 클러스터가 일시 다운(Down)되는 재난 상황이 발생하더라도, 마이크로서비스의 주문 로직은 로컬 트랜잭션(Local DB 쓰기)에 의해 중단 없이 정상 처리됩니다. 카프카 복구 시 메시지 릴레이가 데이터베이스에 안전하게 보관되어 있던 미전송 레코드를 찾아 순차적으로 재발행함으로써 시스템 간 최종 일관성(Eventually Consistency)을 확보합니다.
+                </div>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 13: Database Design & Isolation -->
+    <div class="slide" id="s13">
+        <div class="s-title">💾 <span>데이터베이스 설계 및 격리 수준</span></div>
+        <p class="s-subtitle">도메인 불변성 확보 및 동시성 제어 정책</p>
+        
+        <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="feat-card">
+                <h3>🚫 물리적 스키마 독립</h3>
+                <p>각 서비스는 자신만의 격리된 전용 데이터베이스 인프라를 가지며, API 정의 이외에 상대 도메인 스키마에 직접 연결하여 조회하거나 변경을 가할 수 없습니다.</p>
+            </div>
+            <div class="feat-card">
+                <h3>🔒 무분별한 Setter 제거</h3>
+                <p>도메인 엔티티 설계 시 Setter 메서드를 일절 배제하고, 의미 있는 비즈니스 행위가 드러난 내부 함수를 통해서만 엔티티의 상태 변화를 안전하게 전이시킵니다.</p>
+            </div>
+            <div class="feat-card">
+                <h3>📊 비관적 락 동시성 방어</h3>
+                <p>가상 잔액 예약 차감 등 경쟁 상황이 생기는 트랜잭션 구간에 <strong>Pessimistic Write Lock</strong>을 적용하여 동시성 레이스 컨디션을 완전히 차단합니다.</p>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 14: Interface Segregation Principle -->
+    <div class="slide" id="s14">
+        <div class="s-title">⚙️ <span>인터페이스 분리 원칙 (ISP)</span></div>
+        <p class="s-subtitle">유연한 테스트 인프라와 결합도 최소화 규칙</p>
+        
+        <div class="layout-columns">
+            <div class="layout-col">
+                <ul class="list-styled">
+                    <li><span class="accent">조회/수정 전용 인터페이스 구분</span>: CQRS 설계의 축소판으로, 데이터 저장소에 접근하는 레이어에서 단순 조회 처리를 전담하는 <code>Reader</code> 인터페이스와 상태 변환 쓰기 작업을 전담하는 <code>Writer</code> 인터페이스를 명확하게 이원화하여 격리합니다.</li>
+                    <li><span class="accent">기술 세부가 노출된 작명 규칙 적용</span>: 관례적인 <code>FooServiceImpl</code> 등의 결합도 높은 모호한 명명을 피하고, <code>JpaOrderReader</code>, <code>KafkaTradeEventPublisher</code> 등 사용 기술 인프라가 직접 드러나게 작명함으로써 구현체 교체의 유연성을 강화합니다.</li>
+                </ul>
+            </div>
+            <div class="layout-col">
+                <div class="spec-container">
+                    <table class="spec-table">
+                        <thead>
+                            <tr>
+                                <th>비즈니스 영역</th>
+                                <th>역할 정의 (Interface)</th>
+                                <th>인프라 기술 구현체 (Class)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>주문 원장 적재</td>
+                                <td>OrderWriter</td>
+                                <td>JpaOrderWriter (JPA 기반 저장)</td>
+                            </tr>
+                            <tr>
+                                <td>주문 정보 스캔</td>
+                                <td>OrderReader</td>
+                                <td>JpaOrderReader (JPA 기반 조회)</td>
+                            </tr>
+                            <tr>
+                                <td>체결 이벤트 전파</td>
+                                <td>TradeEventPublisher</td>
+                                <td>KafkaTradeEventPublisher (카프카 전송)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 15: Validation & Transaction Policies -->
+    <div class="slide" id="s15">
+        <div class="s-title">🚦 <span>예외 처리 및 트랜잭션 규칙</span></div>
+        <p class="s-subtitle">견고한 유효성 검증 체인 및 투명한 예외 공표</p>
+        
+        <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="feat-card">
+                <h3><span>01.</span> Protobuf 형식 1차 차단</h3>
+                <p>클라이언트로부터 전달받은 gRPC 직렬화 파라미터의 단순 Null 검사, 누락 필드, 포맷/범위 오류를 진입로에서 1차 차단해 쓸데없는 연산을 낭비하지 않습니다.</p>
+            </div>
+            <div class="feat-card">
+                <h3><span>02.</span> 서비스 레이어 비즈니스 검증</h3>
+                <p>데이터베이스의 상태값, 상대 서비스 호출 회신 결과, 유저 등급별 가용 거래 한도 등을 영속성 트랜잭션 바운더리 내부에서 정밀 2차 검증합니다.</p>
+            </div>
+            <div class="feat-card">
+                <h3><span>03.</span> DB 제약조건 최후 무결성</h3>
+                <p>엔티티 인스턴스 생성자 단계의 값 범위 불변 조건을 충족시키고, DB 외래키, Not Null 제약조건 및 Unique 인덱스를 통해 데이터 오염의 마지막 루트를 밀봉합니다.</p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 12px 25px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; font-size: 0.82rem; text-align: center; max-width: 900px; z-index: 1;">
+            💡 <strong>내부 스택트레이스 유출 원천 금지 (ErrorCode)</strong>: 애플리케이션 런타임 예외 세부 추적 로그를 그대로 전파하지 않고, 사전에 규격화된 시스템 내부 공통 에러코드(예: <code>TRADING_INSUFFICIENT_BALANCE</code>)로 맵핑하여 클라이언트에 400 계열의 정제된 응답으로 제공합니다.
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 16: Service Tech Stack 1 -->
+    <div class="slide" id="s16">
+        <div class="s-title">🔑 <span>서비스 기술 분석 - 인증 & 회원</span></div>
+        <p class="s-subtitle">분산 결합도를 철저히 격리한 사용자 기반 인프라</p>
+        <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="feat-card" style="border-top: 3px solid #ff7e47;">
+                <h3>🔐 auth-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">Spring Security & OAuth 2.0 (JWT)</span></p>
+                <p>수십 개의 마이크로서비스가 유저 인증 처리를 위해 매번 중앙 인증 데이터베이스를 쿼리한다면 인증 서버가 동시성 병목을 유발합니다. 이를 해결하고자 서버에 세션 상태를 저장하지 않는 <strong>Stateless JWT</strong>를 발행하여 각 백엔드 서비스들이 스스로 공개키 서명을 대조/검증하는 분산 무상태 아키텍처를 수립했습니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #ef4444;">
+                <h3>👤 user-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">Spring Data JPA & PostgreSQL</span></p>
+                <p>가장 잦은 CRUD와 함께 복잡한 유저 등급 체계, 프로필 메타데이터, 자산 연동 마일스톤 등 도메인 객체 간의 관계가 중요합니다. JPA의 개체 매핑 및 지연 로딩을 도입해 객체 지향적으로 관계형 데이터를 다루며, PostgreSQL의 높은 격리 수준 보장을 통해 회원 신뢰 원장을 완벽하게 수호합니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #00b4d8;">
+                <h3>📢 notification-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">Firebase Admin SDK (FCM)</span></p>
+                <p>체결 성공, 입출금, 퀴즈 보상 지급 등 실시간 통지를 모바일 기기 사용자에게 정확히 전달하는 것이 핵심입니다. 구글 파이어베이스 FCM 인프라 API를 연동하여 모바일 OS 제약 없이 안정적인 푸시 메시지를 백그라운드로 안전하게 전달하며, 카프카 비동기 큐를 붙여 급증하는 전송 트래픽을 완충합니다.</p>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 17: Service Tech Stack 2 -->
+    <div class="slide" id="s17">
+        <div class="s-title">📈 <span>서비스 기술 분석 - 시세 & 주문</span></div>
+        <p class="s-subtitle">고성능 트래픽 수용 및 엄격한 거래 데이터 잠금 장치</p>
+        <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="feat-card" style="border-top: 3px solid #ff7e47;">
+                <h3>📊 market-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">Redis 현재가 캐시 & WebFlux</span></p>
+                <p>실시간 체결 시세는 외부 공급기로부터 초당 수백 회 이상 쏟아집니다. 이를 물리 디스크 DB에 직접 쓰면 I/O 병목으로 서버 전체가 정지됩니다. 읽기/쓰기가 극도로 빠른 <strong>인메모리 Redis 캐시</strong>에 데이터를 상주시켜 조회 I/O 부하를 90% 이상 걷어내고, WebFlux/gRPC 논블로킹 커넥션으로 클라이언트에 지연 없이 전송합니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #ef4444;">
+                <h3>💳 trading-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">JPA 비관적 락 & Outbox</span></p>
+                <p>동일 계좌에서 찰나의 순간에 복수의 주문이 인입될 때 레이스 컨디션에 의해 예수금보다 더 많은 주식을 매수하는 오작동이 일어날 수 있습니다. DB 레벨의 <strong>비관적 쓰기 잠금(Pessimistic Write Lock)</strong>을 걸어 잔액 차감 순차성을 강제하고, Outbox 이벤트를 활용해 다른 서비스와의 최종 일관성을 보장합니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #00b4d8;">
+                <h3>⭐ wishlist-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">Redis 캐싱 & Kafka 연동</span></p>
+                <p>유저들이 관심 있는 주식 종목을 모니터링하기 위해 화면 진입 시마다 빈번하게 호출되는 읽기 중심 API입니다. 관심 종목 테이블에 매번 조인 쿼리를 치는 오버헤드를 막기 위해 유저별 캐시를 적용하고, 변경이 발생했을 때만 카프카 비동기 이벤트를 흘려 랭킹 분석 서버 등의 연계 뷰에 반영합니다.</p>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 18: Service Tech Stack 3 -->
+    <div class="slide" id="s18">
+        <div class="s-title">🏆 <span>서비스 기술 분석 - 분석 & 소셜</span></div>
+        <p class="s-subtitle">대규모 분석 연산 회피 및 리액티브 대량 소켓 제어</p>
+        <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="feat-card" style="border-top: 3px solid #ff7e47;">
+                <h3>💼 portfolio-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">gRPC Bidirectional Stream</span></p>
+                <p>유저의 보유 주식 수량 및 단가 정보와 실시간으로 오르내리는 시세 데이터를 실시간으로 조합해 실시간 평가 자산을 연산해야 합니다. 클라이언트가 매번 REST API로 폴링(Polling)을 시도하면 불필요한 HTTP 헤더 파싱과 지연 시간이 누적되므로, 단일 논블로킹 파이프로 데이터를 즉각 흘려보내는 양방향 스트리밍을 채택했습니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #ef4444;">
+                <h3>🥇 ranking-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">Redis Cache-Aside & PostgreSQL Fallback</span></p>
+                <p>수익률 내림차순 → 거래 횟수 내림차순 → 유저 ID 오름차순으로 결정적 순위를 산출해 PostgreSQL <code>ranking_history</code>/<code>ranking_runs</code>에 원본으로 저장합니다. Redis에서 ZSET으로 직접 순위를 계산하지 않고, 빈번한 TOP 100·내 순위 조회만 가볍게 <strong>List/String</strong> 캐시로 제공하는 <strong>Cache-Aside</strong> 패턴을 채택했습니다. 장애나 Cache Miss 시에는 PostgreSQL 원본을 조회해 서비스 연속성을 지키고, 조회 후 캐시를 백필하여 정합성을 유지합니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #00b4d8;">
+                <h3>💬 chatting-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">Spring WebFlux & Redis Pub/Sub</span></p>
+                <p>동일 종목을 주시하는 수많은 유저가 소통하는 채팅 서버입니다. 스레드 당 하나의 커넥션을 점유하는 서블릿 모델은 수백 명 접속 시 장비 메모리 한계로 마비됩니다. <strong>리액티브 논블로킹(WebFlux) 웹소켓 게이트웨이</strong>로 적은 리소스로 다중 접속을 유지하며, <strong>Redis Pub/Sub</strong> 채널 분산으로 WAS 가로 확장 시에도 채팅 메시지를 안전하게 릴레이합니다.</p>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 19: Service Tech Stack 4 -->
+    <div class="slide" id="s19">
+        <div class="s-title">🎮 <span>서비스 기술 분석 - 교육 & 유틸리티</span></div>
+        <p class="s-subtitle">비즈니스 흐름 분리와 시스템 결합도 격리</p>
+        <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="feat-card" style="border-top: 3px solid #ff7e47;">
+                <h3>📖 learning-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">도메인 정답 판정 & Outbox 기반 리워드 발행</span></p>
+                <p>퀴즈 정답 판정과 경험치 계산은 <strong>QuizGradingService 도메인 로직</strong>이 전담합니다. 인터셉터는 어디까지나 인증·로깅 같은 횡단 관심사 전용이므로, 정답 검증 같은 핵심 비즈니스 규칙을 인터셉터에 두지 않고 도메인 서비스 계층에 격리했습니다. 합격 리워드는 API 직접 호출 대신 트랜잭션 커밋 시점에 <strong>Outbox</strong>에 함께 기록한 뒤 Relay가 Kafka로 발행하며, user-service는 <code>quizId+userId</code> 멱등키로 중복 지급을 차단합니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #ef4444;">
+                <h3>🎯 mission-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">Isolated Kafka Consumer Group</span></p>
+                <p>유저가 회원 가입을 하거나, 로그인, 매수 주문 완료, 퀴즈 통과를 할 때 실시간으로 도전 과제를 체크합니다. 만약 미션 처리기가 다운되더라도 주문 등 핵심 비즈니스 로직에는 장애가 전혀 전파되지 않도록 전용 Kafka 컨슈머 그룹으로 철저히 비동기 처리하며, 중복 컨슘 방지를 위한 멱등성 검사기가 장착되어 있습니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #00b4d8;">
+                <h3>📰 news-service</h3>
+                <p style="margin-bottom: 8px;"><span class="accent">Python Crawler & gRPC Client</span></p>
+                <p>금융 관련 최신 뉴스를 실시간으로 크롤링하고 수집하는 기능이 필요한 서비스입니다. 텍스트 정제 및 웹 크롤링 생태계가 강력하게 구축된 Python 기반 스크래퍼 시스템을 연동하고, Java 메인 백엔드 서비스와 데이터를 안정적으로 교환하기 위해 강력한 규격 명세인 gRPC 통신 채널을 클라이언트로 내장했습니다.</p>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 20: Spring Batch Architecture -->
+    <div class="slide" id="s20">
+        <div class="s-title">⚙️ <span>Spring Batch 기반 독립 배치 아키텍처</span></div>
+        <p class="s-subtitle">스케줄 기반 Job 실행과 서비스별 도메인 책임 분리</p>
+        
+        <div class="layout-columns">
+            <div class="layout-col">
+                <div class="feat-card" style="margin-bottom: 12px; border-left: 4px solid #ff7e47;">
+                    <h3>📂 서비스 DB 직접 접근 금지</h3>
+                    <p>Candle Batch는 타 마이크로서비스의 DB 테이블을 직접 조인·수정하지 않습니다. 예약·주문·잔고·종가·스냅샷·랭킹 데이터는 각 서비스가 소유하며, Batch는 공식 <strong>gRPC API</strong>를 통해 필요한 작업만 요청합니다. 도메인 상태 변경과 Outbox 기록은 소유 서비스의 트랜잭션에서 처리되고, Batch transaction은 원격 서비스 transaction을 대체하지 않습니다.</p>
+                </div>
+                <div class="feat-card" style="border-left: 4px solid #00b4d8;">
+                    <h3>📂 Batch 전용 실행 경계 분리</h3>
+                    <p>시간 기반 대용량·일괄 작업(예약·주문 처리, Portfolio EOD, Ranking 확정, Stock Sync)은 API 서버가 아닌 Candle Batch에서 독립 실행합니다. <strong>Automatic Scheduler</strong>와 <strong>Batch Control gRPC</strong> 수동 요청은 모두 <strong>JobOperator</strong>로 합쳐져 단일 창구로 제어되며, Metadata는 PostgreSQL <code>candle.batch</code> 스키마에 격리 저장됩니다.</p>
+                </div>
+            </div>
+            <div class="layout-col">
+                <div class="spec-container">
+                    <div class="spec-header">
+                        <span>Candle Batch 4대 핵심 Job</span>
+                        <span>담당 도메인 · 상세는 다음 페이지</span>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">🕒 Trading 예약·주문 일중 배치</div>
+                        <div class="spec-item-desc">예약·주문 생명주기 단계별 처리 (도메인: Trading)</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">📊 Portfolio EOD Snapshot</div>
+                        <div class="spec-item-desc">유저별 일마감 자산 스냅샷 기록 (도메인: Portfolio)</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">🏆 Daily Ranking Finalization</div>
+                        <div class="spec-item-desc">EOD 완료 확인 후 당일 순위 확정 (도메인: Ranking)</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">📈 Stock 종목 마스터 Sync</div>
+                        <div class="spec-item-desc">KOSPI·KOSDAQ 종목 정보 동기화 (도메인: Stock)</div>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; font-size: .72rem; color: var(--text-faint);">⚠️ 실패한 Job은 동일 비즈니스 키(businessDate·rankingDate) 기준으로 실패 지점부터 재시작 가능합니다.</div>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 21: Batch Job Implementation -->
+    <div class="slide" id="s21">
+        <div class="s-title">🔄 <span>Candle Batch 4대 핵심 Job 상세</span></div>
+        <p class="s-subtitle">08:30 → 16:30 KST 실행 시각·선행 조건·실패 격리 범위</p>
+        <div style="display: flex; gap: 10px; margin-bottom: 12px; font-size: .68rem; color: var(--text-faint);">
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff7a70;margin-right:4px;"></span>Trading</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4da3ff;margin-right:4px;"></span>Portfolio</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#b794f4;margin-right:4px;"></span>Ranking</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c997;margin-right:4px;"></span>Stock</span>
+        </div>
+
+        <div class="feat-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 14px;">
+            <div class="feat-card" style="border-top: 3px solid #ff7a70;">
+                <h3 style="font-size: 1rem;">🕒 Trading 일중 배치</h3>
+                <p style="margin-bottom: 6px;"><span class="accent">08:30 ~ 15:40</span></p>
+                <p>PREV_CLOSE 예약 → OPEN+LIMIT 전환 → PENDING 만료 → stale CONVERTING 정리 → TODAY_CLOSE → 잔여 RESERVED 만료까지, 예약·주문 생명주기를 단계별로 안전하게 처리합니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #4da3ff;">
+                <h3 style="font-size: 1rem;">📊 Portfolio EOD Snapshot</h3>
+                <p style="margin-bottom: 6px;"><span class="accent">16:00</span></p>
+                <p>활성 보유자를 페이지 단위로 조회하고, Stock의 확정 종가와 Trading의 현금을 모아 유저별 <code>total_asset</code>을 계산해 일별 스냅샷을 gRPC로 저장 요청합니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #b794f4;">
+                <h3 style="font-size: 1rem;">🏆 Daily Ranking Finalize</h3>
+                <p style="margin-bottom: 6px;"><span class="accent">16:20</span></p>
+                <p>portfolioEodSnapshotJob이 같은 거래일 기준 <code>COMPLETED</code>인지 먼저 확인하는 선행 조건을 통과해야만 Ranking Service의 FinalizeDailyRanking을 호출합니다.</p>
+            </div>
+            <div class="feat-card" style="border-top: 3px solid #22c997;">
+                <h3 style="font-size: 1rem;">📈 Stock 마스터 Sync</h3>
+                <p style="margin-bottom: 6px;"><span class="accent">16:30</span></p>
+                <p>KOSPI 동기화가 완료된 뒤 KOSDAQ 순서로 엄격히 순차 실행하며, 다른 Job과 독립적으로 동작해 실패해도 당일 Ranking 결과를 되돌리지 않습니다.</p>
+            </div>
+        </div>
+
+        <div class="spec-container" style="max-width: 1180px;">
+            <div class="spec-header">
+                <span>Job별 실패 격리 범위</span>
+                <span>같은 businessDate / rankingDate로 재시작</span>
+            </div>
+            <table class="spec-table">
+                <tr><th>Job 그룹</th><th>선행 조건</th><th>실패 시 격리 범위</th></tr>
+                <tr><td>Trading 예약·주문</td><td>없음(독립 실행)</td><td>실패한 Job과 종속된 후속 Job만 중단</td></tr>
+                <tr><td>Portfolio EOD</td><td>Stock 일봉 마감 확정</td><td>사용자 단위 멱등 저장, Job 미완료 시 Ranking 차단</td></tr>
+                <tr><td>Daily Ranking</td><td>Portfolio EOD = COMPLETED</td><td>Ranking transaction 내 원자적 rollback, EOD 결과는 유지</td></tr>
+                <tr><td>Stock Sync</td><td>없음(독립 실행)</td><td>다른 Job과 독립, 실패해도 Ranking을 되돌리지 않음</td></tr>
+            </table>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 22: Build & Deployment Env -->
+    <div class="slide" id="s22">
+        <div class="s-title">🐳 <span>개발 및 배포 환경</span></div>
+        <p class="s-subtitle">신속한 일괄 로컬 구동 및 Gradle 모노레포 구축</p>
+        
+        <div class="layout-columns">
+            <div class="layout-col">
+                <div class="feat-card" style="margin-bottom: 12px;">
+                    <h3><span>⚙️</span> Gradle 멀티 프로젝트 빌드 관리</h3>
+                    <p>루트의 단일 빌드 제어 명세 스크립트 하위에 13개 마이크로서비스와 공통 라이브러리, 배치 모듈을 위치시켰으며, 코드 변경이 없는 서브모듈은 캐시를 활용해 빌드 시간을 70% 단축시킵니다.</p>
+                </div>
+                <div class="feat-card">
+                    <h3><span>🐳</span> Docker Compose 기반 미들웨어 통제</h3>
+                    <p>PostgreSQL 데이터베이스 13개 인스턴스, 분산 메시지용 카프카 브로커 및 주키퍼, 인메모리 Redis 캐시 등 물리 미들웨어 자원을 컨테이너화하여 명령어 한 줄로 로컬 개발망에 즉시 격리 구축합니다.</p>
+                </div>
+            </div>
+            <div class="layout-col">
+                <div class="spec-container">
+                    <div class="spec-header">
+                        <span>로컬 개발자 구동 및 테스트 워크플로우</span>
+                        <span>Shell 명령어 구성</span>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">1. 환경 변수 초기화 복제</div>
+                        <div class="spec-item-desc">각 서비스별 개발 환경 템플릿 복사생성 (<code>.env.development.example</code> ──► <code>.env</code>)</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">2. 인프라 컨테이너 일괄 기동</div>
+                        <div class="spec-item-desc">도커 컴포즈 실행 명령 (<code>docker-compose up -d</code>) 실행을 통해 외부 저장소 격리 실행</div>
+                    </div>
+                    <div class="spec-item">
+                        <div class="spec-item-title">3. 특정 서브모듈 독립 실행</div>
+                        <div class="spec-item-desc">Gradle 태스크 지정 실행 (<code>./gradlew :services:trading-service:bootRun</code>)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 23: Future Roadmaps -->
+    <div class="slide" id="s23">
+        <div class="s-title">🗺️ <span>향후 개선 및 확장 계획</span></div>
+        <p class="s-subtitle">더 안정적이고 고도화된 프로덕션 품질을 향한 과제</p>
+        
+        <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="feat-card">
+                <h3>🔍 분산 Tracing 모니터링</h3>
+                <p>OpenTelemetry 프로토콜 및 Zipkin 분산 트레이서 시각화 도구를 주입하여 BFF, 백엔드 서비스, 카프카 컨슈머 간을 횡단하는 트랜잭션의 지연 시간 병목 및 에러 원점 추적 자동화</p>
+            </div>
+            <div class="feat-card">
+                <h3>⚖️ nGrinder 스트레스 튜닝</h3>
+                <p>동시 사용자 접속 폭증 상황을 구현하는 nGrinder 부하 테스트망을 가동하여 가상 거래 매수/매도 지점을 검증하고, gRPC 커넥션 및 JVM ZGC(Garbage Collector) 튜닝 진행</p>
+            </div>
+            <div class="feat-card">
+                <h3>🏦 실증 증권사 API 포팅</h3>
+                <p>거래 체결 모의 가상 코어 계층의 추상 인터페이스를 확장하여 실제 한국투자증권/키움증권 오픈 API 드라이버를 결합함으로써 실계좌 연동 주문 처리가 가능한 유연한 설계 달성</p>
+            </div>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Slide 24: Closing (Q&A) -->
+    <div class="slide" id="s24">
+        <div class="cover-bg"></div>
+        <div style="position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center;">
+            <div class="closing-icons">
+                <div class="closing-icon">
+                    <div class="ci">📊</div>
+                    <span>모의투자</span>
+                </div>
+                <div class="closing-icon">
+                    <div class="ci">🔥</div>
+                    <span>gRPC/Kafka</span>
+                </div>
+                <div class="closing-icon">
+                    <div class="ci">🛡️</div>
+                    <span>분산 정합성</span>
+                </div>
+                <div class="closing-icon">
+                    <div class="ci">⚙️</div>
+                    <span>Spring Batch</span>
+                </div>
+            </div>
+            <div class="cover-title" style="font-size: clamp(2rem, 4vw, 2.8rem); margin-bottom: 10px;">
+                <span>Q & A</span>
+            </div>
+            <div class="closing-msg">
+                경청해 주셔서 대단히 감사합니다.<br>
+                <strong style="color: #ff7e47;">Candle 서비스 프로젝트</strong>에 대한 질문을 환영합니다.
+            </div>
+            <p style="margin-top: 50px; color: #475569; font-size: .8rem;">Take-Profit-Institute | Micro-Services Project</p>
+        </div>
+        <footer>Take-Profit-Institute | Candle Micro-services Project</footer>
+    </div>
+
+    <!-- Docs Link -->
+    <a class="docs-link" href="https://take-profit-institute.github.io/micro-services/" target="_blank" rel="noopener noreferrer">📖 프로젝트 문서 바로가기</a>
+
+    <!-- Navigation Components -->
+    <div class="nav">
+        <button onclick="go(-1)" id="prevBtn">◀</button>
+        <span class="page" id="pageNum">1 / 24</span>
+        <button onclick="go(1)" id="nextBtn">▶</button>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="라이트/다크 모드 전환">🌙</button>
+    </div>
+    <div class="dots" id="dots"></div>
+
+    <script>
+        // Light / Dark theme toggle (in-memory only, default: dark)
+        let theme = 'dark';
+        function toggleTheme() {
+            theme = (theme === 'dark') ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('themeBtn').textContent = (theme === 'dark') ? '🌙' : '☀️';
+        }
+
+        let cur = 0; 
+        const total = 24;
+        const dots = document.getElementById('dots');
+        
+        // Build dot indicators
+        for (let i = 0; i < total; i++) { 
+            const d = document.createElement('div'); 
+            d.className = 'dot' + (i === 0 ? ' active' : ''); 
+            d.onclick = () => goTo(i); 
+            dots.appendChild(d);
+        }
+        
+        function goTo(n) {
+            if (n < 0 || n >= total || n === cur) return;
+            const slides = document.querySelectorAll('.slide');
+            
+            // Remove previous active classes
+            slides.forEach(s => { 
+                s.classList.remove('active', 'prev'); 
+            });
+            
+            // Assign prev to past slides for sliding layout visual feel
+            for(let j = 0; j < n; j++) {
+                slides[j].classList.add('prev');
+            }
+            
+            // Set the new active slide
+            slides[n].classList.add('active');
+            cur = n;
+            
+            // Update Page indicator and dots active style
+            document.getElementById('pageNum').textContent = `${cur + 1} / ${total}`;
+            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === cur));
+            
+            // Disable button edges
+            document.getElementById('prevBtn').disabled = (cur === 0);
+            document.getElementById('nextBtn').disabled = (cur === total - 1);
+        }
+        
+        function go(d) { 
+            goTo(cur + d); 
+        }
+        
+        // Initial setup
+        document.getElementById('prevBtn').disabled = true;
+        
+        // Key navigation
+        document.addEventListener('keydown', e => { 
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') go(1); 
+            if (e.key === 'ArrowLeft') go(-1);
+        });
+        
+        // Touch swipes for Mobile/Tablet support
+        let tx = 0;
+        document.addEventListener('touchstart', e => tx = e.touches[0].clientX);
+        document.addEventListener('touchend', e => { 
+            const d = e.changedTouches[0].clientX - tx; 
+            if (Math.abs(d) > 50) { 
+                d < 0 ? go(1) : go(-1);
+            } 
+        });
+    </script>
+</body>
+
+</html>
