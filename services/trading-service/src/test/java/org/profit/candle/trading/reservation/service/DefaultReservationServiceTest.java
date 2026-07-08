@@ -79,7 +79,7 @@ class DefaultReservationServiceTest {
         void shouldCreateOpenMarketReservationWithoutLockingBalance() {
             when(marketSessionClient.isTradingDay(tomorrow)).thenReturn(true);
             when(accountService.getAccount(userId)).thenReturn(account);
-            when(reservationRepository.existsByAccountIdAndSymbolAndStatus(any(), anyString(), any()))
+            when(reservationRepository.existsByAccountIdAndSymbolAndSideAndStatus(any(), anyString(), any(), any()))
                     .thenReturn(false);
 
             PlaceReservationCommand command = new PlaceReservationCommand("005930",
@@ -98,7 +98,7 @@ class DefaultReservationServiceTest {
         void shouldLockBalanceForOpenLimitBuyReservation() {
             when(marketSessionClient.isTradingDay(tomorrow)).thenReturn(true);
             when(accountService.getAccount(userId)).thenReturn(account);
-            when(reservationRepository.existsByAccountIdAndSymbolAndStatus(any(), anyString(), any()))
+            when(reservationRepository.existsByAccountIdAndSymbolAndSideAndStatus(any(), anyString(), any(), any()))
                     .thenReturn(false);
 
             PlaceReservationCommand command = new PlaceReservationCommand("005930",
@@ -115,7 +115,7 @@ class DefaultReservationServiceTest {
         void shouldNotLockBalanceForSellReservationEvenWithLimitPrice() {
             when(marketSessionClient.isTradingDay(tomorrow)).thenReturn(true);
             when(accountService.getAccount(userId)).thenReturn(account);
-            when(reservationRepository.existsByAccountIdAndSymbolAndStatus(any(), anyString(), any()))
+            when(reservationRepository.existsByAccountIdAndSymbolAndSideAndStatus(any(), anyString(), any(), any()))
                     .thenReturn(false);
 
             PlaceReservationCommand command = new PlaceReservationCommand("005930",
@@ -128,11 +128,12 @@ class DefaultReservationServiceTest {
         }
 
         @Test
-        void shouldRejectDuplicatePendingReservationForSameSymbol() {
+        void shouldRejectDuplicatePendingReservationForSameSymbolAndSameSide() {
             when(marketSessionClient.isTradingDay(tomorrow)).thenReturn(true);
             when(accountService.getAccount(userId)).thenReturn(account);
-            when(reservationRepository.existsByAccountIdAndSymbolAndStatus(
-                    account.getId(), "005930", ReservationStatusValue.RESERVED)).thenReturn(true);
+            when(reservationRepository.existsByAccountIdAndSymbolAndSideAndStatus(
+                    account.getId(), "005930", ReservationSideValue.BUY, ReservationStatusValue.RESERVED))
+                    .thenReturn(true);
 
             PlaceReservationCommand command = new PlaceReservationCommand("005930",
                     ReservationSideValue.BUY, ReservationTimingValue.OPEN, ReservationOrderKindValue.MARKET,
@@ -142,6 +143,27 @@ class DefaultReservationServiceTest {
                     .isInstanceOf(ReservationException.class)
                     .extracting(e -> ((ReservationException) e).errorCode())
                     .isEqualTo(ReservationErrorCode.DUPLICATE_PENDING_RESERVATION);
+        }
+
+        @Test
+        void shouldAllowSellReservationWhenReservedBuyExistsForSameSymbol() {
+            // 매수 RESERVED가 있어도 매도는 별개 side라 막히면 안 된다 — UX 회귀 방지 테스트.
+            // placeReservation은 command.side()(SELL)로만 조회하므로 BUY 쪽 stub은 실제로 호출되지
+            // 않는다(Mockito strict stubbing에 unnecessary로 잡혀 제거함) — SELL false만으로 충분하다.
+            when(marketSessionClient.isTradingDay(tomorrow)).thenReturn(true);
+            when(accountService.getAccount(userId)).thenReturn(account);
+            when(reservationRepository.existsByAccountIdAndSymbolAndSideAndStatus(
+                    account.getId(), "005930", ReservationSideValue.SELL, ReservationStatusValue.RESERVED))
+                    .thenReturn(false);
+
+            PlaceReservationCommand command = new PlaceReservationCommand("005930",
+                    ReservationSideValue.SELL, ReservationTimingValue.OPEN, ReservationOrderKindValue.MARKET,
+                    10, null, tomorrow, "idem-4-sell");
+
+            ReservationEntity reservation = reservationService.placeReservation(userId, command);
+
+            assertThat(reservation.reserved()).isTrue();
+            verify(reservationRepository).save(any(ReservationEntity.class));
         }
 
         @Test
@@ -162,7 +184,7 @@ class DefaultReservationServiceTest {
         void shouldFixPrevCloseScheduledDateToTomorrowRegardlessOfRequestedDate() {
             when(marketSessionClient.isTradingDay(tomorrow)).thenReturn(true);
             when(accountService.getAccount(userId)).thenReturn(account);
-            when(reservationRepository.existsByAccountIdAndSymbolAndStatus(any(), anyString(), any()))
+            when(reservationRepository.existsByAccountIdAndSymbolAndSideAndStatus(any(), anyString(), any(), any()))
                     .thenReturn(false);
 
             // scheduledDate를 null로 보내도(전일종가는 클라이언트 입력을 쓰지 않음) 내일로 고정된다.

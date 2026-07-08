@@ -3,6 +3,7 @@ package org.profit.candle.trading.reservation.repository;
 import jakarta.persistence.LockModeType;
 import org.profit.candle.trading.reservation.entity.ReservationEntity;
 import org.profit.candle.trading.reservation.entity.ReservationOrderKindValue;
+import org.profit.candle.trading.reservation.entity.ReservationSideValue;
 import org.profit.candle.trading.reservation.entity.ReservationStatusValue;
 import org.profit.candle.trading.reservation.entity.ReservationTimingValue;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,8 +27,13 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
     /** RSV-009: 상태 필터가 적용된 본인 예약 목록 조회. */
     List<ReservationEntity> findByUserIdAndStatusOrderByCreatedAtDesc(UUID userId, ReservationStatusValue status);
 
-    /** ORD-009 동등 규칙: 동일 계좌·동일 종목 RESERVED 예약 존재 여부. */
-    boolean existsByAccountIdAndSymbolAndStatus(UUID accountId, String symbol, ReservationStatusValue status);
+    /**
+     * ORD-009 동등 규칙: 동일 계좌·동일 종목·동일 side RESERVED 예약 존재 여부.
+     * side를 포함해 반대 side(예: 매수 RESERVED가 있는 상태에서 매도 예약)는 서로 막지 않는다.
+     * DB의 부분 unique index(account_id, symbol, side)가 최종 방어선이다.
+     */
+    boolean existsByAccountIdAndSymbolAndSideAndStatus(
+            UUID accountId, String symbol, ReservationSideValue side, ReservationStatusValue status);
 
     /**
      * 취소/정정 처리 직전 락을 걸고 조회한다.

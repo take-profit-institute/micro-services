@@ -71,9 +71,11 @@ public class DefaultReservationService implements ReservationService {
         // (크로스 스키마 FK 금지 — reservations.account_id는 이 시점에 받아온 값을 그대로 저장)
         AccountEntity account = accountService.getAccount(userId);
 
-        // ORD-009 동등 규칙: 동일 종목 RESERVED 예약 중복 방지
-        if (reservationRepository.existsByAccountIdAndSymbolAndStatus(
-                account.getId(), command.symbol(), ReservationStatusValue.RESERVED)) {
+        // ORD-009 동등 규칙: 동일 종목·동일 side RESERVED 예약 중복 방지.
+        // side를 포함해 반대 side(매수 RESERVED가 있는 상태에서 매도 예약 등)는 서로 막지 않는다.
+        // 매도 예약은 잔고를 잠그지 않으므로 반대 side가 공존해도 정합성에 영향 없음.
+        if (reservationRepository.existsByAccountIdAndSymbolAndSideAndStatus(
+                account.getId(), command.symbol(), command.side(), ReservationStatusValue.RESERVED)) {
             throw new ReservationException(ReservationErrorCode.DUPLICATE_PENDING_RESERVATION);
         }
 
@@ -162,6 +164,8 @@ public class DefaultReservationService implements ReservationService {
         }
 
         // CAN-008: 정정 이력 연결 — parent_reservation_id로 원래 예약과 연결한다.
+        // 원예약을 이미 취소했고(위 doCancel) 동일 side로 재생성하는 것이라 중복 검증을
+        // 다시 태우지 않는다 — placeReservation과 달리 amend는 existsBy 체크를 하지 않는다(기존 동작 유지).
         ReservationEntity amended = ReservationEntity.reserve(
                 userId, account.getId(), original.getSymbol(), original.getSide(), timing, kind,
                 quantity, price, scheduledDate, reservedAmountKrw, command.idempotencyKey());
