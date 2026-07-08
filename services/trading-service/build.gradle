@@ -22,11 +22,15 @@ dependencies {
     // 도메인 이벤트 발행 (outbox → Kafka)
     implementation 'org.springframework.kafka:spring-kafka'
 
+    // 실시간 현재가 구독 (market-service market:quotes 채널, Redis Pub/Sub)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
     // gRPC 클라이언트 (ChartService 호출). starter 가 netty 전송 + GrpcChannelFactory 오토컨피그 제공.
     implementation 'org.springframework.boot:spring-boot-starter-grpc-client'
 
-    implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.boot:spring-boot-kafka'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params'
+    testImplementation 'io.grpc:grpc-inprocess'
 }
 
 // 공용 proto 디렉터리(리포 루트 /proto)에서 stub 생성

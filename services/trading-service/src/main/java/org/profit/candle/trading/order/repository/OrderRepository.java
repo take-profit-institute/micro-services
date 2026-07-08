@@ -3,6 +3,7 @@ package org.profit.candle.trading.order.repository;
 import jakarta.persistence.LockModeType;
 import org.profit.candle.trading.order.entity.OrderEntity;
 import org.profit.candle.trading.order.entity.OrderKindValue;
+import org.profit.candle.trading.order.entity.OrderSideValue;
 import org.profit.candle.trading.order.entity.OrderStatusValue;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -30,9 +31,12 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByUserIdAndStatusOrderByCreatedAtDesc(UUID userId, OrderStatusValue status);
 
     /**
-     * ORD-009: 동일 계좌·동일 종목 PENDING 주문 존재 여부. DB의 부분 unique index가 최종 방어선이다.
+     * ORD-009: 동일 계좌·동일 종목·동일 side PENDING 주문 존재 여부.
+     * side를 포함해 반대 side(예: 매수 PENDING 있는 상태에서 매도)는 서로 막지 않는다.
+     * DB의 부분 unique index(account_id, symbol, side)가 최종 방어선이다.
      */
-    boolean existsByAccountIdAndSymbolAndStatus(UUID accountId, String symbol, OrderStatusValue status);
+    boolean existsByAccountIdAndSymbolAndSideAndStatus(
+            UUID accountId, String symbol, OrderSideValue side, OrderStatusValue status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from OrderEntity o where o.id = :id and o.userId = :userId")
