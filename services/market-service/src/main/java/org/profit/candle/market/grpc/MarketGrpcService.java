@@ -15,6 +15,8 @@ import org.profit.candle.market.ranking.service.RankingReadService;
 import org.profit.candle.market.service.MarketIntradayService;
 import org.profit.candle.market.session.MarketSession;
 import org.profit.candle.market.stream.QuoteStreamBroker;
+import org.profit.candle.proto.market.v1.BatchQuotesRequest;
+import org.profit.candle.proto.market.v1.BatchQuotesResponse;
 import org.profit.candle.proto.market.v1.GetIntradayTicksRequest;
 import org.profit.candle.proto.market.v1.GetIntradayTicksResponse;
 import org.profit.candle.proto.market.v1.GetQuoteRequest;
@@ -42,7 +44,7 @@ import java.util.List;
  *
  * GetIntradayTicks: 실시간 그래프의 초기 페인트용 당일 틱 스냅샷.
  * StreamQuotes: 종목 상세 뷰어에게 라이브 tick 팬아웃(구독 수요 획득/해제 포함).
- * GetQuote: 단일 종목 현재가(키움 주식정보 API). SearchStocks/BatchQuotes 는 아직 미구현.
+ * GetQuote/BatchQuotes: 단일/다중 종목 현재가(키움 주식정보 API). SearchStocks 는 아직 미구현.
  */
 @Component
 @RequiredArgsConstructor
@@ -85,15 +87,7 @@ public class MarketGrpcService extends MarketServiceGrpc.MarketServiceImplBase {
     @Override
     public void getQuote(GetQuoteRequest request, StreamObserver<GetQuoteResponse> observer) {
         try {
-            KiwoomStockResponse stock = kiwoomMarketClient.getStockInfo(request.getSymbol());
-            Quote quote = Quote.newBuilder()
-                    .setSymbol(request.getSymbol())
-                    .setPrice(stock.getCurrentPriceValue())
-                    .setChange(stock.getPriceChangeValue())
-                    .setQuotedAt(Timestamp.newBuilder()
-                            .setSeconds(Instant.now().getEpochSecond())
-                            .build())
-                    .build();
+            Quote quote = fetchQuote(request.getSymbol());
             observer.onNext(GetQuoteResponse.newBuilder().setQuote(quote).build());
             observer.onCompleted();
         } catch (MarketException e) {
@@ -102,6 +96,37 @@ public class MarketGrpcService extends MarketServiceGrpc.MarketServiceImplBase {
         } catch (RuntimeException e) {
             observer.onError(Status.INTERNAL.withDescription("INTERNAL").asRuntimeException());
         }
+    }
+
+    /**
+     * 여러 종목 현재가 일괄 조회. portfolio-service가 보유종목 평가금/구성을 on-demand로 계산할 때
+     * (전 종목 실시간 구독은 불가) 한 번에 받아간다. 개별 종목 조회 실패는 스킵하고 나머지를 반환한다
+     * — 호출측은 응답에 없는 심볼을 평가에서 제외하면 된다.
+     */
+    @Override
+    public void batchQuotes(BatchQuotesRequest request, StreamObserver<BatchQuotesResponse> observer) {
+        BatchQuotesResponse.Builder builder = BatchQuotesResponse.newBuilder();
+        for (String symbol : request.getSymbolsList()) {
+            try {
+                builder.addQuotes(fetchQuote(symbol));
+            } catch (RuntimeException e) {
+                // 개별 종목 실패(키움 오류/미상장 등)는 부분 실패로 허용 — 스킵
+            }
+        }
+        observer.onNext(builder.build());
+        observer.onCompleted();
+    }
+
+    private Quote fetchQuote(String symbol) {
+        KiwoomStockResponse stock = kiwoomMarketClient.getStockInfo(symbol);
+        return Quote.newBuilder()
+                .setSymbol(symbol)
+                .setPrice(stock.getCurrentPriceValue())
+                .setChange(stock.getPriceChangeValue())
+                .setQuotedAt(Timestamp.newBuilder()
+                        .setSeconds(Instant.now().getEpochSecond())
+                        .build())
+                .build();
     }
 
     @Override
