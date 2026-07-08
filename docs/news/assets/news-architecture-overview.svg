@@ -10,8 +10,8 @@
   </defs>
   <rect class="bg" width="1500" height="750" rx="34"/>
   <path class="grid" d="M75 0V750 M150 0V750 M225 0V750 M300 0V750 M375 0V750 M450 0V750 M525 0V750 M600 0V750 M675 0V750 M750 0V750 M825 0V750 M900 0V750 M975 0V750 M1050 0V750 M1125 0V750 M1200 0V750 M1275 0V750 M1350 0V750 M1425 0V750 M0 90H1500 M0 180H1500 M0 270H1500 M0 360H1500 M0 450H1500 M0 540H1500 M0 630H1500"/>
-  <text x="64" y="76" class="title">NEWS SERVICE</text>
-  <text x="66" y="112" class="sub">SCHEDULED COLLECTION · STOCK NAME LOOKUP · NAVER NEWS SEARCH</text>
+  <text x="64" y="92" class="title">NEWS SERVICE</text>
+  <text x="66" y="128" class="sub">SCHEDULED COLLECTION · STOCK NAME LOOKUP · NAVER NEWS SEARCH</text>
 
   <rect x="70" y="210" width="270" height="135" rx="26" class="box"/>
   <text x="105" y="260" class="txt">SCHEDULER</text>
@@ -45,7 +45,7 @@
   <path d="M340 278H420" class="line"/>
   <path d="M745 230 C795 230 800 182 845 182" class="line"/>
   <path d="M745 300 C795 300 800 368 845 368" class="line"/>
-  <path d="M1110 368 C1150 368 1150 315 1175 315" class="lineBlue"/>
-  <path d="M745 555 C930 555 1030 395 1175 350" class="lineBlue dash"/>
+  <path d="M1110 368 H1175" class="lineBlue"/>
+  <path d="M745 555 H1315 V410" class="lineBlue dash"/>
   <text x="70" y="690" class="small">No Kafka/Redis/Outbox currently · collection writes owned news schema only · lookup reads PostgreSQL only</text>
 </svg>

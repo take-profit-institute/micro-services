@@ -71,13 +71,29 @@ const documents = [
   {
     number: '09',
     tag: 'DOMAIN',
+    title: 'Learning Service',
+    description: '학습 콘텐츠와 사용자 진도·완료·즐겨찾기 흐름을 설명합니다.',
+    link: '/docs/learning/learning-service-guide',
+    accent: 'mint',
+  },
+  {
+    number: '10',
+    tag: 'DOMAIN',
+    title: 'Market Service',
+    description: '실시간 시세, 호가, 장 상태, 키움 랭킹 캐시 흐름을 설명합니다.',
+    link: '/docs/market/market-service',
+    accent: 'blue',
+  },
+  {
+    number: '11',
+    tag: 'DOMAIN',
     title: 'Wishlist Service',
     description: '관심종목, 가격 알림, Market 구독 수요 이벤트 흐름을 설명합니다.',
     link: '/docs/wishlist/WISHLIST_SERVICE',
     accent: 'coral',
   },
   {
-    number: '10',
+    number: '12',
     tag: 'BATCH',
     title: 'Trading Batch',
     description: '예약·주문 배치 실행 순서와 수동 운영 방법을 설명합니다.',
@@ -85,7 +101,7 @@ const documents = [
     accent: 'coral',
   },
   {
-    number: '11',
+    number: '13',
     tag: 'BATCH',
     title: 'Portfolio EOD Batch',
     description: '장 마감 포트폴리오 스냅샷 생성과 gRPC 연동 흐름을 설명합니다.',
@@ -93,7 +109,7 @@ const documents = [
     accent: 'blue',
   },
   {
-    number: '12',
+    number: '14',
     tag: 'BATCH',
     title: 'Ranking Batch',
     description: 'Portfolio EOD 완료 후 일별 랭킹 확정 배치 흐름을 설명합니다.',
@@ -101,7 +117,7 @@ const documents = [
     accent: 'violet',
   },
   {
-    number: '13',
+    number: '15',
     tag: 'BATCH',
     title: 'Stock Sync Batch',
     description: 'Stock Service 종목 마스터 동기화 배치와 운영 정책을 설명합니다.',
@@ -109,7 +125,7 @@ const documents = [
     accent: 'mint',
   },
   {
-    number: '14',
+    number: '16',
     tag: 'OPS',
     title: 'Batch Manual Operation',
     description: '전체 Batch Job 목록, 수동 실행 명령, DB 확인 방법을 설명합니다.',
@@ -160,6 +176,20 @@ const domainArchitectures = [
     image: '/img/domain-architecture/news-architecture-overview.svg',
     link: '/docs/news/NEWS_SERVICE',
     description: 'Stock gRPC와 Naver News API를 결합해 종목별 최신 뉴스를 수집하고 DB에서 조회합니다.',
+  },
+  {
+    name: 'Learning',
+    eyebrow: 'EDUCATION',
+    image: '/img/domain-architecture/learning-architecture-overview.svg',
+    link: '/docs/learning/learning-service-guide',
+    description: '학습 콘텐츠 CRUD와 사용자별 진도·완료·즐겨찾기·통계 상태를 관리합니다.',
+  },
+  {
+    name: 'Market',
+    eyebrow: 'LIVE MARKET',
+    image: '/img/domain-architecture/market-architecture-overview.svg',
+    link: '/docs/market/market-service',
+    description: '키움 REST·WebSocket을 통해 현재가, 호가, 장 상태, 실시간 시세와 시장 랭킹 캐시를 제공합니다.',
   },
   {
     name: 'Notification',
