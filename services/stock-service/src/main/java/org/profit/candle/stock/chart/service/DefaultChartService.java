@@ -67,11 +67,7 @@ public class DefaultChartService implements ChartService {
         if (codes == null || codes.isEmpty() || interval == null) {
             throw new CandleException(ChartErrorCode.INVALID_CANDLE_REQUEST);
         }
-        List<String> distinct = codes.stream()
-                .filter(c -> c != null && !c.isBlank())
-                .distinct()
-                .limit(MAX_CODES)
-                .toList();
+        List<String> distinct = normalizeCodes(codes);
         if (distinct.isEmpty()) {
             throw new CandleException(ChartErrorCode.INVALID_CANDLE_REQUEST);
         }
@@ -94,6 +90,19 @@ public class DefaultChartService implements ChartService {
             results.add(new SparklineResult(code, closes, last));
         }
         return results;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> findExistingCandleCodes(List<String> codes, CandleInterval interval, Instant openTime) {
+        if (codes == null || codes.isEmpty() || interval == null || openTime == null) {
+            throw new CandleException(ChartErrorCode.INVALID_CANDLE_REQUEST);
+        }
+        List<String> distinct = normalizeCodes(codes);
+        if (distinct.isEmpty()) {
+            throw new CandleException(ChartErrorCode.INVALID_CANDLE_REQUEST);
+        }
+        return candleReader.findExistingCodesAt(distinct, interval.storageValue(), openTime);
     }
 
     @Override
@@ -164,5 +173,13 @@ public class DefaultChartService implements ChartService {
             return MIN_LIMIT;
         }
         return Math.min(requestedLimit, MAX_LIMIT);
+    }
+
+    private static List<String> normalizeCodes(List<String> codes) {
+        return codes.stream()
+                .filter(c -> c != null && !c.isBlank())
+                .distinct()
+                .limit(MAX_CODES)
+                .toList();
     }
 }

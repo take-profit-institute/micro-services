@@ -10,6 +10,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.profit.candle.common.error.CandleException;
 import org.profit.candle.proto.stock.v1.BackfillCandlesRequest;
 import org.profit.candle.proto.stock.v1.BackfillCandlesResponse;
+import org.profit.candle.proto.stock.v1.FindExistingCandleCodesRequest;
+import org.profit.candle.proto.stock.v1.FindExistingCandleCodesResponse;
 import org.profit.candle.proto.stock.v1.GetCandlesRequest;
 import org.profit.candle.proto.stock.v1.GetCandlesResponse;
 import org.profit.candle.proto.stock.v1.GetPriceStatsRequest;
@@ -116,6 +118,24 @@ class ChartGrpcServiceTest {
 
         assertThat(observer.value.hasAsOf()).isFalse();
         assertThat(observer.value.getHigh()).isZero();
+        assertThat(observer.completed).isTrue();
+    }
+
+    @Test
+    void findExistingCandleCodes_returnsExistingCodes() {
+        Instant date = Instant.parse("2026-07-09T00:00:00Z");
+        when(chartService.findExistingCandleCodes(List.of("000001", "000002"), CandleInterval.DAY_1, date))
+                .thenReturn(List.of("000002"));
+        ChartGrpcService service = new ChartGrpcService(chartService, backfillService, dailyCloseService);
+        CapturingObserver<FindExistingCandleCodesResponse> observer = new CapturingObserver<>();
+
+        service.findExistingCandleCodes(FindExistingCandleCodesRequest.newBuilder()
+                .addAllCodes(List.of("000001", "000002"))
+                .setInterval(org.profit.candle.proto.stock.v1.CandleInterval.DAY_1)
+                .setDate(com.google.protobuf.Timestamp.newBuilder().setSeconds(date.getEpochSecond()).build())
+                .build(), observer);
+
+        assertThat(observer.value.getCodesList()).containsExactly("000002");
         assertThat(observer.completed).isTrue();
     }
 

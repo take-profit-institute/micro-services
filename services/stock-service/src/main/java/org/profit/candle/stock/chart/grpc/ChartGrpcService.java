@@ -11,6 +11,8 @@ import org.profit.candle.proto.stock.v1.Candle;
 import org.profit.candle.proto.stock.v1.ChartServiceGrpc;
 import org.profit.candle.proto.stock.v1.CloseDailyCandlesRequest;
 import org.profit.candle.proto.stock.v1.CloseDailyCandlesResponse;
+import org.profit.candle.proto.stock.v1.FindExistingCandleCodesRequest;
+import org.profit.candle.proto.stock.v1.FindExistingCandleCodesResponse;
 import org.profit.candle.proto.stock.v1.GetCandlesRequest;
 import org.profit.candle.proto.stock.v1.GetCandlesResponse;
 import org.profit.candle.proto.stock.v1.GetPreviousCloseRequest;
@@ -115,6 +117,31 @@ public class ChartGrpcService extends ChartServiceGrpc.ChartServiceImplBase {
                 builder.setAsOf(toTimestamp(stats.asOf()));
             }
             observer.onNext(builder.build());
+            observer.onCompleted();
+        } catch (CandleException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        } catch (IllegalArgumentException e) {
+            observer.onError(Status.INVALID_ARGUMENT.withDescription(ChartErrorCode.INVALID_CANDLE_REQUEST.code())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void findExistingCandleCodes(
+            FindExistingCandleCodesRequest request,
+            StreamObserver<FindExistingCandleCodesResponse> observer
+    ) {
+        try {
+            if (!request.hasDate()) {
+                throw new IllegalArgumentException("date is required");
+            }
+            org.profit.candle.stock.chart.dto.CandleInterval interval = intervalOrDefault(request.getInterval());
+            observer.onNext(FindExistingCandleCodesResponse.newBuilder()
+                    .addAllCodes(chartService.findExistingCandleCodes(
+                            request.getCodesList(),
+                            interval,
+                            toInstant(request.getDate())))
+                    .build());
             observer.onCompleted();
         } catch (CandleException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());

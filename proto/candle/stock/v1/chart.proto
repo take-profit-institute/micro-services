@@ -49,6 +49,18 @@ message BackfillCandlesResponse {
   int32 upserted = 1;
 }
 
+// batch 가 백필 전에 "이미 해당 일봉이 있는 종목"을 페이지 단위로 거르기 위한 경량 조회.
+// 요청 codes 중 DB 에 해당 interval/date 캔들이 있는 code 만 반환한다. 백필하지 않는다.
+message FindExistingCandleCodesRequest {
+  repeated string codes = 1;
+  CandleInterval interval = 2;                 // 기본 DAY_1
+  google.protobuf.Timestamp date = 3;          // 조회할 캔들의 open_time
+}
+
+message FindExistingCandleCodesResponse {
+  repeated string codes = 1;
+}
+
 // 장 마감 후 batch(stock.close-daily.v1)가 호출한다. 해당 거래일의 미확정 일봉을 확정(closed=true)하고
 // 종가 이벤트를 발행한다. 이미 확정된 캔들은 건너뛰므로 재실행에 안전하다.
 message CloseDailyCandlesRequest {
@@ -111,6 +123,7 @@ service ChartService {
   rpc GetSparklines(GetSparklinesRequest) returns (GetSparklinesResponse);
   rpc GetPreviousClose(GetPreviousCloseRequest) returns (GetPreviousCloseResponse);
   rpc GetPriceStats(GetPriceStatsRequest) returns (GetPriceStatsResponse);
+  rpc FindExistingCandleCodes(FindExistingCandleCodesRequest) returns (FindExistingCandleCodesResponse);
   rpc BackfillCandles(BackfillCandlesRequest) returns (BackfillCandlesResponse);
   rpc CloseDailyCandles(CloseDailyCandlesRequest) returns (CloseDailyCandlesResponse);
 }

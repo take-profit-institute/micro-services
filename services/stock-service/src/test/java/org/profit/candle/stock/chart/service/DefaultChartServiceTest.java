@@ -102,6 +102,18 @@ class DefaultChartServiceTest {
     }
 
     @Test
+    void findExistingCandleCodes_returnsExistingCodesAtDateWithoutBackfill() {
+        Instant openTime = Instant.parse("2026-07-09T00:00:00Z");
+        List<String> codes = List.of("000001", "000002", "000003");
+        when(candleReader.findExistingCodesAt(codes, "1d", openTime)).thenReturn(List.of("000002"));
+        DefaultChartService service = new DefaultChartService(candleReader, backfillService);
+
+        List<String> result = service.findExistingCandleCodes(codes, CandleInterval.DAY_1, openTime);
+
+        assertThat(result).containsExactly("000002");
+    }
+
+    @Test
     void getPreviousClose_backfillsWhenDbEmpty() {
         Instant date = Instant.parse("2026-07-01T00:00:00Z");
         CandleEntity prev = candle("005930", "1d", "2026-06-30T00:00:00Z", 72000);

@@ -63,6 +63,18 @@ public interface JpaCandleRepository extends JpaRepository<CandleEntity, CandleI
 
     @Override
     @Query("""
+            SELECT c.id.stockCode FROM CandleEntity c
+            WHERE c.id.stockCode IN :codes
+              AND c.id.interval = :interval
+              AND c.id.openTime = :openTime
+            ORDER BY c.id.stockCode ASC
+            """)
+    List<String> findExistingCodesAt(@Param("codes") List<String> codes,
+                                     @Param("interval") String interval,
+                                     @Param("openTime") Instant openTime);
+
+    @Override
+    @Query("""
             SELECT c FROM CandleEntity c
             WHERE c.id.interval = :interval
               AND c.id.openTime = :openTime

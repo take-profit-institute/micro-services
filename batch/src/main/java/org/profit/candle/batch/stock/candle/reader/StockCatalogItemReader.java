@@ -1,6 +1,13 @@
 package org.profit.candle.batch.stock.candle.reader;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import org.profit.candle.batch.stock.candle.client.CandleBackfillClient;
 import org.profit.candle.batch.stock.candle.client.StockCatalogClient;
 import org.profit.candle.batch.stock.candle.policy.StockCandleRetryExecutor;
 import org.springframework.batch.infrastructure.item.ExecutionContext;
@@ -17,8 +24,10 @@ public class StockCatalogItemReader implements ItemStreamReader<String> {
     private static final String FINISHED_KEY = "stockCandle.finished";
 
     private final StockCatalogClient catalogClient;
+    private final CandleBackfillClient candleClient;
     private final StockCandleRetryExecutor retryExecutor;
     private final int pageSize;
+    private final Instant targetOpenTime;
 
     private int page;
     private int index;
@@ -28,12 +37,17 @@ public class StockCatalogItemReader implements ItemStreamReader<String> {
 
     public StockCatalogItemReader(
             StockCatalogClient catalogClient,
+            CandleBackfillClient candleClient,
             StockCandleRetryExecutor retryExecutor,
-            int pageSize
+            int pageSize,
+            String targetDate,
+            String zoneId
     ) {
         this.catalogClient = catalogClient;
+        this.candleClient = candleClient;
         this.retryExecutor = retryExecutor;
         this.pageSize = pageSize;
+        this.targetOpenTime = resolveTargetOpenTime(targetDate, zoneId);
     }
 
     @Override
@@ -44,7 +58,7 @@ public class StockCatalogItemReader implements ItemStreamReader<String> {
                 StockCatalogClient.Page loaded = retryExecutor.execute(
                         () -> catalogClient.listListedCodes(requestedPage, pageSize)
                 );
-                current = loaded.codes();
+                current = filterMissingDailyCandles(loaded.codes());
                 totalPages = loaded.totalPages();
             }
 
@@ -76,5 +90,27 @@ public class StockCatalogItemReader implements ItemStreamReader<String> {
         executionContext.putInt(PAGE_KEY, page);
         executionContext.putInt(INDEX_KEY, index);
         executionContext.putInt(FINISHED_KEY, finished ? 1 : 0);
+    }
+
+    private List<String> filterMissingDailyCandles(List<String> codes) {
+        if (codes == null || codes.isEmpty()) {
+            return List.of();
+        }
+        List<String> existing = retryExecutor.execute(() -> candleClient.findExistingDailyCodes(codes, targetOpenTime));
+        if (existing.isEmpty()) {
+            return codes;
+        }
+        Set<String> existingSet = new HashSet<>(existing);
+        return codes.stream()
+                .filter(code -> !existingSet.contains(code))
+                .toList();
+    }
+
+    private static Instant resolveTargetOpenTime(String targetDate, String zoneId) {
+        LocalDate date = targetDate == null || targetDate.isBlank()
+                ? LocalDate.now(ZoneId.of(zoneId))
+                : LocalDate.parse(targetDate);
+        // stock-service 일봉 open_time은 날짜를 UTC 자정으로 저장한다.
+        return date.atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 }

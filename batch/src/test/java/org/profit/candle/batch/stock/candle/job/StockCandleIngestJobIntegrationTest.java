@@ -2,6 +2,7 @@ package org.profit.candle.batch.stock.candle.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -92,6 +93,8 @@ class StockCandleIngestJobIntegrationTest {
         }
         when(catalogClient.listListedCodes(eq(0), anyInt()))
                 .thenReturn(new StockCatalogClient.Page(codes, 1));
+        when(backfillClient.findExistingDailyCodes(eq(codes), any()))
+                .thenReturn(List.of());
 
         when(backfillClient.backfillDaily(anyString(), anyInt())).thenAnswer(invocation -> {
             String code = invocation.getArgument(0);

@@ -87,10 +87,13 @@ public class StockCandleIngestJobConfiguration {
     @StepScope
     public StockCatalogItemReader stockCandleItemReader(
             @Value("${batch.schedule.stock-candle.page-size:100}") int pageSize,
+            @Value("#{jobParameters['targetDate']}") String targetDate,
+            @Value("${batch.schedule.zone-id:Asia/Seoul}") String zoneId,
             StockCatalogClient catalogClient,
+            CandleBackfillClient candleClient,
             StockCandleRetryExecutor retryExecutor
     ) {
-        return new StockCatalogItemReader(catalogClient, retryExecutor, pageSize);
+        return new StockCatalogItemReader(catalogClient, candleClient, retryExecutor, pageSize, targetDate, zoneId);
     }
 
     /**
