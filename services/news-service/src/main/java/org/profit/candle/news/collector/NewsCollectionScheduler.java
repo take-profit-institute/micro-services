@@ -16,15 +16,25 @@ public class NewsCollectionScheduler {
 
     @Scheduled(cron = "0 0 9,12,15 * * MON-FRI", zone = "Asia/Seoul")
     public void collectNews() {
+        long startedAt = System.currentTimeMillis();
+        log.info("=== News collection scheduler started ===");
         try (NewsCollectionLock.Handle ignored = newsCollectionLock.tryLock().orElse(null)) {
             if (ignored == null) {
                 log.info("Scheduled news collection skipped because another instance holds the lock");
                 return;
             }
             syncListedStocks();
-            newsCollectionService.collectActiveTargets();
+            NewsCollectionResult result = newsCollectionService.collectActiveTargets();
+            log.info(
+                    "News collection completed. targetCount={}, successCount={}, failCount={}",
+                    result.targetCount(),
+                    result.successCount(),
+                    result.failCount()
+            );
         } catch (RuntimeException e) {
             log.error("Scheduled news collection failed", e);
+        } finally {
+            log.info("News collection scheduler finished. elapsed={}ms", System.currentTimeMillis() - startedAt);
         }
     }
 
