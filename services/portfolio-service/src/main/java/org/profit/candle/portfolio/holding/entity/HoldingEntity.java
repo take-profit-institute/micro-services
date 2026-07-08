@@ -117,4 +117,31 @@ public class HoldingEntity {
         this.cachedCurrentPrice = currentPrice;
         this.updatedAt = Instant.now();
     }
+
+    public boolean metadataMissing() {
+        return isBlank(name) || isBlank(sector) || isBlank(market);
+    }
+
+    public void enrichMetadata(String name, String sector, String market) {
+        boolean changed = false;
+        if (!isBlank(name) && !name.equals(this.name)) {
+            this.name = name;
+            changed = true;
+        }
+        if (!isBlank(sector) && !sector.equals(this.sector)) {
+            this.sector = sector;
+            changed = true;
+        }
+        if (!isBlank(market) && !market.equals(this.market)) {
+            this.market = market;
+            changed = true;
+        }
+        if (changed) {
+            this.updatedAt = Instant.now();
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
 }

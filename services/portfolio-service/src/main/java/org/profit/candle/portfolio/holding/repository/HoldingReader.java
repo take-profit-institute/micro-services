@@ -14,4 +14,6 @@ public interface HoldingReader {
     List<String> findActiveUserIdsAfter(String lastUserId, int limit);
     // 주어진 유저 집합의 활성 보유종목을 (user_id, symbol) ASC 로 반환.
     List<HoldingEntity> findActiveHoldingsByUserIds(List<String> userIds);
+    // name/sector/market 중 하나라도 비어 있는 보유종목을 symbol ASC 로 제한 조회한다.
+    List<HoldingEntity> findMetadataMissing(int limit);
 }

@@ -11,6 +11,8 @@ spring:
           target: ${MARKET_SERVICE_GRPC_ADDRESS:static://localhost:50063}
         trading-service:
           target: ${TRADING_SERVICE_GRPC_ADDRESS:static://localhost:50054}
+        stock-service:
+          target: ${STOCK_SERVICE_GRPC_ADDRESS:static://localhost:50060}
   datasource:
     url: ${PORTFOLIO_DB_URL:jdbc:postgresql://localhost:5432/candle?currentSchema=portfolio,public}
     username: ${PORTFOLIO_DB_USERNAME:candle}
@@ -26,3 +28,10 @@ spring:
 
 server:
   port: ${PORTFOLIO_SERVER_PORT:8085}
+
+portfolio:
+  holding:
+    metadata-backfill:
+      enabled: ${PORTFOLIO_HOLDING_METADATA_BACKFILL_ENABLED:false}
+      batch-size: ${PORTFOLIO_HOLDING_METADATA_BACKFILL_BATCH_SIZE:200}
+      max-batches: ${PORTFOLIO_HOLDING_METADATA_BACKFILL_MAX_BATCHES:50}

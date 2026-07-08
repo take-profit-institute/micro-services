@@ -45,4 +45,14 @@ public interface JpaHoldingRepository
             ORDER BY h.id.userId ASC, h.id.symbol ASC
             """)
     List<HoldingEntity> findActiveHoldingsByUserIds(@Param("userIds") List<String> userIds);
+
+    @Override
+    @Query(value = """
+            SELECT *
+            FROM portfolio_holdings
+            WHERE name = '' OR sector = '' OR market = ''
+            ORDER BY symbol ASC, user_id ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<HoldingEntity> findMetadataMissing(@Param("limit") int limit);
 }
