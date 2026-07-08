@@ -2,6 +2,8 @@
 
 투자 학습 콘텐츠 관리 및 사용자 학습 진도 추적 서비스
 
+![Learning architecture overview](./assets/learning-architecture-overview.svg)
+
 ## 아키텍처
 
 ```

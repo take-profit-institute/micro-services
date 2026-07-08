@@ -2,6 +2,8 @@
 
 # Market Service
 
+![Market architecture overview](./assets/market-architecture-overview.svg)
+
 ## 1. 서비스 개요
 
 Market Service는 키움 랭킹 API를 호출하여 주식 랭킹 데이터를 가져오고,

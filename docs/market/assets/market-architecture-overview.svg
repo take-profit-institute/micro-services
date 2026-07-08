@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="1500" viewBox="0 0 1500 750" role="img" aria-labelledby="title desc" preserveAspectRatio="xMidYMid meet" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
+  <title id="title">Market Service architecture overview</title>
+  <desc id="desc">Market gRPC, Kiwoom REST and WebSocket, Redis cache, PostgreSQL market state and Kafka quote publications</desc>
+  <defs>
+    <marker id="goldArrow" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#f6c84c"/></marker>
+    <marker id="mintArrow" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#2dd4a3"/></marker>
+    <marker id="blueArrow" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#55a7ff"/></marker>
+    <marker id="orangeArrow" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L16 8 L0 16 Z" fill="#ff9a2f"/></marker>
+    <style>
+      .bg{fill:#071521}.grid{stroke:#1a3448;stroke-width:1;opacity:.32}.title{font:800 38px Inter,Arial,sans-serif;fill:#fff}.sub{font:700 15px Inter,Arial,sans-serif;fill:#9fb4c8;letter-spacing:.14em}.box{fill:#112538;stroke:#6d8195;stroke-width:1.7}.grpc{fill:#3a3008;stroke:#f6c84c;stroke-width:2.4}.kiwoom{fill:#3b1d24;stroke:#ff756f;stroke-width:2.2}.redis{fill:#0d3b31;stroke:#2dd4a3;stroke-width:2.2}.db{fill:#102f4d;stroke:#55a7ff;stroke-width:2.2}.kafka{fill:#4a2508;stroke:#ff9a2f;stroke-width:2.2}.rank{fill:#2d1c4f;stroke:#b48cff;stroke-width:2.2}.txt{font:800 22px Inter,Arial,sans-serif;fill:#f8fbff}.body{font:600 15px Inter,Arial,sans-serif;fill:#c9d6e3}.small{font:700 12px Inter,Arial,sans-serif;fill:#aebfd0}.lineGold{stroke:#f6c84c;stroke-width:3;fill:none;marker-end:url(#goldArrow)}.lineMint{stroke:#2dd4a3;stroke-width:3;fill:none;marker-end:url(#mintArrow)}.lineBlue{stroke:#55a7ff;stroke-width:3;fill:none;marker-end:url(#blueArrow)}.lineOrange{stroke:#ff9a2f;stroke-width:3;fill:none;marker-end:url(#orangeArrow)}.dash{stroke-dasharray:8 8}
+    </style>
+  </defs>
+  <rect class="bg" width="1500" height="750" rx="34"/>
+  <path class="grid" d="M75 0V750 M150 0V750 M225 0V750 M300 0V750 M375 0V750 M450 0V750 M525 0V750 M600 0V750 M675 0V750 M750 0V750 M825 0V750 M900 0V750 M975 0V750 M1050 0V750 M1125 0V750 M1200 0V750 M1275 0V750 M1350 0V750 M1425 0V750 M0 90H1500 M0 180H1500 M0 270H1500 M0 360H1500 M0 450H1500 M0 540H1500 M0 630H1500"/>
+  <text x="64" y="92" class="title">MARKET SERVICE</text>
+  <text x="66" y="128" class="sub">QUOTE RPC · ORDERBOOK CACHE · LIVE STREAM · KIWOOM RANKING</text>
+
+  <rect x="70" y="175" width="250" height="130" rx="24" class="box"/>
+  <text x="105" y="225" class="txt">BFF / TRADING</text>
+  <text x="105" y="262" class="body">quote · orderbook · status</text>
+
+  <rect x="70" y="420" width="250" height="130" rx="24" class="box"/>
+  <text x="105" y="470" class="txt">BATCH / WISHLIST</text>
+  <text x="105" y="507" class="body">refresh · subscription demand</text>
+
+  <rect x="405" y="220" width="315" height="235" rx="30" class="grpc"/>
+  <text x="445" y="272" class="txt">MarketGrpcService</text>
+  <text x="445" y="310" class="body">GetQuote · BatchQuotes</text>
+  <text x="445" y="342" class="body">GetOrderBook · RefreshOrderBooks</text>
+  <text x="445" y="374" class="body">StreamQuotes · GetRankings</text>
+  <text x="445" y="406" class="body">MarketStatus · TradingDay</text>
+
+  <rect x="825" y="120" width="270" height="150" rx="26" class="kiwoom"/>
+  <text x="865" y="172" class="txt">KIWOOM REST</text>
+  <text x="865" y="208" class="body">stock · tick · orderbook</text>
+  <text x="865" y="238" class="body">ranking APIs</text>
+
+  <rect x="825" y="340" width="270" height="155" rx="26" class="redis"/>
+  <text x="865" y="392" class="txt">REDIS</text>
+  <text x="865" y="428" class="body">intraday ticks</text>
+  <text x="865" y="458" class="body">orderbook · ranking cache</text>
+
+  <rect x="825" y="565" width="270" height="105" rx="24" class="rank"/>
+  <text x="865" y="610" class="txt">WS SUPERVISOR</text>
+  <text x="865" y="644" class="body">session gated realtime subscribe</text>
+
+  <rect x="1215" y="120" width="240" height="160" rx="26" class="db"/>
+  <text x="1250" y="172" class="txt">POSTGRES</text>
+  <text x="1250" y="208" class="body">stocks · ticks</text>
+  <text x="1250" y="238" class="body">market_holidays</text>
+
+  <rect x="1215" y="390" width="240" height="150" rx="26" class="kafka"/>
+  <text x="1250" y="442" class="txt">KAFKA</text>
+  <text x="1250" y="478" class="body">market quotes</text>
+  <text x="1250" y="508" class="body">orderbook events</text>
+
+  <path d="M320 240H390" class="lineGold"/>
+  <path d="M320 485H360 V378 H390" class="lineGold"/>
+  <path d="M720 285H800 V195 H810" class="lineGold"/>
+  <path d="M720 370H810" class="lineMint"/>
+  <path d="M720 420H770 V617 H810" class="lineMint dash"/>
+  <path d="M1095 195H1200" class="lineBlue"/>
+  <path d="M1095 418H1140 V200 H1200" class="lineBlue dash"/>
+  <path d="M1095 445H1200" class="lineOrange"/>
+  <path d="M960 565V510" class="lineMint"/>
+  <text x="70" y="690" class="small">Kiwoom credentials stay inside market-service · Redis is cache/source for hot quote reads · Kafka distributes realtime market changes</text>
+</svg>
