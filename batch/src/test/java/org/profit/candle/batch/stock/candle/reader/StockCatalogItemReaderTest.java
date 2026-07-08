@@ -21,9 +21,9 @@ class StockCatalogItemReaderTest {
     @Mock CandleBackfillClient candleClient;
 
     @Test
-    void read_skipsCodesThatAlreadyHaveDailyCandleAtTargetDate() {
+    void read_skipsCodesThatAlreadyHaveDailyCandleAtBusinessDate() {
         List<String> codes = List.of("000001", "000002", "000003");
-        Instant targetOpenTime = Instant.parse("2026-07-09T00:00:00Z");
+        Instant targetOpenTime = Instant.parse("2026-07-08T00:00:00Z");
         when(catalogClient.listListedCodes(0, 100)).thenReturn(new StockCatalogClient.Page(codes, 1));
         when(candleClient.findExistingDailyCodes(codes, targetOpenTime)).thenReturn(List.of("000002"));
         StockCatalogItemReader reader = new StockCatalogItemReader(
@@ -31,7 +31,7 @@ class StockCatalogItemReaderTest {
                 candleClient,
                 new StockCandleRetryExecutor(),
                 100,
-                "2026-07-09",
+                "2026-07-08",
                 "Asia/Seoul"
         );
 

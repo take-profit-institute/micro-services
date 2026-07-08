@@ -40,14 +40,14 @@ public class StockCatalogItemReader implements ItemStreamReader<String> {
             CandleBackfillClient candleClient,
             StockCandleRetryExecutor retryExecutor,
             int pageSize,
-            String targetDate,
+            String businessDate,
             String zoneId
     ) {
         this.catalogClient = catalogClient;
         this.candleClient = candleClient;
         this.retryExecutor = retryExecutor;
         this.pageSize = pageSize;
-        this.targetOpenTime = resolveTargetOpenTime(targetDate, zoneId);
+        this.targetOpenTime = resolveTargetOpenTime(businessDate, zoneId);
     }
 
     @Override
@@ -106,10 +106,10 @@ public class StockCatalogItemReader implements ItemStreamReader<String> {
                 .toList();
     }
 
-    private static Instant resolveTargetOpenTime(String targetDate, String zoneId) {
-        LocalDate date = targetDate == null || targetDate.isBlank()
+    private static Instant resolveTargetOpenTime(String businessDate, String zoneId) {
+        LocalDate date = businessDate == null || businessDate.isBlank()
                 ? LocalDate.now(ZoneId.of(zoneId))
-                : LocalDate.parse(targetDate);
+                : LocalDate.parse(businessDate);
         // stock-service 일봉 open_time은 날짜를 UTC 자정으로 저장한다.
         return date.atStartOfDay(ZoneOffset.UTC).toInstant();
     }

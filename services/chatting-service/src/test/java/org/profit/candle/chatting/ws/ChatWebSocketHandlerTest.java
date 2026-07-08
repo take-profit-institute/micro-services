@@ -16,6 +16,8 @@ import reactor.test.StepVerifier;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -71,6 +73,23 @@ class ChatWebSocketHandlerTest {
 
         verify(roomCounter).enter(new RoomKey("005930", 1));
         verify(roomCounter).leave(new RoomKey("005930", 1));
+    }
+
+    @Test
+    void handle_broadcastsPresenceOnEnterAndLeave() {
+        // 입장 시 갱신 인원(join)과 퇴장 시 갱신 인원(leave)을 각각 방 채널로 발행한다.
+        ChatWebSocketHandler realHandler =
+                new ChatWebSocketHandler(authenticator, roomCounter, broker, new ObjectMapper());
+        when(roomCounter.enter(any(RoomKey.class))).thenReturn(Mono.just(3L));
+        when(roomCounter.leave(any(RoomKey.class))).thenReturn(Mono.just(2L));
+        when(session.send(any())).thenReturn(Mono.empty());
+        when(broker.publish(eq("chat:005930_1"), any())).thenReturn(Mono.just(1L));
+
+        StepVerifier.create(realHandler.handle(session))
+                .verifyComplete();
+
+        verify(broker).publish(eq("chat:005930_1"), contains("\"event\":\"join\""));
+        verify(broker).publish(eq("chat:005930_1"), contains("\"event\":\"leave\""));
     }
 
     @Test

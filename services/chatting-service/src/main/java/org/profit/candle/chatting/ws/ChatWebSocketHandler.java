@@ -78,17 +78,39 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         // usingWhen: enter(자원 획득)가 성공했을 때만 leave(자원 해제)를 호출한다.
         // → enter 실패/조기 취소 시 불필요한 DECR로 카운터가 음수로 내려가는 비대칭을 막는다
         //   (정리는 완료·에러·취소 모든 종료 신호에서 동일하게 1회 실행).
+        // 입장/퇴장마다 갱신된 인원수를 같은 채널로 브로드캐스트해, 방의 모든 클라가 실시간 반영한다.
         return Mono.usingWhen(
                 roomCounter.enter(key)
-                        .doOnNext(c -> log.debug("WS enter account={} room={} count={}", accountId, roomId, c)),
+                        .doOnNext(c -> log.debug("WS enter account={} room={} count={}", accountId, roomId, c))
+                        .flatMap(count -> publishPresence(channel, PresenceEvent.JOIN, count, accountId)
+                                .thenReturn(count)),
                 enteredCount -> Mono.firstWithSignal(session.send(outbound), inbound),
                 enteredCount -> roomCounter.leave(key)
-                        .doOnError(e -> log.warn("카운터 DECR 실패 room={}: {}", roomId, e.getMessage()))
+                        .doOnNext(c -> log.debug("WS leave account={} room={} count={}", accountId, roomId, c))
+                        .flatMap(count -> publishPresence(channel, PresenceEvent.LEAVE, count, accountId)
+                                .thenReturn(count))
+                        .doOnError(e -> log.warn("카운터 DECR/presence 실패 room={}: {}", roomId, e.getMessage()))
                         .onErrorComplete());
     }
 
     private String serialize(String accountId, String text) throws Exception {
         return objectMapper.writeValueAsString(new ChatMessage(accountId, text, Instant.now().toEpochMilli()));
+    }
+
+    /**
+     * 입장/퇴장 presence 이벤트를 방 채널로 발행한다.
+     *
+     * <p>발행 실패는 삼켜서 커넥션 수명/카운터 대칭을 해치지 않는다: join 발행이 실패했다고 연결을
+     * 끊으면 이미 INCR된 카운터의 leave(DECR)가 호출되지 않아 인원이 새기 때문이다(usingWhen 규약).
+     */
+    private Mono<Long> publishPresence(String channel, String event, long count, String accountId) {
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(
+                        PresenceEvent.of(event, count, accountId, Instant.now().toEpochMilli())))
+                .flatMap(payload -> broker.publish(channel, payload))
+                .onErrorResume(e -> {
+                    log.warn("presence 발행 실패 channel={} event={}: {}", channel, event, e.getMessage());
+                    return Mono.empty();
+                });
     }
 
     /** {@code Sec-WebSocket-Protocol} 헤더의 첫 값을 토큰으로 사용(쿼리 토큰 부재 시 폴백). */
