@@ -57,8 +57,11 @@ public class DefaultOrderService implements OrderService {
 
         AccountEntity account = accountService.getAccount(userId);
 
-        if (orderRepository.existsByAccountIdAndSymbolAndStatus(
-                account.getId(), command.symbol(), OrderStatusValue.PENDING)) {
+        // ORD-009: 동일 종목·동일 side PENDING 중복 방지 — side를 포함해 반대 side(매수 PENDING이
+        // 있는 상태에서 매도 등)는 서로 막지 않는다. 매도는 접수 시점에 보유 수량만 검증하고
+        // 현금을 잠그지 않으므로, 반대 side가 공존해도 잔고/수량 정합성에 영향 없음.
+        if (orderRepository.existsByAccountIdAndSymbolAndSideAndStatus(
+                account.getId(), command.symbol(), command.side(), OrderStatusValue.PENDING)) {
             throw new OrderException(OrderErrorCode.DUPLICATE_PENDING_ORDER);
         }
 

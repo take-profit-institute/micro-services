@@ -78,10 +78,11 @@ class DefaultOrderServiceTest {
         }
 
         @Test
-        void shouldRejectDuplicatePendingOrderForSameSymbol() {
+        void shouldRejectDuplicatePendingOrderForSameSymbolAndSameSide() {
             when(accountService.getAccount(userId)).thenReturn(account);
-            when(orderRepository.existsByAccountIdAndSymbolAndStatus(
-                    account.getId(), "005930", OrderStatusValue.PENDING)).thenReturn(true);
+            when(orderRepository.existsByAccountIdAndSymbolAndSideAndStatus(
+                    account.getId(), "005930", OrderSideValue.BUY, OrderStatusValue.PENDING))
+                    .thenReturn(true);
 
             PlaceOrderCommand command = new PlaceOrderCommand(
                     "005930", OrderSideValue.BUY, OrderKindValue.LIMIT, 10, 70_000L, "idem-2");
@@ -93,9 +94,28 @@ class DefaultOrderServiceTest {
         }
 
         @Test
+        void shouldAllowSellOrderWhenPendingBuyExistsForSameSymbol() {
+            // 매수 PENDING이 있어도 매도는 별개 side라 막히면 안 된다 — UX 회귀 방지 테스트.
+            // placeOrder는 command.side()(SELL)로만 조회하므로 BUY 쪽 stub은 실제로 호출되지 않는다
+            // (Mockito strict stubbing에 unnecessary로 잡혀 제거함) — SELL false만 스텁하면 충분하다.
+            when(accountService.getAccount(userId)).thenReturn(account);
+            when(orderRepository.existsByAccountIdAndSymbolAndSideAndStatus(
+                    account.getId(), "005930", OrderSideValue.SELL, OrderStatusValue.PENDING))
+                    .thenReturn(false);
+
+            PlaceOrderCommand command = new PlaceOrderCommand(
+                    "005930", OrderSideValue.SELL, OrderKindValue.LIMIT, 10, 70_000L, "idem-2-sell");
+
+            OrderEntity result = orderService.placeOrder(userId, command);
+
+            assertThat(result).isNotNull();
+            verify(orderRepository).save(any(OrderEntity.class));
+        }
+
+        @Test
         void shouldLockBalanceIncludingFeeForBuyLimitOrder() {
             when(accountService.getAccount(userId)).thenReturn(account);
-            when(orderRepository.existsByAccountIdAndSymbolAndStatus(any(), anyString(), any()))
+            when(orderRepository.existsByAccountIdAndSymbolAndSideAndStatus(any(), anyString(), any(), any()))
                     .thenReturn(false);
 
             PlaceOrderCommand command = new PlaceOrderCommand(
@@ -112,7 +132,7 @@ class DefaultOrderServiceTest {
         @Test
         void shouldNotLockBalanceForSellLimitOrder() {
             when(accountService.getAccount(userId)).thenReturn(account);
-            when(orderRepository.existsByAccountIdAndSymbolAndStatus(any(), anyString(), any()))
+            when(orderRepository.existsByAccountIdAndSymbolAndSideAndStatus(any(), anyString(), any(), any()))
                     .thenReturn(false);
 
             PlaceOrderCommand command = new PlaceOrderCommand(
@@ -126,7 +146,7 @@ class DefaultOrderServiceTest {
         @Test
         void shouldTriggerImmediateFillForMarketOrder() {
             when(accountService.getAccount(userId)).thenReturn(account);
-            when(orderRepository.existsByAccountIdAndSymbolAndStatus(any(), anyString(), any()))
+            when(orderRepository.existsByAccountIdAndSymbolAndSideAndStatus(any(), anyString(), any(), any()))
                     .thenReturn(false);
             OrderEntity filled = OrderEntity.place(userId, account.getId(), "005930",
                     OrderSideValue.BUY, OrderKindValue.MARKET, 10, null, 0L, "idem-5");
