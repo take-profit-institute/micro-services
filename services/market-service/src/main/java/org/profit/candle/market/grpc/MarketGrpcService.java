@@ -5,7 +5,9 @@ import io.grpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
+import org.profit.candle.market.client.KiwoomMarketClient;
 import org.profit.candle.market.dto.IntradayTickResult;
+import org.profit.candle.market.dto.response.KiwoomStockResponse;
 import org.profit.candle.market.exception.MarketException;
 import org.profit.candle.market.ranking.dto.cache.RankingSnapshot;
 import org.profit.candle.market.ranking.dto.cache.StockRankingCacheItem;
@@ -15,6 +17,9 @@ import org.profit.candle.market.session.MarketSession;
 import org.profit.candle.market.stream.QuoteStreamBroker;
 import org.profit.candle.proto.market.v1.GetIntradayTicksRequest;
 import org.profit.candle.proto.market.v1.GetIntradayTicksResponse;
+import org.profit.candle.proto.market.v1.GetQuoteRequest;
+import org.profit.candle.proto.market.v1.GetQuoteResponse;
+import org.profit.candle.proto.market.v1.Quote;
 import org.profit.candle.proto.market.v1.GetMarketStatusRequest;
 import org.profit.candle.proto.market.v1.GetMarketStatusResponse;
 import org.profit.candle.proto.market.v1.GetRankingsRequest;
@@ -37,7 +42,7 @@ import java.util.List;
  *
  * GetIntradayTicks: 실시간 그래프의 초기 페인트용 당일 틱 스냅샷.
  * StreamQuotes: 종목 상세 뷰어에게 라이브 tick 팬아웃(구독 수요 획득/해제 포함).
- * SearchStocks/GetQuote/BatchQuotes 는 아직 미구현(호출 시 UNIMPLEMENTED).
+ * GetQuote: 단일 종목 현재가(키움 주식정보 API). SearchStocks/BatchQuotes 는 아직 미구현.
  */
 @Component
 @RequiredArgsConstructor
@@ -47,6 +52,7 @@ public class MarketGrpcService extends MarketServiceGrpc.MarketServiceImplBase {
     private final QuoteStreamBroker quoteStreamBroker;
     private final MarketSession marketSession;
     private final RankingReadService rankingReadService;
+    private final KiwoomMarketClient kiwoomMarketClient;
 
     @Override
     public void getIntradayTicks(GetIntradayTicksRequest request,
@@ -66,6 +72,32 @@ public class MarketGrpcService extends MarketServiceGrpc.MarketServiceImplBase {
             observer.onCompleted();
         } catch (MarketException e) {
             // 키움 조회 실패 등 상류 장애 → UNAVAILABLE (BFF가 폴백 가능)
+            observer.onError(Status.UNAVAILABLE.withDescription(e.getMessage()).asRuntimeException());
+        } catch (RuntimeException e) {
+            observer.onError(Status.INTERNAL.withDescription("INTERNAL").asRuntimeException());
+        }
+    }
+
+    /**
+     * 단일 종목 현재가 조회. 키움 주식정보 API(getStockInfo)로 실시간 현재가를 가져온다.
+     * trading-service의 시장가 즉시 체결(GrpcMarketPriceProvider)이 호출한다.
+     */
+    @Override
+    public void getQuote(GetQuoteRequest request, StreamObserver<GetQuoteResponse> observer) {
+        try {
+            KiwoomStockResponse stock = kiwoomMarketClient.getStockInfo(request.getSymbol());
+            Quote quote = Quote.newBuilder()
+                    .setSymbol(request.getSymbol())
+                    .setPrice(stock.getCurrentPriceValue())
+                    .setChange(stock.getPriceChangeValue())
+                    .setQuotedAt(Timestamp.newBuilder()
+                            .setSeconds(Instant.now().getEpochSecond())
+                            .build())
+                    .build();
+            observer.onNext(GetQuoteResponse.newBuilder().setQuote(quote).build());
+            observer.onCompleted();
+        } catch (MarketException e) {
+            // 키움 조회 실패 등 상류 장애 → UNAVAILABLE (trading이 MARKET_PRICE_UNAVAILABLE로 매핑)
             observer.onError(Status.UNAVAILABLE.withDescription(e.getMessage()).asRuntimeException());
         } catch (RuntimeException e) {
             observer.onError(Status.INTERNAL.withDescription("INTERNAL").asRuntimeException());
