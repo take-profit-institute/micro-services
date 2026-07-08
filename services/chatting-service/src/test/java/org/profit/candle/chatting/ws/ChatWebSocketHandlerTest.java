@@ -6,10 +6,12 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.profit.candle.chatting.auth.HandshakeAuthenticator;
 import org.profit.candle.chatting.config.ChatProperties;
 import org.profit.candle.chatting.room.RoomCounter;
 import org.profit.candle.chatting.room.RoomKey;
+import org.reactivestreams.Publisher;
 import org.springframework.web.reactive.socket.HandshakeInfo;
 import org.springframework.web.reactive.socket.WebSocketMessage;
 import org.springframework.web.reactive.socket.WebSocketSession;
@@ -100,6 +102,31 @@ class ChatWebSocketHandlerTest {
 
         verify(broker).publish(eq("chat:005930_1"), contains("\"event\":\"join\""));
         verify(broker).publish(eq("chat:005930_1"), contains("\"event\":\"leave\""));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void handle_sendsCurrentCountToJoinerAsFirstFrame() {
+        // 입장자는 자기 JOIN 브로드캐스트를 놓치므로, outbound 첫 프레임으로 현재 인원을 즉시 받아야 한다.
+        ChatWebSocketHandler realHandler =
+                new ChatWebSocketHandler(authenticator, roomCounter, broker, new ObjectMapper(), properties);
+        when(roomCounter.enter(any(RoomKey.class), anyString())).thenReturn(Mono.just(7L));
+        when(roomCounter.leave(any(RoomKey.class), anyString())).thenReturn(Mono.just(6L));
+        when(broker.publish(eq("chat:005930_1"), any())).thenReturn(Mono.just(1L));
+        when(session.textMessage(anyString())).thenAnswer(inv -> {
+            WebSocketMessage m = mock(WebSocketMessage.class);
+            when(m.getPayloadAsText()).thenReturn(inv.getArgument(0));
+            return m;
+        });
+        ArgumentCaptor<Publisher<WebSocketMessage>> outbound = ArgumentCaptor.forClass(Publisher.class);
+        when(session.send(outbound.capture())).thenReturn(Mono.empty());
+
+        StepVerifier.create(realHandler.handle(session)).verifyComplete();
+
+        // 캡처한 outbound의 첫 프레임 = 본인 현재 인원(count=7)인 presence join.
+        StepVerifier.create(Flux.from(outbound.getValue()).map(WebSocketMessage::getPayloadAsText).take(1))
+                .expectNextMatches(s -> s.contains("\"event\":\"join\"") && s.contains("\"count\":7"))
+                .verifyComplete();
     }
 
     @Test

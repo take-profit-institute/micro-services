@@ -83,10 +83,6 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                         })
                         .then(Mono.empty()));
 
-        Flux<WebSocketMessage> outbound = Flux.merge(
-                broker.subscribe(channel).map(session::textMessage),
-                heartbeat);
-
         Mono<Void> inbound = session.receive()
                 .map(WebSocketMessage::getPayloadAsText)
                 .concatMap(text -> Mono.fromCallable(() -> serialize(accountId, text))
@@ -103,7 +99,13 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                         .doOnNext(c -> log.debug("WS enter account={} room={} count={}", accountId, roomId, c))
                         .flatMap(count -> publishPresence(channel, PresenceEvent.JOIN, count, accountId)
                                 .thenReturn(count)),
-                enteredCount -> Mono.firstWithSignal(session.send(outbound), inbound),
+                // 첫 프레임으로 본인에게 현재 인원 주입(자기 JOIN 유실 보정) → 이후 채널 구독 + heartbeat.
+                enteredCount -> {
+                    Flux<WebSocketMessage> outbound = Flux.concat(
+                            selfPresence(session, enteredCount, accountId),
+                            Flux.merge(broker.subscribe(channel).map(session::textMessage), heartbeat));
+                    return Mono.firstWithSignal(session.send(outbound), inbound);
+                },
                 enteredCount -> roomCounter.leave(key, memberId)
                         .doOnNext(c -> log.debug("WS leave account={} room={} count={}", accountId, roomId, c))
                         .flatMap(count -> publishPresence(channel, PresenceEvent.LEAVE, count, accountId)
@@ -116,20 +118,37 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         return objectMapper.writeValueAsString(new ChatMessage(accountId, text, Instant.now().toEpochMilli()));
     }
 
+    private String presenceJson(String event, long count, String accountId) throws Exception {
+        return objectMapper.writeValueAsString(
+                PresenceEvent.of(event, count, accountId, Instant.now().toEpochMilli()));
+    }
+
     /**
      * 입장/퇴장 presence 이벤트를 방 채널로 발행한다.
      *
      * <p>발행 실패는 삼켜서 커넥션 수명/카운터 대칭을 해치지 않는다: join 발행이 실패했다고 연결을
-     * 끊으면 이미 INCR된 카운터의 leave(DECR)가 호출되지 않아 인원이 새기 때문이다(usingWhen 규약).
+     * 끊으면 이미 등록된 presence의 leave가 호출되지 않아 인원이 새기 때문이다(usingWhen 규약).
      */
     private Mono<Long> publishPresence(String channel, String event, long count, String accountId) {
-        return Mono.fromCallable(() -> objectMapper.writeValueAsString(
-                        PresenceEvent.of(event, count, accountId, Instant.now().toEpochMilli())))
+        return Mono.fromCallable(() -> presenceJson(event, count, accountId))
                 .flatMap(payload -> broker.publish(channel, payload))
                 .onErrorResume(e -> {
                     log.warn("presence 발행 실패 channel={} event={}: {}", channel, event, e.getMessage());
                     return Mono.empty();
                 });
+    }
+
+    /**
+     * 입장자 본인에게 현재 인원을 즉시 내려주는 첫 프레임.
+     *
+     * <p>Redis pub/sub은 발행 시점에 구독 중인 세션에만 전달된다. 그런데 본인 JOIN 발행은 enter 단계에서
+     * (본인이 채널을 구독하기 전에) 일어나므로, 본인은 자기 JOIN 브로드캐스트를 못 받는다. 그러면 다음
+     * 입/퇴장 전까지 낡은 인원(REST 스냅샷)을 보게 되므로, 권원 인원을 직접 한 프레임 주입해 즉시 맞춘다.
+     */
+    private Flux<WebSocketMessage> selfPresence(WebSocketSession session, long count, String accountId) {
+        return Mono.fromCallable(() -> session.textMessage(presenceJson(PresenceEvent.JOIN, count, accountId)))
+                .onErrorResume(e -> Mono.empty())
+                .flux();
     }
 
     /** {@code Sec-WebSocket-Protocol} 헤더의 첫 값을 토큰으로 사용(쿼리 토큰 부재 시 폴백). */
