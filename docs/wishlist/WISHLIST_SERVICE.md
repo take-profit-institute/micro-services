@@ -1,5 +1,7 @@
 # Wishlist Service 구조 설명
 
+![Wishlist architecture overview](./assets/wishlist-architecture-overview.svg)
+
 이 문서는 `wishlist-service`의 구조와 동작 방식을 설명한다.
 개발 경험이나 gRPC 지식 없이도 읽을 수 있도록 작성했다.
 

@@ -1,5 +1,7 @@
 # Notification Service
 
+![Notification architecture overview](./assets/notification-architecture-overview.svg)
+
 ## 1. 목적과 현재 전제
 
 이 문서는 Candle `notification-service`의 실제 구현을 기준으로 기능, gRPC 계약, 데이터 저장 결과, 트랜잭션, 멱등성, Outbox, FCM 발송 흐름, 테스트 및 운영 설정을 정리한다.

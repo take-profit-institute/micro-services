@@ -29,10 +29,11 @@
   <text x="900" y="238" class="body">contents CRUD</text>
   <text x="900" y="268" class="body">search · read_count</text>
 
-  <rect x="860" y="390" width="290" height="165" rx="26" class="state"/>
-  <text x="900" y="442" class="txt">UserContentStateService</text>
-  <text x="900" y="478" class="body">progress · complete</text>
-  <text x="900" y="508" class="body">favorite · stats</text>
+  <rect x="860" y="378" width="290" height="165" rx="26" class="state"/>
+  <text x="900" y="430" class="txt">UserContentState</text>
+  <text x="900" y="458" class="txt">Service</text>
+  <text x="900" y="492" class="body">progress · complete</text>
+  <text x="900" y="522" class="body">favorite · stats</text>
 
   <rect x="1235" y="180" width="230" height="330" rx="30" class="db"/>
   <text x="1270" y="232" class="txt">POSTGRES</text>
@@ -41,15 +42,16 @@
   <text x="1270" y="334" class="body">unique user+content</text>
   <text x="1270" y="366" class="body">progress check 0..100</text>
 
-  <rect x="415" y="535" width="735" height="100" rx="24" class="future"/>
-  <text x="455" y="578" class="txt">FUTURE CONTRACT</text>
-  <text x="455" y="612" class="body">CommandMetadata · idempotency_records · LearningCompleted Outbox are not implemented yet</text>
+  <rect x="415" y="570" width="735" height="95" rx="24" class="future"/>
+  <text x="455" y="610" class="txt">FUTURE CONTRACT</text>
+  <text x="455" y="638" class="body">CommandMetadata · idempotency_records</text>
+  <text x="455" y="660" class="body">LearningCompleted Outbox are future contract points</text>
 
   <path d="M320 308H400" class="lineGold"/>
   <path d="M735 260H845" class="lineGold"/>
-  <path d="M735 350H800 V472 H845" class="lineViolet"/>
+  <path d="M735 350H800 V460 H845" class="lineViolet"/>
   <path d="M1150 230H1220" class="lineBlue"/>
-  <path d="M1150 472H1190 V345 H1220" class="lineBlue"/>
-  <path d="M783 535V440" class="lineViolet dash"/>
-  <text x="70" y="690" class="small">Current implementation owns learning schema only · no service DB cross-read · event/idempotency are future contract points</text>
+  <path d="M1150 460H1190 V345 H1220" class="lineBlue"/>
+  <path d="M783 570V440" class="lineViolet dash"/>
+  <text x="70" y="705" class="small">Current implementation owns learning schema only · no service DB cross-read · event/idempotency are future contract points</text>
 </svg>

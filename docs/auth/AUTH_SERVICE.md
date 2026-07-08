@@ -1,5 +1,7 @@
 # Auth Service 기능·연동·운영 가이드
 
+![Auth architecture overview](./assets/auth-architecture-overview.svg)
+
 ## 1. 문서 목적과 책임
 
 Auth Service는 Candle의 인증 진입점이다. OAuth 로그인으로 사용자를 식별하고,

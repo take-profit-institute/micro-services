@@ -40,9 +40,10 @@
   <text x="865" y="428" class="body">intraday ticks</text>
   <text x="865" y="458" class="body">orderbook · ranking cache</text>
 
-  <rect x="825" y="565" width="270" height="105" rx="24" class="rank"/>
-  <text x="865" y="610" class="txt">WS SUPERVISOR</text>
-  <text x="865" y="644" class="body">session gated realtime subscribe</text>
+  <rect x="825" y="555" width="270" height="125" rx="24" class="rank"/>
+  <text x="865" y="602" class="txt">WS SUPERVISOR</text>
+  <text x="865" y="636" class="body">session gated</text>
+  <text x="865" y="662" class="body">realtime subscribe</text>
 
   <rect x="1215" y="120" width="240" height="160" rx="26" class="db"/>
   <text x="1250" y="172" class="txt">POSTGRES</text>
@@ -60,8 +61,8 @@
   <path d="M720 370H810" class="lineMint"/>
   <path d="M720 420H770 V617 H810" class="lineMint dash"/>
   <path d="M1095 195H1200" class="lineBlue"/>
-  <path d="M1095 418H1140 V200 H1200" class="lineBlue dash"/>
+  <path d="M1095 418H1160 V255 H1200" class="lineBlue dash"/>
   <path d="M1095 445H1200" class="lineOrange"/>
-  <path d="M960 565V510" class="lineMint"/>
+  <path d="M960 555V510" class="lineMint"/>
   <text x="70" y="690" class="small">Kiwoom credentials stay inside market-service · Redis is cache/source for hot quote reads · Kafka distributes realtime market changes</text>
 </svg>
