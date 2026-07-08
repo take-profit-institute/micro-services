@@ -36,6 +36,13 @@ public interface JpaPortfolioSnapshotRepository
     );
 
     @Override
+    default Optional<PortfolioSnapshotEntity> findLatestByUserId(String userId) {
+        return findFirstByUserIdOrderBySnapshotDateDesc(userId);
+    }
+
+    Optional<PortfolioSnapshotEntity> findFirstByUserIdOrderBySnapshotDateDesc(String userId);
+
+    @Override
     default Optional<PortfolioSnapshotEntity> findLatestBefore(String userId, LocalDate date) {
         return findFirstByUserIdAndSnapshotDateLessThanOrderBySnapshotDateDesc(userId, date);
     }

@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.profit.candle.batch.market.orderbook.job.MarketOrderBookRefreshJobConfiguration;
 import org.profit.candle.batch.portfolio.eod.job.PortfolioEodJobConfiguration;
 import org.profit.candle.batch.ranking.job.RankingFinalizeJobConfiguration;
 import org.profit.candle.batch.smoke.job.BatchSmokeJobConfiguration;
@@ -55,6 +56,7 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
     private static final Set<String> ALLOWED_JOBS = Set.of(
             BatchSmokeJobConfiguration.JOB_NAME,
             PortfolioEodJobConfiguration.JOB_NAME,
+            MarketOrderBookRefreshJobConfiguration.JOB_NAME,
             RankingFinalizeJobConfiguration.JOB_NAME,
             StockSyncJobConfiguration.JOB_NAME,
             TradingMorningJobsConfiguration.PREVIOUS_CLOSE_JOB_NAME,
@@ -92,6 +94,12 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
                         .setDescription("Portfolio end-of-day snapshot generation")
                         .addSupportedParameters("businessDate")
                         .setTriggerable(isRegistered(PortfolioEodJobConfiguration.JOB_NAME))
+                        .build())
+                .addJobs(BatchJob.newBuilder()
+                        .setName(MarketOrderBookRefreshJobConfiguration.JOB_NAME)
+                        .setDescription("Refresh market order book Redis cache from Kiwoom")
+                        .addSupportedParameters("runId")
+                        .setTriggerable(isRegistered(MarketOrderBookRefreshJobConfiguration.JOB_NAME))
                         .build())
                 .addJobs(BatchJob.newBuilder()
                         .setName(StockSyncJobConfiguration.JOB_NAME)
@@ -238,6 +246,7 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
         }
 
         if (BatchSmokeJobConfiguration.JOB_NAME.equals(jobName)
+                || MarketOrderBookRefreshJobConfiguration.JOB_NAME.equals(jobName)
                 || StockSyncJobConfiguration.JOB_NAME.equals(jobName)) {
             builder.addString("businessDate", input.getOrDefault("businessDate", LocalDate.now(clock).toString()));
             builder.addLong("runId", input.containsKey("runId")

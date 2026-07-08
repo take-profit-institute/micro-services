@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.market.client.KiwoomMarketClient;
 import org.profit.candle.market.dto.IntradayTickResult;
 import org.profit.candle.market.dto.response.KiwoomTickChartResponse;
+import org.profit.candle.market.session.MarketSession;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -22,7 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * 키움 ka10079(주식틱차트)를 조회해 오늘치 틱을 {@link IntradayTickResult} 로 변환한다.
  * 장마감이어도 REST 로 당겨오므로 그래프를 그릴 수 있다.
- * 동일 종목 동시 조회 폭주 시 키움 rate-limit 를 피하려고 종목별 짧은 TTL 캐시를 둔다.
+ * 동일 종목 동시 조회 폭주 시 키움 rate-limit 를 피하려고 캐시를 둔다.
+ * 장중에는 1분만 캐시하고, 장마감/휴장 중에는 다음 정규장 시작 전까지 캐시한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,14 +32,17 @@ public class MarketIntradayService {
 
     private static final int DEFAULT_LIMIT = 600;
     private static final int MAX_LIMIT = 2000;
-    private static final Duration CACHE_TTL = Duration.ofSeconds(5);
+    private static final Duration OPEN_CACHE_TTL = Duration.ofMinutes(1);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final KiwoomMarketClient kiwoomMarketClient;
+    private final IntradayTickCache redisCache;
+    private final MarketSession marketSession;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
+    private final Map<String, Object> locks = new ConcurrentHashMap<>();
 
-    private record Cached(List<IntradayTickResult> ticks, Instant at) {
+    private record Cached(List<IntradayTickResult> ticks, Instant at, Duration ttl) {
     }
 
     /** 오래된 -> 최신 정렬로 최근 {@code limit} 개(0 이면 기본값)를 돌려준다. */
@@ -45,20 +50,70 @@ public class MarketIntradayService {
         int n = limit <= 0 ? DEFAULT_LIMIT : Math.min(limit, MAX_LIMIT);
 
         Cached cached = cache.get(symbol);
-        if (cached != null && Duration.between(cached.at(), Instant.now()).compareTo(CACHE_TTL) < 0) {
+        if (isFresh(cached)) {
             return trim(cached.ticks(), n);
         }
+        var redisTicks = redisCache.get(symbol);
+        if (redisTicks.isPresent() && !redisTicks.get().isEmpty()) {
+            List<IntradayTickResult> ticks = redisTicks.get();
+            cache.put(symbol, new Cached(ticks, Instant.now(), cacheTtl()));
+            return trim(ticks, n);
+        }
 
-        KiwoomTickChartResponse response = kiwoomMarketClient.getTickChart(symbol);
-        List<IntradayTickResult> all = response.ticks() == null ? List.of()
-                : response.ticks().stream()
-                        .map(this::toResult)
-                        .filter(Objects::nonNull)
-                        .sorted(Comparator.comparing(IntradayTickResult::time)) // 오래된 -> 최신
-                        .toList();
+        synchronized (locks.computeIfAbsent(symbol, ignored -> new Object())) {
+            cached = cache.get(symbol);
+            if (isFresh(cached)) {
+                return trim(cached.ticks(), n);
+            }
+            redisTicks = redisCache.get(symbol);
+            if (redisTicks.isPresent() && !redisTicks.get().isEmpty()) {
+                List<IntradayTickResult> ticks = redisTicks.get();
+                cache.put(symbol, new Cached(ticks, Instant.now(), cacheTtl()));
+                return trim(ticks, n);
+            }
+            return fetchAndCache(symbol, n, cached);
+        }
+    }
 
-        cache.put(symbol, new Cached(all, Instant.now()));
+    private List<IntradayTickResult> fetchAndCache(String symbol, int n, Cached cached) {
+        List<IntradayTickResult> all;
+        try {
+            KiwoomTickChartResponse response = kiwoomMarketClient.getTickChart(symbol);
+            all = response.ticks() == null ? List.of()
+                    : response.ticks().stream()
+                            .map(this::toResult)
+                            .filter(Objects::nonNull)
+                            .sorted(Comparator.comparing(IntradayTickResult::time)) // 오래된 -> 최신
+                            .toList();
+        } catch (RuntimeException exception) {
+            if (cached != null && !cached.ticks().isEmpty()) {
+                return trim(cached.ticks(), n);
+            }
+            throw exception;
+        }
+
+        if (all.isEmpty() && cached != null && !cached.ticks().isEmpty()) {
+            return trim(cached.ticks(), n);
+        }
+        if (all.isEmpty()) {
+            return List.of();
+        }
+        Duration ttl = cacheTtl();
+        cache.put(symbol, new Cached(all, Instant.now(), ttl));
+        redisCache.put(symbol, all, ttl);
         return trim(all, n);
+    }
+
+    private boolean isFresh(Cached cached) {
+        return cached != null && Duration.between(cached.at(), Instant.now()).compareTo(cached.ttl()) < 0;
+    }
+
+    private Duration cacheTtl() {
+        if ("OPEN".equals(marketSession.status())) {
+            return OPEN_CACHE_TTL;
+        }
+        Duration untilNextOpen = marketSession.durationUntilNextRegularOpen();
+        return untilNextOpen.compareTo(OPEN_CACHE_TTL) > 0 ? untilNextOpen : OPEN_CACHE_TTL;
     }
 
     private static List<IntradayTickResult> trim(List<IntradayTickResult> all, int n) {

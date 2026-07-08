@@ -3,7 +3,7 @@ package org.profit.candle.portfolio.analytics.dto;
 public record PortfolioSummaryResult(
         String userId,
         long totalBookValue,
-        long totalStockValue,        // 캐시 시세 기준 근사값
+        long totalStockValue,        // MarketService.BatchQuotes 현재가 기준
         long totalUnrealizedProfit,
         long totalRealizedProfit,
         String totalReturnRate,      // "%"

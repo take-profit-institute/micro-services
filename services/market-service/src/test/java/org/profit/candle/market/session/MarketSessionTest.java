@@ -3,6 +3,7 @@ package org.profit.candle.market.session;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -61,6 +62,19 @@ class MarketSessionTest {
         assertThat(at("2026-01-01T10:47:09", holiday).status()).isEqualTo("CLOSED");
         assertThat(at("2026-01-01T10:00:00", holiday).withinConnectionWindow()).isFalse();
         assertThat(at("2026-01-01T10:00:00", holiday).isTradingDay()).isFalse();
+    }
+
+    @Test
+    void durationUntilNextRegularOpen_skipsWeekendAndHolidays() {
+        TradingCalendar holiday = date -> date.equals(LocalDate.of(2026, 7, 6)); // Monday holiday
+
+        assertThat(at("2026-07-03T15:31:00", holiday).durationUntilNextRegularOpen())
+                .isEqualTo(Duration.ofHours(89).plusMinutes(29));
+    }
+
+    @Test
+    void durationUntilNextRegularOpen_isZeroDuringRegularHours() {
+        assertThat(at("2026-07-03T10:00:00").durationUntilNextRegularOpen()).isZero();
     }
 
     @Test

@@ -11,7 +11,9 @@ import org.profit.candle.portfolio.analytics.dto.PortfolioSummaryResult;
 import org.profit.candle.portfolio.analytics.dto.SectorBreakdownResult;
 import org.profit.candle.portfolio.analytics.dto.TradingStatsResult;
 import org.profit.candle.portfolio.analytics.entity.PortfolioSnapshotEntity;
+import org.profit.candle.portfolio.analytics.market.MarketQuoteClient;
 import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotReader;
+import org.profit.candle.portfolio.analytics.trading.TradingBalanceClient;
 import org.profit.candle.portfolio.holding.entity.HoldingEntity;
 import org.profit.candle.portfolio.holding.entity.SellOutcome;
 import org.profit.candle.portfolio.holding.repository.HoldingReader;
@@ -22,6 +24,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +38,8 @@ class DefaultPortfolioAnalyticsServiceTest {
     @Mock HoldingReader holdingReader;
     @Mock PortfolioSnapshotReader snapshotReader;
     @Mock RealizedTradeReader realizedTradeReader;
+    @Mock MarketQuoteClient marketQuoteClient;
+    @Mock TradingBalanceClient tradingBalanceClient;
     @InjectMocks DefaultPortfolioAnalyticsService service;
 
     private static final String USER_ID = "user-1";
@@ -71,6 +77,8 @@ class DefaultPortfolioAnalyticsServiceTest {
         HoldingEntity h2 = holding("035720", 5, 100_000, "인터넷"); // book=500000, stock=500000
         when(holdingReader.findActiveByUserId(USER_ID)).thenReturn(List.of(h1, h2));
         when(holdingReader.findByUserId(USER_ID)).thenReturn(List.of(h1, h2));
+        when(marketQuoteClient.currentPrices(List.of("005930", "035720")))
+                .thenReturn(Map.of("005930", 75_000L, "035720", 100_000L));
 
         PortfolioSummaryResult result = service.getSummary(USER_ID);
 
@@ -85,15 +93,35 @@ class DefaultPortfolioAnalyticsServiceTest {
     @Test
     void getSummary_cachedPriceAboveAvg_showsPositiveUnrealizedProfit() {
         HoldingEntity h = holding("005930", 10, 75_000, "반도체");
-        h.updateCachedPrice(85_000); // stock_value = 850000, book = 750000, unrealized = 100000
+        h.updateCachedPrice(85_000);
         when(holdingReader.findActiveByUserId(USER_ID)).thenReturn(List.of(h));
         when(holdingReader.findByUserId(USER_ID)).thenReturn(List.of(h));
+        when(marketQuoteClient.currentPrices(List.of("005930")))
+                .thenReturn(Map.of("005930", 90_000L));
 
         PortfolioSummaryResult result = service.getSummary(USER_ID);
 
-        assertThat(result.totalStockValue()).isEqualTo(850_000);
-        assertThat(result.totalUnrealizedProfit()).isEqualTo(100_000);
-        assertThat(result.totalReturnRate()).isEqualTo("13.33"); // 100000/750000*100
+        assertThat(result.totalStockValue()).isEqualTo(900_000);
+        assertThat(result.totalUnrealizedProfit()).isEqualTo(150_000);
+        assertThat(result.totalReturnRate()).isEqualTo("20.00"); // 150000/750000*100
+    }
+
+    @Test
+    void getSummary_comparesCurrentTotalAssetWithLatestSnapshotForDayProfit() {
+        HoldingEntity h = holding("005930", 10, 75_000, "반도체");
+        when(holdingReader.findActiveByUserId(USER_ID)).thenReturn(List.of(h));
+        when(holdingReader.findByUserId(USER_ID)).thenReturn(List.of(h));
+        when(marketQuoteClient.currentPrices(List.of("005930")))
+                .thenReturn(Map.of("005930", 90_000L));
+        when(tradingBalanceClient.cash(USER_ID)).thenReturn(200_000L);
+        when(snapshotReader.findLatestByUserId(USER_ID))
+                .thenReturn(Optional.of(snapshot(LocalDate.now().minusDays(3), 1_000_000, 800_000, 0, "0.00")));
+
+        PortfolioSummaryResult result = service.getSummary(USER_ID);
+
+        assertThat(result.totalStockValue()).isEqualTo(900_000);
+        assertThat(result.dayProfit()).isEqualTo(100_000);
+        assertThat(result.dayReturnRate()).isEqualTo("10.00");
     }
 
     @Test
@@ -105,6 +133,8 @@ class DefaultPortfolioAnalyticsServiceTest {
         sold.applySell(5, 90_000); // realized = 50000, active=false
         when(holdingReader.findActiveByUserId(USER_ID)).thenReturn(List.of(active));
         when(holdingReader.findByUserId(USER_ID)).thenReturn(List.of(active, sold));
+        when(marketQuoteClient.currentPrices(List.of("005930")))
+                .thenReturn(Map.of("005930", 75_000L));
 
         PortfolioSummaryResult result = service.getSummary(USER_ID);
 
@@ -116,6 +146,7 @@ class DefaultPortfolioAnalyticsServiceTest {
     void getSummary_noHoldings_returnsAllZeros() {
         when(holdingReader.findActiveByUserId(USER_ID)).thenReturn(List.of());
         when(holdingReader.findByUserId(USER_ID)).thenReturn(List.of());
+        when(marketQuoteClient.currentPrices(List.of())).thenReturn(Map.of());
 
         PortfolioSummaryResult result = service.getSummary(USER_ID);
 
@@ -163,6 +194,8 @@ class DefaultPortfolioAnalyticsServiceTest {
         HoldingEntity h2 = holding("000660", 5, 200_000, "반도체");  // 1000000
         HoldingEntity h3 = holding("035720", 20, 50_000, "인터넷");  // 1000000
         when(holdingReader.findActiveByUserId(USER_ID)).thenReturn(List.of(h1, h2, h3));
+        when(marketQuoteClient.currentPrices(List.of("005930", "000660", "035720")))
+                .thenReturn(Map.of("005930", 100_000L, "000660", 200_000L, "035720", 50_000L));
 
         List<SectorBreakdownResult> results = service.getSectorBreakdown(USER_ID);
 
@@ -178,6 +211,8 @@ class DefaultPortfolioAnalyticsServiceTest {
     void getSectorBreakdown_singleSector_weightIs100() {
         HoldingEntity h = holding("005930", 10, 75_000, "반도체");
         when(holdingReader.findActiveByUserId(USER_ID)).thenReturn(List.of(h));
+        when(marketQuoteClient.currentPrices(List.of("005930")))
+                .thenReturn(Map.of("005930", 75_000L));
 
         List<SectorBreakdownResult> results = service.getSectorBreakdown(USER_ID);
 
@@ -188,6 +223,7 @@ class DefaultPortfolioAnalyticsServiceTest {
     @Test
     void getSectorBreakdown_noHoldings_returnsEmpty() {
         when(holdingReader.findActiveByUserId(USER_ID)).thenReturn(List.of());
+        when(marketQuoteClient.currentPrices(List.of())).thenReturn(Map.of());
 
         assertThat(service.getSectorBreakdown(USER_ID)).isEmpty();
     }

@@ -86,6 +86,22 @@ configure(bootProjects) {
             implementation 'org.springframework.boot:spring-boot-starter-web'
         }
     }
+
+    if ([
+            ':services:auth-service',
+            ':services:learning-service',
+            ':services:market-service',
+            ':services:portfolio-service',
+            ':services:ranking-service',
+            ':services:stock-service',
+            ':services:trading-service',
+            ':services:user-service',
+            ':services:wishlist-service'
+    ].contains(project.path)) {
+        dependencies {
+            implementation 'software.amazon.msk:aws-msk-iam-auth:2.3.2'
+        }
+    }
 }
 
 project(':common') {

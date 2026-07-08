@@ -5,6 +5,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.profit.candle.common.kafka.KafkaIamSupport;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,13 +24,13 @@ public class RankingKafkaConfiguration {
     @Bean
     ConsumerFactory<String, String> rankingConsumerFactory(
             @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
-        return new DefaultKafkaConsumerFactory<>(Map.of(
+        return new DefaultKafkaConsumerFactory<>(KafkaIamSupport.withIamIfNeeded(bootstrapServers, Map.of(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
                 ConsumerConfig.GROUP_ID_CONFIG, "ranking-service",
                 ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
                 ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false,
                 ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
-                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class));
+                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class)));
     }
 
     /** @KafkaListener가 사용하는 기본 listener container를 생성한다. */
@@ -47,10 +48,10 @@ public class RankingKafkaConfiguration {
     @Bean
     ProducerFactory<String, String> rankingProducerFactory(
             @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
-        return new DefaultKafkaProducerFactory<>(Map.of(
+        return new DefaultKafkaProducerFactory<>(KafkaIamSupport.withIamIfNeeded(bootstrapServers, Map.of(
                 ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class));
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class)));
     }
 
     /** Outbox publisher가 사용할 KafkaTemplate을 생성한다. */
