@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="820" viewBox="0 0 1280 820">
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .band { fill: #eef2f7; }
+      .title { font: 700 30px Arial, sans-serif; fill: #0f172a; }
+      .label { font: 700 18px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 14px Arial, sans-serif; fill: #334155; }
+      .box { fill: #ffffff; stroke: #94a3b8; stroke-width: 2; rx: 8; }
+      .service { fill: #e0f2fe; stroke: #0284c7; }
+      .db { fill: #ecfdf5; stroke: #059669; }
+      .external { fill: #fff7ed; stroke: #ea580c; }
+      .event { fill: #fef2f2; stroke: #dc2626; }
+      .arrow { stroke: #334155; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dashed { stroke-dasharray: 7 6; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="820"/>
+  <text class="title" x="48" y="58">Stock Service Structure and Runtime Flow</text>
+
+  <rect class="band" x="40" y="90" width="1200" height="190" rx="8"/>
+  <text class="label" x="60" y="125">1. Catalog query and sync</text>
+
+  <rect class="box external" x="70" y="155" width="150" height="82"/>
+  <text class="label" x="116" y="188">BFF</text>
+  <text class="small" x="92" y="214">gRPC request</text>
+
+  <rect class="box service" x="270" y="145" width="200" height="102"/>
+  <text class="label" x="306" y="180">StockGrpcService</text>
+  <text class="small" x="303" y="207">Search / Get</text>
+  <text class="small" x="303" y="229">Batch / Sync</text>
+
+  <rect class="box service" x="525" y="145" width="225" height="102"/>
+  <text class="label" x="555" y="180">CatalogService</text>
+  <text class="small" x="555" y="207">DB first</text>
+  <text class="small" x="555" y="229">fallback when allowed</text>
+
+  <rect class="box db" x="805" y="125" width="170" height="142"/>
+  <text class="label" x="843" y="160">stock DB</text>
+  <text class="small" x="840" y="190">stocks</text>
+  <text class="small" x="840" y="214">stock_financials</text>
+  <text class="small" x="840" y="238">seed data</text>
+
+  <rect class="box external" x="1035" y="155" width="165" height="82"/>
+  <text class="label" x="1083" y="188">Kiwoom</text>
+  <text class="small" x="1065" y="214">stock OpenAPI</text>
+
+  <path class="arrow" d="M220 196 H270"/>
+  <path class="arrow" d="M470 196 H525"/>
+  <path class="arrow" d="M750 196 H805"/>
+  <path class="arrow dashed" d="M750 170 C855 75 970 105 1035 176"/>
+
+  <rect class="band" x="40" y="315" width="1200" height="220" rx="8"/>
+  <text class="label" x="60" y="350">2. Chart query and backfill</text>
+
+  <rect class="box external" x="70" y="390" width="150" height="82"/>
+  <text class="label" x="92" y="423">BFF / batch</text>
+  <text class="small" x="95" y="449">ChartService RPC</text>
+
+  <rect class="box service" x="270" y="370" width="200" height="122"/>
+  <text class="label" x="306" y="405">ChartGrpcService</text>
+  <text class="small" x="303" y="432">Candles</text>
+  <text class="small" x="303" y="454">Sparklines</text>
+  <text class="small" x="303" y="476">Previous close</text>
+
+  <rect class="box service" x="525" y="370" width="225" height="122"/>
+  <text class="label" x="565" y="405">ChartService</text>
+  <text class="small" x="555" y="432">read DB first</text>
+  <text class="small" x="555" y="454">backfill on miss</text>
+  <text class="small" x="555" y="476">limit normalization</text>
+
+  <rect class="box db" x="805" y="370" width="170" height="122"/>
+  <text class="label" x="848" y="405">candles</text>
+  <text class="small" x="835" y="432">PK: code</text>
+  <text class="small" x="835" y="454">interval</text>
+  <text class="small" x="835" y="476">open_time</text>
+
+  <rect class="box service" x="1025" y="345" width="185" height="82"/>
+  <text class="label" x="1052" y="378">SingleFlight</text>
+  <text class="small" x="1055" y="404">dedupe backfill</text>
+
+  <rect class="box external" x="1025" y="455" width="185" height="62"/>
+  <text class="label" x="1078" y="489">Kiwoom</text>
+  <text class="small" x="1060" y="511">chart OpenAPI</text>
+
+  <path class="arrow" d="M220 431 H270"/>
+  <path class="arrow" d="M470 431 H525"/>
+  <path class="arrow" d="M750 431 H805"/>
+  <path class="arrow dashed" d="M750 390 H1025"/>
+  <path class="arrow dashed" d="M1118 427 V455"/>
+  <path class="arrow dashed" d="M1025 486 C990 505 980 505 975 486"/>
+
+  <rect class="band" x="40" y="570" width="1200" height="190" rx="8"/>
+  <text class="label" x="60" y="605">3. Daily close and outbox</text>
+
+  <rect class="box external" x="70" y="645" width="150" height="72"/>
+  <text class="label" x="108" y="677">batch</text>
+  <text class="small" x="95" y="700">CloseDaily</text>
+
+  <rect class="box service" x="270" y="635" width="205" height="92"/>
+  <text class="label" x="302" y="668">DailyCloseService</text>
+  <text class="small" x="305" y="694">mark closed=true</text>
+
+  <rect class="box db" x="530" y="635" width="165" height="92"/>
+  <text class="label" x="575" y="668">candles</text>
+  <text class="small" x="565" y="694">dirty checking</text>
+
+  <rect class="box db" x="750" y="635" width="180" height="92"/>
+  <text class="label" x="785" y="668">outbox_events</text>
+  <text class="small" x="785" y="694">same transaction</text>
+
+  <rect class="box service" x="985" y="635" width="170" height="92"/>
+  <text class="label" x="1010" y="668">OutboxPublisher</text>
+  <text class="small" x="1020" y="694">fixed delay</text>
+
+  <rect class="box event" x="985" y="745" width="170" height="48"/>
+  <text class="label" x="1010" y="775">Kafka topic</text>
+
+  <path class="arrow" d="M220 681 H270"/>
+  <path class="arrow" d="M475 681 H530"/>
+  <path class="arrow" d="M695 681 H750"/>
+  <path class="arrow" d="M930 681 H985"/>
+  <path class="arrow" d="M1070 727 V745"/>
+</svg>
