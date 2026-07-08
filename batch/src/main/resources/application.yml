@@ -73,6 +73,10 @@ batch:
       chunk-size: ${BATCH_STOCK_CANDLE_INGEST_CHUNK_SIZE:50}
       page-size: ${BATCH_STOCK_CANDLE_INGEST_PAGE_SIZE:100}
       candle-count: ${BATCH_STOCK_CANDLE_INGEST_CANDLE_COUNT:10}
+      # (a) 종목별 키움 백필을 병렬 처리하는 워커 수. 키움 REST rate limit을 고려해 조절한다.
+      concurrency: ${BATCH_STOCK_CANDLE_INGEST_CONCURRENCY:8}
+      # (c) 실패 종목 누적 skip 상한. 초과하면(대량 장애) 잡을 FAILED로 떨군다.
+      skip-limit: ${BATCH_STOCK_CANDLE_INGEST_SKIP_LIMIT:200}
     market-order-book:
       enabled: ${BATCH_MARKET_ORDER_BOOK_ENABLED:false}
       cron: "${BATCH_MARKET_ORDER_BOOK_CRON:0 */1 * * * MON-FRI}"
