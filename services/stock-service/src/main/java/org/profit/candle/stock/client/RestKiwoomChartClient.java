@@ -2,12 +2,15 @@ package org.profit.candle.stock.client;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.profit.candle.common.error.CandleException;
 import org.profit.candle.stock.chart.dto.CandleInterval;
+import org.profit.candle.stock.chart.exception.ChartErrorCode;
 import org.profit.candle.stock.config.KiwoomProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
@@ -20,6 +23,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Component
 @Slf4j
@@ -34,6 +38,7 @@ public class RestKiwoomChartClient implements KiwoomChartClient {
 
     private final KiwoomProperties properties;
     private final RestClient kiwoomRestClient;
+    private final KiwoomRateLimiter rateLimiter;
 
     private volatile String cachedToken;
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
@@ -43,12 +48,42 @@ public class RestKiwoomChartClient implements KiwoomChartClient {
         if (!properties.enabled()) {
             return List.of();
         }
+        int maxAttempts = properties.rateLimitMaxAttempts();
+        HttpClientErrorException lastRateLimit = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return fetchPages(code, interval, count, to);
+            } catch (HttpClientErrorException e) {
+                if (e.getStatusCode().value() != 429) {
+                    log.warn("키움 차트 조회 실패 code={} interval={} status={}", code, interval, e.getStatusCode(), e);
+                    return List.of();
+                }
+                // 429(rate limit)는 빈 결과로 삼키지 않고 백오프 후 재시도한다.
+                lastRateLimit = e;
+                if (attempt < maxAttempts) {
+                    backoff(attempt);
+                }
+            } catch (RuntimeException e) {
+                // 원인 예외(예: Jackson 파싱 실패)를 함께 남긴다 — 최상위 메시지만으론 원인 파악이 안 된다.
+                log.warn("키움 차트 조회 실패 code={} interval={}", code, interval, e);
+                return List.of();
+            }
+        }
+        // 재시도 소진 — 호출자(배치)가 재시도/skip 으로 처리하도록 던진다(RESOURCE_EXHAUSTED 로 매핑됨).
+        log.warn("키움 차트 rate limit 재시도 소진 code={} interval={} attempts={}", code, interval, maxAttempts);
+        throw new CandleException(ChartErrorCode.KIWOOM_RATE_LIMITED, lastRateLimit);
+    }
+
+    /** 429 재시도 간 지수 백오프 + 지터(파드 간 요청 분산). */
+    private void backoff(int attempt) {
+        long base = properties.rateLimitBackoff().toMillis();
+        long delay = base * (1L << (attempt - 1));
+        long jitter = ThreadLocalRandom.current().nextLong(base + 1);
         try {
-            return fetchPages(code, interval, count, to);
-        } catch (RuntimeException e) {
-            // 원인 예외(예: Jackson 파싱 실패)를 함께 남긴다 — 최상위 메시지만으론 원인 파악이 안 된다.
-            log.warn("키움 차트 조회 실패 code={} interval={}", code, interval, e);
-            return List.of();
+            Thread.sleep(delay + jitter);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("키움 rate limit 백오프 중 인터럽트", e);
         }
     }
 
@@ -60,6 +95,7 @@ public class RestKiwoomChartClient implements KiwoomChartClient {
         int pages = 0;
 
         do {
+            rateLimiter.acquire();
             ResponseEntity<Map<String, Object>> response = kiwoomRestClient.post()
                     .uri(properties.chartPath())
                     .contentType(MediaType.APPLICATION_JSON)

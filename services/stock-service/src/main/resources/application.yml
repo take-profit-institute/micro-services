@@ -38,3 +38,8 @@ kiwoom:
   # 외부 호출 timeout. 차트 첫 페이지는 응답이 커서 read timeout 을 넉넉히 잡는다.
   connect-timeout: ${KIWOOM_CONNECT_TIMEOUT:5s}
   read-timeout: ${KIWOOM_READ_TIMEOUT:40s}
+  # 차트 API rate limit(파드 단위). 계정 한도는 초당 5건이고 파드가 계정을 공유하므로
+  # 파드 수만큼 나눠 설정한다(예: 2파드면 2~3). 초과분은 429 지수 백오프로 재시도한다.
+  rate-per-second: ${KIWOOM_RATE_PER_SECOND:3}
+  rate-limit-max-attempts: ${KIWOOM_RATE_LIMIT_MAX_ATTEMPTS:4}
+  rate-limit-backoff: ${KIWOOM_RATE_LIMIT_BACKOFF:500ms}

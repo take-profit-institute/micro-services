@@ -228,6 +228,8 @@ public class ChartGrpcService extends ChartServiceGrpc.ChartServiceImplBase {
             return switch (code) {
                 case INVALID_CANDLE_REQUEST -> Status.INVALID_ARGUMENT.withDescription(code.code());
                 case CHART_DATA_UNAVAILABLE -> Status.UNAVAILABLE.withDescription(code.code());
+                // 키움 rate limit — 호출자(배치)가 재시도 가능으로 받도록 RESOURCE_EXHAUSTED로 매핑.
+                case KIWOOM_RATE_LIMITED -> Status.RESOURCE_EXHAUSTED.withDescription(code.code());
             };
         }
         return Status.INTERNAL.withDescription(e.errorCode().code());
