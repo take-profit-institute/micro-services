@@ -9,7 +9,7 @@ import "candle/common/v1/common.proto";
 
 // ─── Holding ───────────────────────────────────────────────────────────────
 // trading-service의 체결 이벤트를 구독해 유지하는 read model.
-// 미실현손익(current_price 기반)은 BFF가 MarketService.BatchQuotes와 머지한다.
+// 미실현손익(current_price 기반)은 portfolio-service가 MarketService.BatchQuotes와 머지한다.
 
 message Holding {
   string symbol          = 1;
@@ -83,7 +83,7 @@ message ListActiveHoldersResponse {
 message PortfolioSummary {
   string user_id                = 1;
   int64  total_book_value       = 2;  // 총 매입금액
-  int64  total_stock_value      = 3;  // 총 주식 평가금액 (캐시 시세 기준)
+  int64  total_stock_value      = 3;  // 총 주식 평가금액 (MarketService.BatchQuotes 현재가 기준)
   int64  total_unrealized_profit = 4; // total_stock_value − total_book_value
   int64  total_realized_profit  = 5;  // 누적 실현손익
   string total_return_rate      = 6;  // 총 수익률 "12.34" (%)
@@ -123,8 +123,8 @@ message GetPortfolioHistoryResponse {
 
 message SectorWeight {
   string sector     = 1;
-  string weight     = 2;  // total_book_value 대비 비중 "34.5" (%)
-  int64  book_value = 3;
+  string weight     = 2;  // 주식 평가금액 대비 비중 "34.5" (%)
+  int64  book_value = 3;  // 호환성 때문에 필드명은 유지하지만 값은 평가금액이다.
   int32  count      = 4;  // 해당 섹터 종목 수
 }
 

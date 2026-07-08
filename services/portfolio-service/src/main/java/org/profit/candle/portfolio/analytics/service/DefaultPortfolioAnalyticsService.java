@@ -8,6 +8,7 @@ import org.profit.candle.portfolio.analytics.dto.PortfolioSummaryResult;
 import org.profit.candle.portfolio.analytics.dto.SectorBreakdownResult;
 import org.profit.candle.portfolio.analytics.dto.TradingStatsResult;
 import org.profit.candle.portfolio.analytics.entity.PortfolioSnapshotEntity;
+import org.profit.candle.portfolio.analytics.market.MarketQuoteClient;
 import org.profit.candle.portfolio.analytics.repository.PortfolioSnapshotReader;
 import org.profit.candle.portfolio.holding.entity.HoldingEntity;
 import org.profit.candle.portfolio.holding.repository.HoldingReader;
@@ -33,16 +34,18 @@ public class DefaultPortfolioAnalyticsService implements PortfolioAnalyticsServi
     private final HoldingReader holdingReader;
     private final PortfolioSnapshotReader snapshotReader;
     private final RealizedTradeReader realizedTradeReader;
+    private final MarketQuoteClient marketQuoteClient;
 
     @Override
     @Transactional(readOnly = true)
     public PortfolioSummaryResult getSummary(String userId) {
         List<HoldingEntity> active = holdingReader.findActiveByUserId(userId);
         List<HoldingEntity> all = holdingReader.findByUserId(userId);
+        Map<String, Long> currentPrices = currentPrices(active);
 
         long totalBookValue = active.stream().mapToLong(HoldingEntity::bookValue).sum();
         long totalStockValue = active.stream()
-                .mapToLong(h -> h.quantity() * h.cachedCurrentPrice()).sum();
+                .mapToLong(h -> h.quantity() * currentPrice(h, currentPrices)).sum();
         long totalUnrealizedProfit = totalStockValue - totalBookValue;
         long totalRealizedProfit = all.stream().mapToLong(HoldingEntity::realizedProfit).sum();
 
@@ -83,15 +86,20 @@ public class DefaultPortfolioAnalyticsService implements PortfolioAnalyticsServi
     @Transactional(readOnly = true)
     public List<SectorBreakdownResult> getSectorBreakdown(String userId) {
         List<HoldingEntity> active = holdingReader.findActiveByUserId(userId);
-        long totalBookValue = active.stream().mapToLong(HoldingEntity::bookValue).sum();
+        Map<String, Long> currentPrices = currentPrices(active);
+        long totalMarketValue = active.stream()
+                .mapToLong(h -> h.quantity() * currentPrice(h, currentPrices))
+                .sum();
 
         return active.stream()
                 .collect(Collectors.groupingBy(HoldingEntity::sector))
                 .entrySet().stream()
                 .map(entry -> {
-                    long sectorValue = entry.getValue().stream().mapToLong(HoldingEntity::bookValue).sum();
-                    String weight = totalBookValue > 0
-                            ? String.format("%.2f", (double) sectorValue / totalBookValue * 100)
+                    long sectorValue = entry.getValue().stream()
+                            .mapToLong(h -> h.quantity() * currentPrice(h, currentPrices))
+                            .sum();
+                    String weight = totalMarketValue > 0
+                            ? String.format("%.2f", (double) sectorValue / totalMarketValue * 100)
                             : "0.00";
                     return new SectorBreakdownResult(entry.getKey(), weight, sectorValue, entry.getValue().size());
                 })
@@ -155,5 +163,15 @@ public class DefaultPortfolioAnalyticsService implements PortfolioAnalyticsServi
                     return new MonthlyReturnResult(entry.getKey().toString(), returnRate, profit);
                 })
                 .toList();
+    }
+
+    private Map<String, Long> currentPrices(List<HoldingEntity> holdings) {
+        return marketQuoteClient.currentPrices(holdings.stream()
+                .map(HoldingEntity::symbol)
+                .toList());
+    }
+
+    private long currentPrice(HoldingEntity holding, Map<String, Long> currentPrices) {
+        return currentPrices.getOrDefault(holding.symbol(), holding.cachedCurrentPrice());
     }
 }
