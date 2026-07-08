@@ -16,13 +16,24 @@ import org.springframework.stereotype.Component;
  * 2. 해당 종목의 PENDING 지정가 주문 중 조건 충족한 것들을 체결한다 (EXE-002)
  *
  * <p>토픽명({@code TOPIC})은 Market 담당자(팀장)와 협의 후 확정 예정.</p>
+ *
+ * <p><b>[2026-07-08 현황]</b> market-service는 현재 Kafka를 전혀 발행하지 않고
+ * Redis Pub/Sub({@code market:quotes} 채널)만 사용한다. 즉 이 리스너는 지금
+ * 실제로는 아무 메시지도 수신하지 못하는 상태다 — 같은 역할(캐시 갱신 + 지정가 체결)은
+ * {@code trading.support.event.MarketQuoteRedisSubscriber}가 Redis 경로로 대신 수행 중이다.
+ *
+ * <p>이 클래스는 삭제하지 않고 유지한다 — 팀장 지시로, market-service가 추후 Kafka 발행을
+ * 추가하는 경우를 대비해 토픽명(TOPIC 상수)만 교체하면 바로 살아날 수 있게 남겨둔다.
+ * 두 경로(Kafka/Redis)가 동시에 활성화되어도 아래 처리(캐시 갱신, 지정가 조건 체결)는
+ * 멱등하므로 중복 실행 자체가 정합성 문제를 일으키지는 않는다 — 다만 실제로 market-service가
+ * Kafka 발행을 붙이는 시점에는 두 경로를 동시에 둘지, 하나로 정리할지 다시 논의 필요.</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderMarketPriceConsumer {
 
-    private static final String TOPIC = "market.open-price.v1";
+    private static final String TOPIC = "market.order-book.v1";
     private static final String GROUP_ID = "trading-service-order-market-price";
 
     private final CachedMarketPriceProvider cachedMarketPriceProvider;

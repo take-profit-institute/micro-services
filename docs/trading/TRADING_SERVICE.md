@@ -389,7 +389,7 @@ public void startConverting() {
 ### 5-2. 지정가 조건 체결 흐름 (완전 비동기, 이전 초안엔 없던 흐름)
 
 ```
-Market 서비스가 현재가 Kafka 이벤트 발행(market.open-price.v1)
+Market 서비스가 현재가 Kafka 이벤트 발행(market.order-book.v1)
     ▼
 [OrderMarketPriceConsumer.consume]
     ├─ 1. CachedMarketPriceProvider.updatePrice   (인메모리 캐시 갱신)
