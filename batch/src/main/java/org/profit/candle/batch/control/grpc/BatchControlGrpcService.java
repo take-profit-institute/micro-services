@@ -93,6 +93,7 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
                         .setName(PortfolioEodJobConfiguration.JOB_NAME)
                         .setDescription("Portfolio end-of-day snapshot generation")
                         .addSupportedParameters("businessDate")
+                        .addSupportedParameters("runId")
                         .setTriggerable(isRegistered(PortfolioEodJobConfiguration.JOB_NAME))
                         .build())
                 .addJobs(BatchJob.newBuilder()
@@ -220,9 +221,9 @@ public class BatchControlGrpcService extends BatchControlServiceGrpc.BatchContro
             String businessDate = input.getOrDefault("businessDate", LocalDate.now(clock).toString());
             validateDate(businessDate);
             builder.addString("businessDate", businessDate);
-            if (input.containsKey("runId")) {
-                builder.addLong("runId", parseLong(input.get("runId"), "runId"));
-            }
+            builder.addLong("runId", input.containsKey("runId")
+                    ? parseLong(input.get("runId"), "runId")
+                    : System.nanoTime());
             return builder.toJobParameters();
         }
 
