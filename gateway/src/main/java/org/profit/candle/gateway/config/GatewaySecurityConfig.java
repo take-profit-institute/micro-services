@@ -66,6 +66,7 @@ public class GatewaySecurityConfig {
                 .securityMatcher(new OrServerWebExchangeMatcher(
                         ServerWebExchangeMatchers.pathMatchers(HttpMethod.OPTIONS, "/**"),
                         ServerWebExchangeMatchers.pathMatchers(
+                                "/**",
                                 "/api/auth/providers",
                                 "/api/auth/oauth/**",
                                 "/api/auth/token/refresh",
