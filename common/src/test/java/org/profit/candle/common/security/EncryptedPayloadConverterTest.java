@@ -29,6 +29,10 @@ class EncryptedPayloadConverterTest {
     private static final String TEST_KEY_BASE64 =
             Base64.getEncoder().encodeToString("0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8));
 
+    // 키 회전 시나리오 검증용 — TEST_KEY_BASE64와 다른 32바이트 키.
+    private static final String ROTATED_KEY_BASE64 =
+            Base64.getEncoder().encodeToString("fedcba9876543210fedcba9876543210".getBytes(StandardCharsets.UTF_8));
+
     private final EncryptedPayloadConverter converter = new EncryptedPayloadConverter();
 
     @BeforeEach
@@ -80,6 +84,24 @@ class EncryptedPayloadConverterTest {
     }
 
     @Test
+    @DisplayName("키 회전 후 이전 키로 암호화된 데이터를 복호화하면 예외가 발생한다")
+    void decrypt_withDifferentKeyAfterRotation_throwsException() {
+        byte[] original = "encrypted before rotation".getBytes(StandardCharsets.UTF_8);
+        byte[] encrypted = converter.convertToDatabaseColumn(original);
+
+        // 키 회전 상황 재현 — 이전 데이터는 새 키로 복호화할 수 없어야 한다
+        // (현재 컨버터는 단일 키만 지원하므로, 회전 시 이전 키로 암호화된 데이터는
+        // 복호화 불가 상태가 된다는 걸 명시적으로 확인해둔다).
+        EncryptedPayloadConverter.resetKeyForTest();
+        EncryptedPayloadConverter.initKey(ROTATED_KEY_BASE64);
+
+        assertThatThrownBy(() -> converter.convertToEntityAttribute(encrypted))
+                .isInstanceOf(CandleException.class)
+                .satisfies(e -> assertThat(((CandleException) e).errorCode())
+                        .isEqualTo(CommonErrorCode.PAYLOAD_DECRYPTION_FAILED));
+    }
+
+    @Test
     @DisplayName("32바이트가 아닌 키로 초기화하면 즉시 예외가 발생한다")
     void initKey_invalidKeyLength_throwsImmediately() {
         String tooShortKey = Base64.getEncoder().encodeToString("short-key".getBytes(StandardCharsets.UTF_8));
@@ -107,6 +129,20 @@ class EncryptedPayloadConverterTest {
         EncryptedPayloadConverter.resetKeyForTest(); // setUpKey()가 설정한 키를 일부러 제거
 
         assertThatThrownBy(() -> converter.convertToDatabaseColumn("data".getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOf(CandleException.class)
+                .satisfies(e -> assertThat(((CandleException) e).errorCode())
+                        .isEqualTo(CommonErrorCode.INVALID_ENCRYPTION_KEY));
+    }
+
+    @Test
+    @DisplayName("키가 초기화된 상태로 암호화한 뒤, 복호화 시점에 키가 없으면 예외가 발생한다")
+    void convertToEntityAttribute_keyNotInitialized_throwsException() {
+        byte[] encrypted = converter.convertToDatabaseColumn("data".getBytes(StandardCharsets.UTF_8));
+
+        // 암호화는 정상 키로 끝냈지만, 복호화 직전에 키가 사라진 상황(부팅 설정 누락) 재현.
+        EncryptedPayloadConverter.resetKeyForTest();
+
+        assertThatThrownBy(() -> converter.convertToEntityAttribute(encrypted))
                 .isInstanceOf(CandleException.class)
                 .satisfies(e -> assertThat(((CandleException) e).errorCode())
                         .isEqualTo(CommonErrorCode.INVALID_ENCRYPTION_KEY));
