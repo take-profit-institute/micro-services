@@ -103,6 +103,7 @@ Docs
 - [⚙️ Operation Layer Services](#️-operation-layer-services)
   - [🕯️ Batch Service](#️-batch-service)
 - [🛡 Core Engineering Principles](#-core-engineering-principles)
+- [☁️ Infrastructure Architecture](#️-infrastructure-architecture)
 - [🚀 CI/CD & Deployment Architecture](#-cicd--deployment-architecture)
 - [📂 Project Structure](#-project-structure)
 - [⚙️ Environment Variables](#️-environment-variables)
@@ -1605,18 +1606,318 @@ flowchart LR
 
 ---
 
-# 🚀 CI/CD & Deployment Architecture
+
+# ☁️ Infrastructure Architecture
+
+Candle 인프라는 **Terraform으로 AWS 기반 자원을 만들고**, **EKS 위에서 Kubernetes + Istio + ArgoCD로 서비스를 운영**하는 구조입니다.  
+정적 웹은 S3와 CloudFront로 배포하고, API 요청은 CloudFront/WAF → API Gateway → VPC Link → 내부 Load Balancer → Istio Ingress Gateway를 지나 EKS 내부 서비스로 들어갑니다.
+
+## 1. AWS · EKS 전체 구조
+
+```mermaid
+flowchart TB
+    User["👤 User Browser"] --> CFApp["CloudFront<br/>app.dev.candle.io.kr"]
+    Admin["🧑‍💼 Admin Browser"] --> CFAdmin["CloudFront<br/>admin"]
+    CFApp --> S3App["S3<br/>Web Static Assets"]
+    CFAdmin --> S3Admin["S3<br/>Admin Static Assets"]
+
+    User --> CFApi["CloudFront + WAF<br/>api edge security"]
+    CFApi --> APIGW["API Gateway<br/>JWT / route control"]
+    APIGW --> VPCLink["VPC Link<br/>private integration"]
+
+    subgraph AWS["AWS Seoul Region"]
+        subgraph VPC["VPC"]
+            subgraph Public["Public Subnets"]
+                NAT["NAT Gateway<br/>private outbound"]
+                ALB["Internal ALB / LoadBalancer<br/>AWS Load Balancer Controller"]
+            end
+
+            subgraph Private["Private Service Subnets"]
+                subgraph EKS["EKS · Kubernetes Cluster"]
+                    IstioGW["Istio Ingress Gateway<br/>VirtualService routing"]
+
+                    subgraph CandleNS["candle namespace"]
+                        BFF["bff Deployment<br/>HPA · rolling"]
+                        Auth["auth-service<br/>Envoy sidecar"]
+                        UserSvc["user-service<br/>Envoy sidecar"]
+                        Trading["trading-service<br/>Envoy sidecar"]
+                        Portfolio["portfolio-service<br/>Envoy sidecar"]
+                        Ranking["ranking-service<br/>Envoy sidecar"]
+                        Market["market-service<br/>Envoy sidecar"]
+                        Batch["batch / CronJob<br/>native sidecar"]
+                    end
+
+                    subgraph PlatformNS["platform namespaces"]
+                        Argo["ArgoCD<br/>GitOps"]
+                        ESO["External Secrets Operator"]
+                        Obs["Observability<br/>Prometheus · Grafana · Loki · Jaeger"]
+                    end
+                end
+            end
+
+            subgraph Data["Private Data Subnets"]
+                RDS["RDS PostgreSQL<br/>service-owned schema / DB"]
+                Redis["ElastiCache Redis<br/>cache · pub/sub · ranking"]
+                MSK["MSK Kafka<br/>domain events"]
+            end
+        end
+
+        ECR["ECR<br/>Docker image registry"]
+        Secrets["AWS Secrets Manager"]
+        CW["CloudWatch<br/>logs · metrics · alarms"]
+        TFState["S3 Terraform State"]
+    end
+
+    VPCLink --> ALB
+    ALB --> IstioGW
+    IstioGW --> BFF
+    IstioGW --> Auth
+    BFF --> Auth
+    BFF --> UserSvc
+    BFF --> Trading
+    BFF --> Portfolio
+    BFF --> Ranking
+    BFF --> Market
+
+    Auth --> RDS
+    UserSvc --> RDS
+    Trading --> RDS
+    Portfolio --> RDS
+    Ranking --> RDS
+    Market --> Redis
+    Ranking --> Redis
+    Trading -. Outbox/Event .-> MSK
+    Portfolio -. Event consume .-> MSK
+    Ranking -. Event consume/publish .-> MSK
+
+    ESO --> Secrets
+    EKS --> CW
+    Argo --> ECR
+```
+
+## 2. 요청 진입 경로
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CF as CloudFront/WAF
+    participant API as API Gateway
+    participant VL as VPC Link
+    participant LB as Internal ALB / LoadBalancer
+    participant IG as Istio Ingress Gateway
+    participant BFF as BFF
+    participant SVC as Domain Service
+
+    U->>CF: HTTPS API Request
+    CF->>CF: WAF rule / rate limit / edge security
+    CF->>API: Forward API request
+    API->>API: JWT validation / route policy
+    API->>VL: Private integration
+    VL->>LB: VPC internal traffic
+    LB->>IG: Kubernetes LoadBalancer target
+    IG->>BFF: VirtualService route
+    BFF->>SVC: gRPC / HTTP inside mesh
+    SVC-->>BFF: Domain response
+    BFF-->>U: API response
+```
+
+## 3. Kubernetes Runtime
+
+| Component | 역할 |
+|---|---|
+| EKS | 서비스 컨테이너를 실행하는 Kubernetes control plane |
+| Kubernetes Deployment | 각 마이크로서비스 Pod 수와 rollout 상태 관리 |
+| HPA | CPU/메모리/커스텀 지표 기준으로 Pod 자동 확장 |
+| Service / LoadBalancer | Pod 앞단의 안정적인 내부 주소와 트래픽 분산 |
+| AWS Load Balancer Controller | Kubernetes Ingress/Service를 AWS ALB/LoadBalancer와 연결 |
+| Istio Ingress Gateway | 외부에서 들어온 요청을 내부 서비스로 라우팅 |
+| Envoy Sidecar | 서비스 간 통신의 mTLS, 로드밸런싱, 지표, tracing 처리 |
+| CronJob / Batch Pod | 주기적 배치 실행, Job 종료 후 Pod 정리 |
+
+## 4. Service Mesh · mTLS
+
+Istio는 각 서비스 Pod 옆에 Envoy sidecar를 붙여서 서비스 간 통신을 대신 처리합니다.  
+앱 코드는 비즈니스 로직과 gRPC 계약에 집중하고, 통신 보안/관측/로드밸런싱은 mesh가 담당합니다.
 
 ```mermaid
 flowchart LR
-    Dev["👩‍💻 Developer"] --> Git["GitHub Repository"]
-    Git --> Actions["GitHub Actions"]
-    Actions --> Build["Gradle Build / Test"]
-    Build --> Image["Docker Image"]
-    Image --> Deploy["Deployment Environment"]
-    Deploy --> App["Candle App<br/>https://app.dev.candle.io.kr"]
-    Actions --> Docs["Docusaurus Docs<br/>https://take-profit-institute.github.io/micro-services/"]
+    subgraph PodA["auth-service Pod"]
+        AppA["auth app"]
+        EnvoyA["Envoy sidecar"]
+        AppA --> EnvoyA
+    end
+
+    subgraph PodB["trading-service Pod"]
+        EnvoyB["Envoy sidecar"]
+        AppB["trading app"]
+        EnvoyB --> AppB
+    end
+
+    EnvoyA <-->|"mTLS STRICT<br/>certificate verification"| EnvoyB
+
+    EnvoyA --> Metrics["Prometheus metrics"]
+    EnvoyB --> Tracing["Jaeger traces"]
 ```
+
+## 5. Secrets · IAM · IRSA
+
+비밀번호와 외부 API key는 코드나 GitHub에 직접 저장하지 않고, AWS Secrets Manager에서 관리합니다.  
+ESO가 Secrets Manager 값을 Kubernetes Secret으로 동기화하고, 각 Pod는 필요한 Secret만 환경변수로 주입받습니다.
+
+```mermaid
+flowchart LR
+    Secrets["AWS Secrets Manager<br/>DB password · API key"] --> ESO["External Secrets Operator"]
+    ESO --> K8sSecret["Kubernetes Secret"]
+    K8sSecret --> Pod["Service Pod<br/>env / volume injection"]
+
+    SA["Kubernetes ServiceAccount"] --> IRSA["IRSA<br/>IAM Role for Service Account"]
+    IRSA --> IAM["AWS IAM Policy<br/>least privilege"]
+    Pod --> SA
+    Pod -. "필요한 AWS 자원만 접근" .-> IAM
+```
+
+| Security Item | Candle 적용 방식 |
+|---|---|
+| IRSA | 서비스별 ServiceAccount에 AWS IAM Role 연결 |
+| ESO | AWS Secrets Manager → Kubernetes Secret 자동 동기화 |
+| mTLS | Istio Envoy sidecar 간 쌍방향 인증/암호화 |
+| WAF | CloudFront/API 앞단에서 과도한 요청과 공격 패턴 차단 |
+| Private Subnet | EKS 워커와 데이터 계층을 외부 인터넷에서 직접 접근 불가하게 격리 |
+| Security Group | ALB, EKS, RDS, Redis, MSK 간 허용 포트 최소화 |
+
+## 6. Data · Event · Storage Layer
+
+| Layer | AWS / Platform | 사용 목적 |
+|---|---|---|
+| Static Web | S3 + CloudFront | 프론트 정적 파일 배포와 CDN 캐싱 |
+| Image Registry | ECR | GitHub Actions가 빌드한 Docker image 저장 |
+| Relational DB | RDS PostgreSQL | 서비스별 원장/조회 모델/schema 저장 |
+| Cache / PubSub | ElastiCache Redis | Market cache, Ranking cache, Chatting/Wishlist pub-sub |
+| Event Backbone | MSK Kafka | 서비스 간 비동기 이벤트 전달 |
+| Object / State | S3 | 정적 파일, Terraform state 등 |
+| Logs / Metrics | CloudWatch | AWS 리소스와 애플리케이션 로그/지표 수집 |
+
+## 7. Terraform · GitOps · Rolling Deployment
+
+```mermaid
+flowchart LR
+    Dev["👩‍💻 Developer"] --> PR["GitHub Pull Request"]
+
+    subgraph CI["GitHub Actions · CI"]
+        Test["Gradle build / test"]
+        Docker["Docker image build"]
+        Push["Push image to ECR"]
+        Static["Upload web assets to S3"]
+        Invalidate["CloudFront invalidation"]
+    end
+
+    subgraph IaC["Terraform · IaC"]
+        Plan["terraform fmt / validate / plan"]
+        Apply["terraform apply<br/>reviewed apply"]
+        AWSInfra["VPC · EKS · RDS · S3 · CloudFront · ECR · IAM"]
+    end
+
+    subgraph GitOps["ArgoCD · GitOps"]
+        K8sRepo["candle-k8s manifests / Helm values"]
+        Argo["ArgoCD App-of-Apps"]
+        Rollout["Kubernetes Rolling Update"]
+    end
+
+    PR --> Test
+    Test --> Docker
+    Docker --> Push
+    Test --> Static
+    Static --> Invalidate
+
+    PR --> Plan
+    Plan --> Apply
+    Apply --> AWSInfra
+
+    Push --> K8sRepo
+    K8sRepo --> Argo
+    Argo --> Rollout
+    Rollout --> EKS["EKS Deployments / HPA"]
+```
+
+| Pipeline | 역할 |
+|---|---|
+| GitHub Actions | 테스트, 빌드, Docker image 생성, ECR push, S3/CloudFront 배포 |
+| Terraform | VPC, EKS, RDS, S3, CloudFront, IAM, ECR 등 AWS 자원 선언형 관리 |
+| ArgoCD | Git에 선언된 Kubernetes 상태를 EKS에 자동 반영 |
+| App-of-Apps | root application이 Istio, observability, services, batch 앱을 순서대로 관리 |
+| Rolling Update | Pod를 한 번에 모두 내리지 않고 순차 교체해 무중단 배포 |
+| HPA | 트래픽 증가 시 Pod replica를 자동으로 늘리고 줄임 |
+
+## 8. Observability
+
+```mermaid
+flowchart TB
+    Pod["Service Pods<br/>Spring Boot + Envoy"] --> Metrics["Prometheus<br/>metrics scrape"]
+    Pod --> Logs["stdout JSON logs"]
+    Pod --> Traces["trace context<br/>Istio / app"]
+
+    Metrics --> Grafana["Grafana Dashboard"]
+    Logs --> Loki["Loki Log Store"]
+    Traces --> Jaeger["Jaeger Distributed Tracing"]
+
+    EKS["EKS / ALB / RDS / MSK"] --> CloudWatch["CloudWatch<br/>logs · metrics · alarms"]
+    CloudWatch --> Alert["Alarm / 운영 확인"]
+```
+
+| 관측 대상 | 확인 내용 |
+|---|---|
+| CloudWatch | ALB, EKS, RDS, MSK, application log, AWS metric |
+| Prometheus | Pod, JVM, Envoy, Istio traffic metric |
+| Grafana | 서비스별 대시보드와 운영 지표 시각화 |
+| Loki | 서비스 로그 검색 |
+| Jaeger | 요청이 BFF → Trading → Portfolio처럼 이동한 경로 추적 |
+
+<div align="right">
+
+[🔝 Back to Top](#top)
+
+</div>
+
+---
+
+# 🚀 CI/CD & Deployment Architecture
+
+Candle의 CI는 **GitHub Actions**, 배포는 **ArgoCD GitOps + Kubernetes Rolling Update**를 기준으로 합니다.  
+애플리케이션 코드는 이미지로 빌드되어 ECR에 저장되고, Kubernetes manifest/Helm values 변경을 ArgoCD가 감지해 EKS에 반영합니다.
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant GH as GitHub
+    participant CI as GitHub Actions
+    participant ECR as Amazon ECR
+    participant S3 as S3 / CloudFront
+    participant K8sRepo as candle-k8s
+    participant Argo as ArgoCD
+    participant EKS as EKS
+
+    Dev->>GH: git push / Pull Request
+    GH->>CI: workflow trigger
+    CI->>CI: Gradle build + test
+    CI->>CI: Docker image build
+    CI->>ECR: push image tag
+    CI->>S3: upload frontend static assets
+    CI->>S3: CloudFront cache invalidation
+    CI->>K8sRepo: update image tag / values
+    Argo->>K8sRepo: watch desired state
+    Argo->>EKS: sync manifests
+    EKS->>EKS: rolling update pods
+```
+
+| Stage | Tool | Output |
+|---|---|---|
+| CI | GitHub Actions | build/test 결과, Docker image |
+| Image Registry | ECR | 서비스별 image tag |
+| Static Deploy | S3 + CloudFront | Web/App 정적 파일 배포 |
+| Infra Change | Terraform | AWS 리소스 생성/변경 계획 및 적용 |
+| GitOps Deploy | ArgoCD | EKS Kubernetes 리소스 동기화 |
+| Runtime Deploy | Kubernetes Rolling Update | 기존 Pod를 순차 교체해 서비스 중단 최소화 |
+| Scale | HPA | 부하에 따라 Pod replica 자동 조정 |
 
 <div align="right">
 
