@@ -20,6 +20,14 @@
 <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white"/>
 <img src="https://img.shields.io/badge/Spring_Batch-6DB33F?style=for-the-badge"/>
 <img src="https://img.shields.io/badge/Docusaurus-3ECC5F?style=for-the-badge&logo=docusaurus&logoColor=white"/>
+<br/>
+<img src="https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white"/>
+<img src="https://img.shields.io/badge/EKS-FF9900?style=for-the-badge&logo=amazoneks&logoColor=white"/>
+<img src="https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white"/>
+<img src="https://img.shields.io/badge/Istio-466BB0?style=for-the-badge&logo=istio&logoColor=white"/>
+<img src="https://img.shields.io/badge/Terraform-844FBA?style=for-the-badge&logo=terraform&logoColor=white"/>
+<img src="https://img.shields.io/badge/Argo_CD-EF7B4D?style=for-the-badge&logo=argo&logoColor=white"/>
+<img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white"/>
 
 <br/><br/>
 
@@ -83,6 +91,7 @@ Docs
 
 - [👨‍💻 Team & Contributions](#-team--contributions)
 - [💡 Project Overview](#-project-overview)
+- [🛠 Tech Stack](#-tech-stack)
 - [🧭 Domain Grouping Strategy](#-domain-grouping-strategy)
 - [🏛 System Architecture](#-system-architecture)
 - [📈 Investment Core Flow](#-investment-core-flow)
@@ -100,7 +109,10 @@ Docs
   - [📚 Learning Service](#-learning-service)
   - [💬 Chatting Service](#-chatting-service)
   - [🔔 Notification Service](#-notification-service)
+- [⚙️ Operation Layer Services](#️-operation-layer-services)
+  - [🕯️ Batch Service](#️-batch-service)
 - [🛡 Core Engineering Principles](#-core-engineering-principles)
+- [☁️ Infrastructure Architecture](#️-infrastructure-architecture)
 - [🚀 CI/CD & Deployment Architecture](#-cicd--deployment-architecture)
 - [📂 Project Structure](#-project-structure)
 - [⚙️ Environment Variables](#️-environment-variables)
@@ -235,6 +247,150 @@ Candle은 실제 증권 서비스처럼 **시세·주문·체결·자산·랭킹
 | 체결 이후 자산/랭킹/알림은 후속 반영이 필요함 | Kafka 이벤트 기반 최종 일관성 |
 | 일일 마감·랭킹 확정은 API 서버와 성격이 다름 | 독립 Spring Batch 애플리케이션 |
 | 서비스가 많아지면 DB 직접 참조가 위험함 | Service-Owned Data, gRPC 계약, FK 금지 |
+
+<div align="right">
+
+[🔝 Back to Top](#top)
+
+</div>
+
+---
+
+
+# 🛠 Tech Stack
+
+Candle은 **Spring Boot 기반 MSA 애플리케이션**과 **AWS EKS 기반 운영 인프라**를 분리해서 설계했습니다.  
+애플리케이션 코드는 서비스별 책임을 나누고, 인프라는 Terraform과 ArgoCD로 재현 가능하게 관리합니다.
+
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="260">
+
+### 🧱 Backend
+
+Java 21  
+Spring Boot 4.1  
+Spring Batch  
+Spring Data JPA  
+Flyway
+
+</td>
+<td align="center" width="260">
+
+### 🔗 Communication
+
+gRPC / Protobuf  
+REST  
+WebSocket  
+Kafka Event  
+Redis Pub/Sub
+
+</td>
+<td align="center" width="260">
+
+### ☁️ Cloud Native
+
+AWS  
+EKS  
+Kubernetes  
+Istio  
+Terraform
+
+</td>
+<td align="center" width="260">
+
+### 🚀 Delivery
+
+GitHub Actions  
+ECR  
+ArgoCD  
+Rolling Update  
+HPA
+
+</td>
+</tr>
+</table>
+
+</div>
+
+## Application Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| Language | `Java 21` | 전체 백엔드 서비스 개발 언어 |
+| Framework | `Spring Boot 4.1` | 마이크로서비스 애플리케이션 기반 |
+| Batch | `Spring Batch` | EOD 스냅샷, 랭킹 확정, 종목 동기화, Trading 일중 작업 |
+| Persistence | `Spring Data JPA`, `Flyway` | 서비스별 schema 소유, migration 기반 DB 변경 관리 |
+| API Contract | `gRPC`, `Protocol Buffers` | 서비스 간 동기 호출 계약 |
+| External API | `REST Client` | Kiwoom, Naver News, Firebase 등 외부 연동 |
+| Real-time | `WebSocket`, `Redis Pub/Sub` | 채팅, 실시간 시세 전달 |
+
+## Data & Messaging Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| Main DB | `RDS PostgreSQL` | Auth, User, Trading, Portfolio, Ranking 등 서비스 데이터 저장 |
+| Time-series / Market Data | `TimescaleDB` | 시세성 데이터 저장 확장 영역 |
+| Cache | `Redis / ElastiCache` | 랭킹 캐시, 시세 캐시, Pub/Sub, 실시간 데이터 처리 |
+| Event Backbone | `Kafka / MSK` | 서비스 간 비동기 이벤트 전달 |
+| Outbox | `Transactional Outbox`, `Debezium / CDC` | DB commit 이후 이벤트 유실 방지 |
+| Object Storage | `S3` | 프론트 정적 파일과 배포 산출물 저장 |
+
+## Infrastructure Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| Network | `VPC`, `Public Subnet`, `Private Subnet`, `Database Subnet`, `NAT Gateway` | 외부 진입, 서비스 실행, 데이터 계층 분리 |
+| Edge | `CloudFront`, `WAF`, `Route53`, `ACM` | 정적 웹 배포, HTTPS, 도메인, 보안 필터링 |
+| Ingress | `ALB`, `Load Balancer`, `Istio Ingress Gateway` | 외부 요청을 EKS 내부 서비스로 라우팅 |
+| Container Runtime | `EKS`, `Kubernetes`, `Pod`, `Deployment`, `Service`, `CronJob` | 서비스와 배치 컨테이너 운영 |
+| Image Registry | `ECR` | GitHub Actions가 빌드한 Docker image 저장 |
+| IaC | `Terraform` | VPC, EKS, RDS, ECR, IAM 등 AWS 리소스 코드화 |
+| GitOps | `ArgoCD`, `App-of-Apps`, `ApplicationSet` | Git 기준 Kubernetes 배포 상태 동기화 |
+
+## Security & Traffic Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| Service Mesh | `Istio`, `Envoy Sidecar` | 서비스 간 트래픽 제어, 관측, 보안 정책 적용 |
+| Encryption | `mTLS` | EKS 내부 서비스 간 쌍방향 인증과 암호화 |
+| Secret Management | `AWS Secrets Manager`, `ESO` | AWS secret을 Kubernetes Secret으로 동기화 |
+| AWS Permission | `IAM`, `IRSA`, `OIDC` | Pod와 GitHub Actions에 최소 권한 부여 |
+| Scaling | `HPA` | CPU/트래픽 기준 Pod 자동 확장 |
+| Deployment Strategy | `Rolling Update` | Pod를 하나씩 교체하는 무중단 배포 방식 |
+
+## Observability Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| AWS Logs / Metrics | `CloudWatch` | AWS 리소스 로그와 지표 확인 |
+| Metrics | `Prometheus` | Spring Boot actuator와 Envoy metric 수집 |
+| Dashboard | `Grafana` | 서비스 상태, JVM, 네트워크, 인프라 지표 시각화 |
+| Logs | `Loki` | Pod stdout 로그 중앙 수집과 검색 |
+| Tracing | `Jaeger` | 사용자 요청이 여러 서비스를 거치는 경로 추적 |
+
+```mermaid
+flowchart LR
+    Code["👩‍💻 Developer Code"] --> CI["GitHub Actions<br/>build · test · docker build"]
+    CI --> ECR["Amazon ECR<br/>container image registry"]
+    CI --> S3["S3<br/>static web artifacts"]
+    S3 --> CF["CloudFront<br/>web CDN"]
+
+    GitOps["candle-k8s Git Repo"] --> Argo["ArgoCD<br/>GitOps sync"]
+    ECR --> Argo
+    Argo --> EKS["EKS / Kubernetes<br/>Rolling Update"]
+
+    EKS --> Istio["Istio + Envoy Sidecar<br/>mTLS · traffic control"]
+    EKS --> HPA["HPA<br/>auto scaling"]
+    EKS --> RDS["RDS PostgreSQL"]
+    EKS --> Redis["ElastiCache Redis"]
+    EKS --> Kafka["MSK Kafka"]
+    EKS --> ESO["External Secrets Operator"]
+    ESO --> Secrets["AWS Secrets Manager"]
+    EKS --> CW["CloudWatch"]
+```
 
 <div align="right">
 
@@ -1408,6 +1564,152 @@ erDiagram
 
 ---
 
+
+# ⚙️ Operation Layer Services
+
+Operation Layer는 Candle의 일일 운영 흐름을 담당합니다.  
+API 서버가 실시간 요청을 처리한다면, Batch는 정해진 시각에 **예약 주문 처리 → 일봉 확정 → 포트폴리오 EOD → 일별 랭킹 확정 → 종목 마스터 동기화**를 순서대로 실행합니다.
+
+```mermaid
+flowchart LR
+    A["08:30<br/>PREV_CLOSE 예약"] --> B["09:00<br/>OPEN + LIMIT 전환"]
+    B --> C["15:30<br/>미체결 주문 만료<br/>stale 예약 정리"]
+    C --> D["15:40<br/>일봉 마감<br/>종가 예약 처리"]
+    D --> E["16:00<br/>Portfolio EOD"]
+    E --> F["16:20<br/>Daily Ranking Finalize"]
+    F --> G["16:30<br/>Stock Master Sync"]
+```
+
+---
+
+## 🕯️ Batch Service
+
+![Batch architecture overview](docs/batch/assets/batch-architecture-overview.svg)
+
+### Role
+
+`batch`는 Candle의 운영 오케스트레이션 서비스입니다.  
+Batch는 도메인 DB를 직접 수정하지 않고, 정해진 시각과 순서에 따라 Trading, Stock, Portfolio, Ranking 서비스의 gRPC API를 호출합니다. 최종 데이터와 트랜잭션은 항상 호출받은 도메인 서비스가 소유합니다.
+
+### Responsibilities
+
+| Area | Description |
+|---|---|
+| Scheduler | Asia/Seoul 기준 cron으로 일일 Job 자동 실행 |
+| Manual Control | Batch Control gRPC로 수동 Job 실행 |
+| Job Orchestration | 선행 Job 완료 여부 확인 후 후속 Job 실행 |
+| Restart | Spring Batch metadata 기반 실패 지점 재시작 |
+| Retry | 일시적 gRPC 오류에 대해 제한된 횟수 재시도 |
+| Guard | Portfolio EOD 완료 전 Ranking 실행 차단 |
+| Metadata | JobInstance, JobExecution, StepExecution, ExecutionContext 기록 |
+
+### Daily Timeline
+
+![Candle Batch daily timeline](docs/batch/assets/batch-daily-timeline.svg)
+
+| Time(KST) | Job Group | Main RPC / Action | Owner Service |
+|---|---|---|---|
+| 08:30 | Previous Close Reservation | `ProcessPrevCloseReservations` | Trading |
+| 09:00 | Open Limit Reservation | `ProcessOpenLimitReservations` | Trading |
+| 15:30 | Market Close Cleanup | `ExpirePendingOrders` → stale converting cleanup | Trading |
+| 15:40 | Today Close Processing | `CloseDailyCandles` → `ProcessTodayCloseReservations` | Stock / Trading |
+| 16:00 | Portfolio EOD | `ListActiveHolders` → `RecordDailySnapshot` | Portfolio |
+| 16:20 | Daily Ranking | `FinalizeDailyRanking` | Ranking |
+| 16:30 | Stock Master Sync | `SyncStocks(KOSPI)` → `SyncStocks(KOSDAQ)` | Stock |
+
+### Trading Day Chain
+
+![Trading batch sequence](docs/batch/assets/batch-trading-sequence.svg)
+
+Trading 관련 Batch는 예약·주문 상태를 직접 변경하지 않습니다.  
+Batch는 정해진 시간에 Trading 또는 Stock의 상태 변경 RPC를 호출하고, 실제 DB 변경과 Outbox 기록은 호출받은 서비스의 transaction에서 처리됩니다.
+
+```mermaid
+sequenceDiagram
+    participant B as Candle Batch
+    participant T as Trading Service
+    participant S as Stock Service
+    participant DB as Domain DB / Outbox
+
+    B->>T: 08:30 ProcessPrevCloseReservations
+    T->>DB: 예약 처리 + Outbox
+    B->>T: 09:00 ProcessOpenLimitReservations
+    T->>DB: 예약 → 주문 전환 + Outbox
+    B->>T: 15:30 ExpirePendingOrders
+    T->>DB: 미체결 주문 만료
+    B->>T: ListStaleConvertingReservations / Fail...
+    T->>DB: stale 예약 실패 처리
+    B->>S: 15:40 CloseDailyCandles
+    S->>DB: 일봉 확정 + Outbox
+    B->>T: ProcessTodayCloseReservations
+    T->>DB: 종가 예약 처리 + Outbox
+    B->>T: ListExpirableReservations / Expire...
+    T->>DB: 잔여 예약 만료
+```
+
+### Portfolio EOD → Ranking Finalize
+
+![Portfolio EOD ranking sequence](docs/batch/assets/batch-eod-ranking-sequence.svg)
+
+Portfolio EOD는 활성 보유자를 페이지로 읽고, 종목별 확정 종가와 사용자별 현금을 모아 일별 스냅샷을 저장합니다.  
+Ranking은 같은 거래일의 `portfolioEodSnapshotJob`이 `COMPLETED`인 경우에만 실행됩니다.
+
+| Step | Batch Action | Data Owner |
+|---|---|---|
+| 1 | `ListActiveHolders(page)`로 활성 보유자 조회 | Portfolio |
+| 2 | `GetPreviousClose(code)`로 확정 종가 조회 | Stock |
+| 3 | `GetBalance(user_id)`로 현금 잔고 조회 | Trading |
+| 4 | `stock_value`, `total_asset` 계산 후 `RecordDailySnapshot` 호출 | Portfolio |
+| 5 | Batch metadata에서 EOD 완료 여부 확인 | Batch |
+| 6 | `FinalizeDailyRanking(rankingDate)` 호출 | Ranking |
+
+### Stock Master Sync
+
+![Stock sync sequence](docs/batch/assets/batch-stock-sync-sequence.svg)
+
+Stock Sync는 Batch가 시장 순서만 지정하고, Kiwoom 통신·응답 파싱·`stocks` upsert는 Stock Service가 전부 담당합니다.
+
+```text
+Batch stockSyncJob
+  -> StockService.SyncStocks(KOSPI)
+  -> StockService.SyncStocks(KOSDAQ)
+  -> Stock Service가 Kiwoom 조회와 stocks upsert 수행
+```
+
+### Service Impact & Failure Containment
+
+![Batch service impact](docs/batch/assets/batch-service-impact.svg)
+
+| Failure Point | Protected Behavior | Recovery |
+|---|---|---|
+| gRPC 연결 실패 | Step이 `FAILED`로 기록되고 성공으로 위장하지 않음 | 대상 서비스 복구 후 같은 날짜로 재시작 |
+| Trading 선행 Job 실패 | 후속 stale/expire Job 미실행 | 선행 Job 성공 후 후속 Job 실행 |
+| Stock 일봉 마감 실패 | 종가 예약 처리와 EOD 평가 기준 생성 차단 | `tradingTodayCloseJob` 재실행 |
+| Portfolio EOD 미완료 | Ranking RPC를 호출하지 않음 | EOD 복구 후 Ranking 재실행 |
+| Ranking transaction 실패 | 랭킹·Outbox·멱등성 레코드 함께 rollback | 같은 `rankingDate`와 동일 key로 재시작 |
+| Redis 장애 | Ranking DB 원본은 유지 | DB fallback 또는 캐시 복구 |
+| Kiwoom 장애 | 다른 일일 Job과 서비스 DB에 영향 없음 | 인증/응답 복구 후 `stockSyncJob` 재실행 |
+
+### Engineering Points
+
+| Point | Description |
+|---|---|
+| Single Batch Instance | 현재 운영 전제는 Batch replica 1개 |
+| Service-Owned Transaction | Batch transaction은 원격 서비스 transaction을 대체하지 않음 |
+| Deterministic Idempotency Key | `businessDate` / `rankingDate` 기준으로 같은 의미의 요청은 같은 key 사용 |
+| Completion Guard | Ranking은 같은 날짜 Portfolio EOD 완료 여부를 먼저 확인 |
+| Safe Restart | 실패 Job은 같은 날짜 parameter로 실패 지점부터 재시작 |
+| No Direct DB Mutation | Batch는 Trading/Stock/Portfolio/Ranking DB를 직접 수정하지 않음 |
+| Outbox Boundary | 이벤트 발행과 중복 소비는 도메인 서비스의 Outbox/Consumer 정책을 따름 |
+
+<div align="right">
+
+[🔝 Back to Top](#top)
+
+</div>
+
+---
+
 # 🛡 Core Engineering Principles
 
 ## 1. Service-Owned Data
@@ -1457,18 +1759,318 @@ flowchart LR
 
 ---
 
-# 🚀 CI/CD & Deployment Architecture
+
+# ☁️ Infrastructure Architecture
+
+Candle 인프라는 **Terraform으로 AWS 기반 자원을 만들고**, **EKS 위에서 Kubernetes + Istio + ArgoCD로 서비스를 운영**하는 구조입니다.  
+정적 웹은 S3와 CloudFront로 배포하고, API 요청은 CloudFront/WAF → API Gateway → VPC Link → 내부 Load Balancer → Istio Ingress Gateway를 지나 EKS 내부 서비스로 들어갑니다.
+
+## 1. AWS · EKS 전체 구조
+
+```mermaid
+flowchart TB
+    User["👤 User Browser"] --> CFApp["CloudFront<br/>app.dev.candle.io.kr"]
+    Admin["🧑‍💼 Admin Browser"] --> CFAdmin["CloudFront<br/>admin"]
+    CFApp --> S3App["S3<br/>Web Static Assets"]
+    CFAdmin --> S3Admin["S3<br/>Admin Static Assets"]
+
+    User --> CFApi["CloudFront + WAF<br/>api edge security"]
+    CFApi --> APIGW["API Gateway<br/>JWT / route control"]
+    APIGW --> VPCLink["VPC Link<br/>private integration"]
+
+    subgraph AWS["AWS Seoul Region"]
+        subgraph VPC["VPC"]
+            subgraph Public["Public Subnets"]
+                NAT["NAT Gateway<br/>private outbound"]
+                ALB["Internal ALB / LoadBalancer<br/>AWS Load Balancer Controller"]
+            end
+
+            subgraph Private["Private Service Subnets"]
+                subgraph EKS["EKS · Kubernetes Cluster"]
+                    IstioGW["Istio Ingress Gateway<br/>VirtualService routing"]
+
+                    subgraph CandleNS["candle namespace"]
+                        BFF["bff Deployment<br/>HPA · rolling"]
+                        Auth["auth-service<br/>Envoy sidecar"]
+                        UserSvc["user-service<br/>Envoy sidecar"]
+                        Trading["trading-service<br/>Envoy sidecar"]
+                        Portfolio["portfolio-service<br/>Envoy sidecar"]
+                        Ranking["ranking-service<br/>Envoy sidecar"]
+                        Market["market-service<br/>Envoy sidecar"]
+                        Batch["batch / CronJob<br/>native sidecar"]
+                    end
+
+                    subgraph PlatformNS["platform namespaces"]
+                        Argo["ArgoCD<br/>GitOps"]
+                        ESO["External Secrets Operator"]
+                        Obs["Observability<br/>Prometheus · Grafana · Loki · Jaeger"]
+                    end
+                end
+            end
+
+            subgraph Data["Private Data Subnets"]
+                RDS["RDS PostgreSQL<br/>service-owned schema / DB"]
+                Redis["ElastiCache Redis<br/>cache · pub/sub · ranking"]
+                MSK["MSK Kafka<br/>domain events"]
+            end
+        end
+
+        ECR["ECR<br/>Docker image registry"]
+        Secrets["AWS Secrets Manager"]
+        CW["CloudWatch<br/>logs · metrics · alarms"]
+        TFState["S3 Terraform State"]
+    end
+
+    VPCLink --> ALB
+    ALB --> IstioGW
+    IstioGW --> BFF
+    IstioGW --> Auth
+    BFF --> Auth
+    BFF --> UserSvc
+    BFF --> Trading
+    BFF --> Portfolio
+    BFF --> Ranking
+    BFF --> Market
+
+    Auth --> RDS
+    UserSvc --> RDS
+    Trading --> RDS
+    Portfolio --> RDS
+    Ranking --> RDS
+    Market --> Redis
+    Ranking --> Redis
+    Trading -. Outbox/Event .-> MSK
+    Portfolio -. Event consume .-> MSK
+    Ranking -. Event consume/publish .-> MSK
+
+    ESO --> Secrets
+    EKS --> CW
+    Argo --> ECR
+```
+
+## 2. 요청 진입 경로
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CF as CloudFront/WAF
+    participant API as API Gateway
+    participant VL as VPC Link
+    participant LB as Internal ALB / LoadBalancer
+    participant IG as Istio Ingress Gateway
+    participant BFF as BFF
+    participant SVC as Domain Service
+
+    U->>CF: HTTPS API Request
+    CF->>CF: WAF rule / rate limit / edge security
+    CF->>API: Forward API request
+    API->>API: JWT validation / route policy
+    API->>VL: Private integration
+    VL->>LB: VPC internal traffic
+    LB->>IG: Kubernetes LoadBalancer target
+    IG->>BFF: VirtualService route
+    BFF->>SVC: gRPC / HTTP inside mesh
+    SVC-->>BFF: Domain response
+    BFF-->>U: API response
+```
+
+## 3. Kubernetes Runtime
+
+| Component | 역할 |
+|---|---|
+| EKS | 서비스 컨테이너를 실행하는 Kubernetes control plane |
+| Kubernetes Deployment | 각 마이크로서비스 Pod 수와 rollout 상태 관리 |
+| HPA | CPU/메모리/커스텀 지표 기준으로 Pod 자동 확장 |
+| Service / LoadBalancer | Pod 앞단의 안정적인 내부 주소와 트래픽 분산 |
+| AWS Load Balancer Controller | Kubernetes Ingress/Service를 AWS ALB/LoadBalancer와 연결 |
+| Istio Ingress Gateway | 외부에서 들어온 요청을 내부 서비스로 라우팅 |
+| Envoy Sidecar | 서비스 간 통신의 mTLS, 로드밸런싱, 지표, tracing 처리 |
+| CronJob / Batch Pod | 주기적 배치 실행, Job 종료 후 Pod 정리 |
+
+## 4. Service Mesh · mTLS
+
+Istio는 각 서비스 Pod 옆에 Envoy sidecar를 붙여서 서비스 간 통신을 대신 처리합니다.  
+앱 코드는 비즈니스 로직과 gRPC 계약에 집중하고, 통신 보안/관측/로드밸런싱은 mesh가 담당합니다.
 
 ```mermaid
 flowchart LR
-    Dev["👩‍💻 Developer"] --> Git["GitHub Repository"]
-    Git --> Actions["GitHub Actions"]
-    Actions --> Build["Gradle Build / Test"]
-    Build --> Image["Docker Image"]
-    Image --> Deploy["Deployment Environment"]
-    Deploy --> App["Candle App<br/>https://app.dev.candle.io.kr"]
-    Actions --> Docs["Docusaurus Docs<br/>https://take-profit-institute.github.io/micro-services/"]
+    subgraph PodA["auth-service Pod"]
+        AppA["auth app"]
+        EnvoyA["Envoy sidecar"]
+        AppA --> EnvoyA
+    end
+
+    subgraph PodB["trading-service Pod"]
+        EnvoyB["Envoy sidecar"]
+        AppB["trading app"]
+        EnvoyB --> AppB
+    end
+
+    EnvoyA <-->|"mTLS STRICT<br/>certificate verification"| EnvoyB
+
+    EnvoyA --> Metrics["Prometheus metrics"]
+    EnvoyB --> Tracing["Jaeger traces"]
 ```
+
+## 5. Secrets · IAM · IRSA
+
+비밀번호와 외부 API key는 코드나 GitHub에 직접 저장하지 않고, AWS Secrets Manager에서 관리합니다.  
+ESO가 Secrets Manager 값을 Kubernetes Secret으로 동기화하고, 각 Pod는 필요한 Secret만 환경변수로 주입받습니다.
+
+```mermaid
+flowchart LR
+    Secrets["AWS Secrets Manager<br/>DB password · API key"] --> ESO["External Secrets Operator"]
+    ESO --> K8sSecret["Kubernetes Secret"]
+    K8sSecret --> Pod["Service Pod<br/>env / volume injection"]
+
+    SA["Kubernetes ServiceAccount"] --> IRSA["IRSA<br/>IAM Role for Service Account"]
+    IRSA --> IAM["AWS IAM Policy<br/>least privilege"]
+    Pod --> SA
+    Pod -. "필요한 AWS 자원만 접근" .-> IAM
+```
+
+| Security Item | Candle 적용 방식 |
+|---|---|
+| IRSA | 서비스별 ServiceAccount에 AWS IAM Role 연결 |
+| ESO | AWS Secrets Manager → Kubernetes Secret 자동 동기화 |
+| mTLS | Istio Envoy sidecar 간 쌍방향 인증/암호화 |
+| WAF | CloudFront/API 앞단에서 과도한 요청과 공격 패턴 차단 |
+| Private Subnet | EKS 워커와 데이터 계층을 외부 인터넷에서 직접 접근 불가하게 격리 |
+| Security Group | ALB, EKS, RDS, Redis, MSK 간 허용 포트 최소화 |
+
+## 6. Data · Event · Storage Layer
+
+| Layer | AWS / Platform | 사용 목적 |
+|---|---|---|
+| Static Web | S3 + CloudFront | 프론트 정적 파일 배포와 CDN 캐싱 |
+| Image Registry | ECR | GitHub Actions가 빌드한 Docker image 저장 |
+| Relational DB | RDS PostgreSQL | 서비스별 원장/조회 모델/schema 저장 |
+| Cache / PubSub | ElastiCache Redis | Market cache, Ranking cache, Chatting/Wishlist pub-sub |
+| Event Backbone | MSK Kafka | 서비스 간 비동기 이벤트 전달 |
+| Object / State | S3 | 정적 파일, Terraform state 등 |
+| Logs / Metrics | CloudWatch | AWS 리소스와 애플리케이션 로그/지표 수집 |
+
+## 7. Terraform · GitOps · Rolling Deployment
+
+```mermaid
+flowchart LR
+    Dev["👩‍💻 Developer"] --> PR["GitHub Pull Request"]
+
+    subgraph CI["GitHub Actions · CI"]
+        Test["Gradle build / test"]
+        Docker["Docker image build"]
+        Push["Push image to ECR"]
+        Static["Upload web assets to S3"]
+        Invalidate["CloudFront invalidation"]
+    end
+
+    subgraph IaC["Terraform · IaC"]
+        Plan["terraform fmt / validate / plan"]
+        Apply["terraform apply<br/>reviewed apply"]
+        AWSInfra["VPC · EKS · RDS · S3 · CloudFront · ECR · IAM"]
+    end
+
+    subgraph GitOps["ArgoCD · GitOps"]
+        K8sRepo["candle-k8s manifests / Helm values"]
+        Argo["ArgoCD App-of-Apps"]
+        Rollout["Kubernetes Rolling Update"]
+    end
+
+    PR --> Test
+    Test --> Docker
+    Docker --> Push
+    Test --> Static
+    Static --> Invalidate
+
+    PR --> Plan
+    Plan --> Apply
+    Apply --> AWSInfra
+
+    Push --> K8sRepo
+    K8sRepo --> Argo
+    Argo --> Rollout
+    Rollout --> EKS["EKS Deployments / HPA"]
+```
+
+| Pipeline | 역할 |
+|---|---|
+| GitHub Actions | 테스트, 빌드, Docker image 생성, ECR push, S3/CloudFront 배포 |
+| Terraform | VPC, EKS, RDS, S3, CloudFront, IAM, ECR 등 AWS 자원 선언형 관리 |
+| ArgoCD | Git에 선언된 Kubernetes 상태를 EKS에 자동 반영 |
+| App-of-Apps | root application이 Istio, observability, services, batch 앱을 순서대로 관리 |
+| Rolling Update | Pod를 한 번에 모두 내리지 않고 순차 교체해 무중단 배포 |
+| HPA | 트래픽 증가 시 Pod replica를 자동으로 늘리고 줄임 |
+
+## 8. Observability
+
+```mermaid
+flowchart TB
+    Pod["Service Pods<br/>Spring Boot + Envoy"] --> Metrics["Prometheus<br/>metrics scrape"]
+    Pod --> Logs["stdout JSON logs"]
+    Pod --> Traces["trace context<br/>Istio / app"]
+
+    Metrics --> Grafana["Grafana Dashboard"]
+    Logs --> Loki["Loki Log Store"]
+    Traces --> Jaeger["Jaeger Distributed Tracing"]
+
+    EKS["EKS / ALB / RDS / MSK"] --> CloudWatch["CloudWatch<br/>logs · metrics · alarms"]
+    CloudWatch --> Alert["Alarm / 운영 확인"]
+```
+
+| 관측 대상 | 확인 내용 |
+|---|---|
+| CloudWatch | ALB, EKS, RDS, MSK, application log, AWS metric |
+| Prometheus | Pod, JVM, Envoy, Istio traffic metric |
+| Grafana | 서비스별 대시보드와 운영 지표 시각화 |
+| Loki | 서비스 로그 검색 |
+| Jaeger | 요청이 BFF → Trading → Portfolio처럼 이동한 경로 추적 |
+
+<div align="right">
+
+[🔝 Back to Top](#top)
+
+</div>
+
+---
+
+# 🚀 CI/CD & Deployment Architecture
+
+Candle의 CI는 **GitHub Actions**, 배포는 **ArgoCD GitOps + Kubernetes Rolling Update**를 기준으로 합니다.  
+애플리케이션 코드는 이미지로 빌드되어 ECR에 저장되고, Kubernetes manifest/Helm values 변경을 ArgoCD가 감지해 EKS에 반영합니다.
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant GH as GitHub
+    participant CI as GitHub Actions
+    participant ECR as Amazon ECR
+    participant S3 as S3 / CloudFront
+    participant K8sRepo as candle-k8s
+    participant Argo as ArgoCD
+    participant EKS as EKS
+
+    Dev->>GH: git push / Pull Request
+    GH->>CI: workflow trigger
+    CI->>CI: Gradle build + test
+    CI->>CI: Docker image build
+    CI->>ECR: push image tag
+    CI->>S3: upload frontend static assets
+    CI->>S3: CloudFront cache invalidation
+    CI->>K8sRepo: update image tag / values
+    Argo->>K8sRepo: watch desired state
+    Argo->>EKS: sync manifests
+    EKS->>EKS: rolling update pods
+```
+
+| Stage | Tool | Output |
+|---|---|---|
+| CI | GitHub Actions | build/test 결과, Docker image |
+| Image Registry | ECR | 서비스별 image tag |
+| Static Deploy | S3 + CloudFront | Web/App 정적 파일 배포 |
+| Infra Change | Terraform | AWS 리소스 생성/변경 계획 및 적용 |
+| GitOps Deploy | ArgoCD | EKS Kubernetes 리소스 동기화 |
+| Runtime Deploy | Kubernetes Rolling Update | 기존 Pod를 순차 교체해 서비스 중단 최소화 |
+| Scale | HPA | 부하에 따라 Pod replica 자동 조정 |
 
 <div align="right">
 
