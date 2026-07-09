@@ -100,6 +100,8 @@ Docs
   - [📚 Learning Service](#-learning-service)
   - [💬 Chatting Service](#-chatting-service)
   - [🔔 Notification Service](#-notification-service)
+- [⚙️ Operation Layer Services](#️-operation-layer-services)
+  - [🕯️ Batch Service](#️-batch-service)
 - [🛡 Core Engineering Principles](#-core-engineering-principles)
 - [🚀 CI/CD & Deployment Architecture](#-cicd--deployment-architecture)
 - [📂 Project Structure](#-project-structure)
@@ -151,7 +153,7 @@ Docs
 <tr>
 <td align="center" width="180px">
 
-### 📈 박은서
+### 📈 은서
 
 </td>
 <td>
@@ -1399,6 +1401,152 @@ erDiagram
 | Outbox Scope | 현재는 Outbox record까지만 구현, Kafka publisher는 미구현 |
 | Hard Delete | `DeleteNotification`은 soft delete가 아닌 hard delete |
 | No Redis | Notification Service는 Redis/cache를 사용하지 않음 |
+
+<div align="right">
+
+[🔝 Back to Top](#top)
+
+</div>
+
+---
+
+
+# ⚙️ Operation Layer Services
+
+Operation Layer는 Candle의 일일 운영 흐름을 담당합니다.  
+API 서버가 실시간 요청을 처리한다면, Batch는 정해진 시각에 **예약 주문 처리 → 일봉 확정 → 포트폴리오 EOD → 일별 랭킹 확정 → 종목 마스터 동기화**를 순서대로 실행합니다.
+
+```mermaid
+flowchart LR
+    A["08:30<br/>PREV_CLOSE 예약"] --> B["09:00<br/>OPEN + LIMIT 전환"]
+    B --> C["15:30<br/>미체결 주문 만료<br/>stale 예약 정리"]
+    C --> D["15:40<br/>일봉 마감<br/>종가 예약 처리"]
+    D --> E["16:00<br/>Portfolio EOD"]
+    E --> F["16:20<br/>Daily Ranking Finalize"]
+    F --> G["16:30<br/>Stock Master Sync"]
+```
+
+---
+
+## 🕯️ Batch Service
+
+![Batch architecture overview](docs/batch/assets/batch-architecture-overview.svg)
+
+### Role
+
+`batch`는 Candle의 운영 오케스트레이션 서비스입니다.  
+Batch는 도메인 DB를 직접 수정하지 않고, 정해진 시각과 순서에 따라 Trading, Stock, Portfolio, Ranking 서비스의 gRPC API를 호출합니다. 최종 데이터와 트랜잭션은 항상 호출받은 도메인 서비스가 소유합니다.
+
+### Responsibilities
+
+| Area | Description |
+|---|---|
+| Scheduler | Asia/Seoul 기준 cron으로 일일 Job 자동 실행 |
+| Manual Control | Batch Control gRPC로 수동 Job 실행 |
+| Job Orchestration | 선행 Job 완료 여부 확인 후 후속 Job 실행 |
+| Restart | Spring Batch metadata 기반 실패 지점 재시작 |
+| Retry | 일시적 gRPC 오류에 대해 제한된 횟수 재시도 |
+| Guard | Portfolio EOD 완료 전 Ranking 실행 차단 |
+| Metadata | JobInstance, JobExecution, StepExecution, ExecutionContext 기록 |
+
+### Daily Timeline
+
+![Candle Batch daily timeline](docs/batch/assets/batch-daily-timeline.svg)
+
+| Time(KST) | Job Group | Main RPC / Action | Owner Service |
+|---|---|---|---|
+| 08:30 | Previous Close Reservation | `ProcessPrevCloseReservations` | Trading |
+| 09:00 | Open Limit Reservation | `ProcessOpenLimitReservations` | Trading |
+| 15:30 | Market Close Cleanup | `ExpirePendingOrders` → stale converting cleanup | Trading |
+| 15:40 | Today Close Processing | `CloseDailyCandles` → `ProcessTodayCloseReservations` | Stock / Trading |
+| 16:00 | Portfolio EOD | `ListActiveHolders` → `RecordDailySnapshot` | Portfolio |
+| 16:20 | Daily Ranking | `FinalizeDailyRanking` | Ranking |
+| 16:30 | Stock Master Sync | `SyncStocks(KOSPI)` → `SyncStocks(KOSDAQ)` | Stock |
+
+### Trading Day Chain
+
+![Trading batch sequence](docs/batch/assets/batch-trading-sequence.svg)
+
+Trading 관련 Batch는 예약·주문 상태를 직접 변경하지 않습니다.  
+Batch는 정해진 시간에 Trading 또는 Stock의 상태 변경 RPC를 호출하고, 실제 DB 변경과 Outbox 기록은 호출받은 서비스의 transaction에서 처리됩니다.
+
+```mermaid
+sequenceDiagram
+    participant B as Candle Batch
+    participant T as Trading Service
+    participant S as Stock Service
+    participant DB as Domain DB / Outbox
+
+    B->>T: 08:30 ProcessPrevCloseReservations
+    T->>DB: 예약 처리 + Outbox
+    B->>T: 09:00 ProcessOpenLimitReservations
+    T->>DB: 예약 → 주문 전환 + Outbox
+    B->>T: 15:30 ExpirePendingOrders
+    T->>DB: 미체결 주문 만료
+    B->>T: ListStaleConvertingReservations / Fail...
+    T->>DB: stale 예약 실패 처리
+    B->>S: 15:40 CloseDailyCandles
+    S->>DB: 일봉 확정 + Outbox
+    B->>T: ProcessTodayCloseReservations
+    T->>DB: 종가 예약 처리 + Outbox
+    B->>T: ListExpirableReservations / Expire...
+    T->>DB: 잔여 예약 만료
+```
+
+### Portfolio EOD → Ranking Finalize
+
+![Portfolio EOD ranking sequence](docs/batch/assets/batch-eod-ranking-sequence.svg)
+
+Portfolio EOD는 활성 보유자를 페이지로 읽고, 종목별 확정 종가와 사용자별 현금을 모아 일별 스냅샷을 저장합니다.  
+Ranking은 같은 거래일의 `portfolioEodSnapshotJob`이 `COMPLETED`인 경우에만 실행됩니다.
+
+| Step | Batch Action | Data Owner |
+|---|---|---|
+| 1 | `ListActiveHolders(page)`로 활성 보유자 조회 | Portfolio |
+| 2 | `GetPreviousClose(code)`로 확정 종가 조회 | Stock |
+| 3 | `GetBalance(user_id)`로 현금 잔고 조회 | Trading |
+| 4 | `stock_value`, `total_asset` 계산 후 `RecordDailySnapshot` 호출 | Portfolio |
+| 5 | Batch metadata에서 EOD 완료 여부 확인 | Batch |
+| 6 | `FinalizeDailyRanking(rankingDate)` 호출 | Ranking |
+
+### Stock Master Sync
+
+![Stock sync sequence](docs/batch/assets/batch-stock-sync-sequence.svg)
+
+Stock Sync는 Batch가 시장 순서만 지정하고, Kiwoom 통신·응답 파싱·`stocks` upsert는 Stock Service가 전부 담당합니다.
+
+```text
+Batch stockSyncJob
+  -> StockService.SyncStocks(KOSPI)
+  -> StockService.SyncStocks(KOSDAQ)
+  -> Stock Service가 Kiwoom 조회와 stocks upsert 수행
+```
+
+### Service Impact & Failure Containment
+
+![Batch service impact](docs/batch/assets/batch-service-impact.svg)
+
+| Failure Point | Protected Behavior | Recovery |
+|---|---|---|
+| gRPC 연결 실패 | Step이 `FAILED`로 기록되고 성공으로 위장하지 않음 | 대상 서비스 복구 후 같은 날짜로 재시작 |
+| Trading 선행 Job 실패 | 후속 stale/expire Job 미실행 | 선행 Job 성공 후 후속 Job 실행 |
+| Stock 일봉 마감 실패 | 종가 예약 처리와 EOD 평가 기준 생성 차단 | `tradingTodayCloseJob` 재실행 |
+| Portfolio EOD 미완료 | Ranking RPC를 호출하지 않음 | EOD 복구 후 Ranking 재실행 |
+| Ranking transaction 실패 | 랭킹·Outbox·멱등성 레코드 함께 rollback | 같은 `rankingDate`와 동일 key로 재시작 |
+| Redis 장애 | Ranking DB 원본은 유지 | DB fallback 또는 캐시 복구 |
+| Kiwoom 장애 | 다른 일일 Job과 서비스 DB에 영향 없음 | 인증/응답 복구 후 `stockSyncJob` 재실행 |
+
+### Engineering Points
+
+| Point | Description |
+|---|---|
+| Single Batch Instance | 현재 운영 전제는 Batch replica 1개 |
+| Service-Owned Transaction | Batch transaction은 원격 서비스 transaction을 대체하지 않음 |
+| Deterministic Idempotency Key | `businessDate` / `rankingDate` 기준으로 같은 의미의 요청은 같은 key 사용 |
+| Completion Guard | Ranking은 같은 날짜 Portfolio EOD 완료 여부를 먼저 확인 |
+| Safe Restart | 실패 Job은 같은 날짜 parameter로 실패 지점부터 재시작 |
+| No Direct DB Mutation | Batch는 Trading/Stock/Portfolio/Ranking DB를 직접 수정하지 않음 |
+| Outbox Boundary | 이벤트 발행과 중복 소비는 도메인 서비스의 Outbox/Consumer 정책을 따름 |
 
 <div align="right">
 
