@@ -153,7 +153,7 @@ Docs
 <tr>
 <td align="center" width="180px">
 
-### 📈 은서
+### 📈 박은서
 
 </td>
 <td>
