@@ -20,6 +20,14 @@
 <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white"/>
 <img src="https://img.shields.io/badge/Spring_Batch-6DB33F?style=for-the-badge"/>
 <img src="https://img.shields.io/badge/Docusaurus-3ECC5F?style=for-the-badge&logo=docusaurus&logoColor=white"/>
+<br/>
+<img src="https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white"/>
+<img src="https://img.shields.io/badge/EKS-FF9900?style=for-the-badge&logo=amazoneks&logoColor=white"/>
+<img src="https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white"/>
+<img src="https://img.shields.io/badge/Istio-466BB0?style=for-the-badge&logo=istio&logoColor=white"/>
+<img src="https://img.shields.io/badge/Terraform-844FBA?style=for-the-badge&logo=terraform&logoColor=white"/>
+<img src="https://img.shields.io/badge/Argo_CD-EF7B4D?style=for-the-badge&logo=argo&logoColor=white"/>
+<img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white"/>
 
 <br/><br/>
 
@@ -83,6 +91,7 @@ Docs
 
 - [👨‍💻 Team & Contributions](#-team--contributions)
 - [💡 Project Overview](#-project-overview)
+- [🛠 Tech Stack](#-tech-stack)
 - [🧭 Domain Grouping Strategy](#-domain-grouping-strategy)
 - [🏛 System Architecture](#-system-architecture)
 - [📈 Investment Core Flow](#-investment-core-flow)
@@ -238,6 +247,150 @@ Candle은 실제 증권 서비스처럼 **시세·주문·체결·자산·랭킹
 | 체결 이후 자산/랭킹/알림은 후속 반영이 필요함 | Kafka 이벤트 기반 최종 일관성 |
 | 일일 마감·랭킹 확정은 API 서버와 성격이 다름 | 독립 Spring Batch 애플리케이션 |
 | 서비스가 많아지면 DB 직접 참조가 위험함 | Service-Owned Data, gRPC 계약, FK 금지 |
+
+<div align="right">
+
+[🔝 Back to Top](#top)
+
+</div>
+
+---
+
+
+# 🛠 Tech Stack
+
+Candle은 **Spring Boot 기반 MSA 애플리케이션**과 **AWS EKS 기반 운영 인프라**를 분리해서 설계했습니다.  
+애플리케이션 코드는 서비스별 책임을 나누고, 인프라는 Terraform과 ArgoCD로 재현 가능하게 관리합니다.
+
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="260">
+
+### 🧱 Backend
+
+Java 21  
+Spring Boot 4.1  
+Spring Batch  
+Spring Data JPA  
+Flyway
+
+</td>
+<td align="center" width="260">
+
+### 🔗 Communication
+
+gRPC / Protobuf  
+REST  
+WebSocket  
+Kafka Event  
+Redis Pub/Sub
+
+</td>
+<td align="center" width="260">
+
+### ☁️ Cloud Native
+
+AWS  
+EKS  
+Kubernetes  
+Istio  
+Terraform
+
+</td>
+<td align="center" width="260">
+
+### 🚀 Delivery
+
+GitHub Actions  
+ECR  
+ArgoCD  
+Rolling Update  
+HPA
+
+</td>
+</tr>
+</table>
+
+</div>
+
+## Application Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| Language | `Java 21` | 전체 백엔드 서비스 개발 언어 |
+| Framework | `Spring Boot 4.1` | 마이크로서비스 애플리케이션 기반 |
+| Batch | `Spring Batch` | EOD 스냅샷, 랭킹 확정, 종목 동기화, Trading 일중 작업 |
+| Persistence | `Spring Data JPA`, `Flyway` | 서비스별 schema 소유, migration 기반 DB 변경 관리 |
+| API Contract | `gRPC`, `Protocol Buffers` | 서비스 간 동기 호출 계약 |
+| External API | `REST Client` | Kiwoom, Naver News, Firebase 등 외부 연동 |
+| Real-time | `WebSocket`, `Redis Pub/Sub` | 채팅, 실시간 시세 전달 |
+
+## Data & Messaging Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| Main DB | `RDS PostgreSQL` | Auth, User, Trading, Portfolio, Ranking 등 서비스 데이터 저장 |
+| Time-series / Market Data | `TimescaleDB` | 시세성 데이터 저장 확장 영역 |
+| Cache | `Redis / ElastiCache` | 랭킹 캐시, 시세 캐시, Pub/Sub, 실시간 데이터 처리 |
+| Event Backbone | `Kafka / MSK` | 서비스 간 비동기 이벤트 전달 |
+| Outbox | `Transactional Outbox`, `Debezium / CDC` | DB commit 이후 이벤트 유실 방지 |
+| Object Storage | `S3` | 프론트 정적 파일과 배포 산출물 저장 |
+
+## Infrastructure Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| Network | `VPC`, `Public Subnet`, `Private Subnet`, `Database Subnet`, `NAT Gateway` | 외부 진입, 서비스 실행, 데이터 계층 분리 |
+| Edge | `CloudFront`, `WAF`, `Route53`, `ACM` | 정적 웹 배포, HTTPS, 도메인, 보안 필터링 |
+| Ingress | `ALB`, `Load Balancer`, `Istio Ingress Gateway` | 외부 요청을 EKS 내부 서비스로 라우팅 |
+| Container Runtime | `EKS`, `Kubernetes`, `Pod`, `Deployment`, `Service`, `CronJob` | 서비스와 배치 컨테이너 운영 |
+| Image Registry | `ECR` | GitHub Actions가 빌드한 Docker image 저장 |
+| IaC | `Terraform` | VPC, EKS, RDS, ECR, IAM 등 AWS 리소스 코드화 |
+| GitOps | `ArgoCD`, `App-of-Apps`, `ApplicationSet` | Git 기준 Kubernetes 배포 상태 동기화 |
+
+## Security & Traffic Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| Service Mesh | `Istio`, `Envoy Sidecar` | 서비스 간 트래픽 제어, 관측, 보안 정책 적용 |
+| Encryption | `mTLS` | EKS 내부 서비스 간 쌍방향 인증과 암호화 |
+| Secret Management | `AWS Secrets Manager`, `ESO` | AWS secret을 Kubernetes Secret으로 동기화 |
+| AWS Permission | `IAM`, `IRSA`, `OIDC` | Pod와 GitHub Actions에 최소 권한 부여 |
+| Scaling | `HPA` | CPU/트래픽 기준 Pod 자동 확장 |
+| Deployment Strategy | `Rolling Update` | Pod를 하나씩 교체하는 무중단 배포 방식 |
+
+## Observability Stack
+
+| Area | Tech | Usage |
+|---|---|---|
+| AWS Logs / Metrics | `CloudWatch` | AWS 리소스 로그와 지표 확인 |
+| Metrics | `Prometheus` | Spring Boot actuator와 Envoy metric 수집 |
+| Dashboard | `Grafana` | 서비스 상태, JVM, 네트워크, 인프라 지표 시각화 |
+| Logs | `Loki` | Pod stdout 로그 중앙 수집과 검색 |
+| Tracing | `Jaeger` | 사용자 요청이 여러 서비스를 거치는 경로 추적 |
+
+```mermaid
+flowchart LR
+    Code["👩‍💻 Developer Code"] --> CI["GitHub Actions<br/>build · test · docker build"]
+    CI --> ECR["Amazon ECR<br/>container image registry"]
+    CI --> S3["S3<br/>static web artifacts"]
+    S3 --> CF["CloudFront<br/>web CDN"]
+
+    GitOps["candle-k8s Git Repo"] --> Argo["ArgoCD<br/>GitOps sync"]
+    ECR --> Argo
+    Argo --> EKS["EKS / Kubernetes<br/>Rolling Update"]
+
+    EKS --> Istio["Istio + Envoy Sidecar<br/>mTLS · traffic control"]
+    EKS --> HPA["HPA<br/>auto scaling"]
+    EKS --> RDS["RDS PostgreSQL"]
+    EKS --> Redis["ElastiCache Redis"]
+    EKS --> Kafka["MSK Kafka"]
+    EKS --> ESO["External Secrets Operator"]
+    ESO --> Secrets["AWS Secrets Manager"]
+    EKS --> CW["CloudWatch"]
+```
 
 <div align="right">
 
