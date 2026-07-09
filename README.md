@@ -125,33 +125,116 @@ Docs
 
 # 👨‍💻 Team & Contributions
 
+<div align="center">
+
+### 🌟 Candle Team
+
+서비스별 책임을 명확히 나누고, 각 도메인의 데이터·계약·운영 경계를 팀원이 직접 소유했습니다.
+
+<br/>
+
 <table>
 <tr>
-<td align="center" width="180px">
-
-### 🐣 박유빈
-
+<td align="center" width="170">
+<a href="https://github.com/yyubin">
+<img src="https://avatars.githubusercontent.com/yyubin" width="115px" style="border-radius:50%;" alt="박유빈 GitHub Profile"/>
+</a>
+<br/>
+<strong>🐣 박유빈</strong>
+<br/>
+<a href="https://github.com/yyubin"><sub><b>@yyubin</b></sub></a>
+<br/><br/>
+<img src="https://img.shields.io/badge/User/Auth-ff7e47?style=flat-square"/>
+<img src="https://img.shields.io/badge/Infra-00b4d8?style=flat-square"/>
 </td>
-<td>
 
-### 🔐 User · Auth · Chatting · Stock · Wishlist · Portfolio · Infra
+<td align="center" width="170">
+<a href="https://github.com/chan-nni">
+<img src="https://avatars.githubusercontent.com/chan-nni" width="115px" style="border-radius:50%;" alt="강찬미 GitHub Profile"/>
+</a>
+<br/>
+<strong>🕯️ 강찬미</strong>
+<br/>
+<a href="https://github.com/chan-nni"><sub><b>@chan-nni</b></sub></a>
+<br/><br/>
+<img src="https://img.shields.io/badge/Batch-F4C95D?style=flat-square"/>
+<img src="https://img.shields.io/badge/Ranking-B794F4?style=flat-square"/>
+</td>
+
+<td align="center" width="170">
+<a href="https://github.com/dmstj0162">
+<img src="https://avatars.githubusercontent.com/dmstj0162" width="115px" style="border-radius:50%;" alt="박은서 GitHub Profile"/>
+</a>
+<br/>
+<strong>📈 박은서</strong>
+<br/>
+<a href="https://github.com/dmstj0162"><sub><b>@dmstj0162</b></sub></a>
+<br/><br/>
+<img src="https://img.shields.io/badge/Market-22C997?style=flat-square"/>
+<img src="https://img.shields.io/badge/Kiwoom-4DA3FF?style=flat-square"/>
+</td>
+</tr>
+
+<tr>
+<td align="center" width="170">
+<a href="https://github.com/qkdrn2341">
+<img src="https://avatars.githubusercontent.com/qkdrn2341" width="115px" style="border-radius:50%;" alt="신예은 GitHub Profile"/>
+</a>
+<br/>
+<strong>📰 신예은</strong>
+<br/>
+<a href="https://github.com/qkdrn2341"><sub><b>@qkdrn2341</b></sub></a>
+<br/><br/>
+<img src="https://img.shields.io/badge/News-FF9F43?style=flat-square"/>
+<img src="https://img.shields.io/badge/Notification-DC382D?style=flat-square"/>
+</td>
+
+<td align="center" width="170">
+<a href="https://github.com/ironhamlab">
+<img src="https://avatars.githubusercontent.com/ironhamlab" width="115px" style="border-radius:50%;" alt="김서원 GitHub Profile"/>
+</a>
+<br/>
+<strong>💸 김서원</strong>
+<br/>
+<a href="https://github.com/ironhamlab"><sub><b>@ironhamlab</b></sub></a>
+<br/><br/>
+<img src="https://img.shields.io/badge/Trading-FF7A70?style=flat-square"/>
+<img src="https://img.shields.io/badge/Order/Reservation-4A2028?style=flat-square"/>
+</td>
+
+<td align="center" width="170">
+<a href="https://github.com/chl31031">
+<img src="https://avatars.githubusercontent.com/chl31031" width="115px" style="border-radius:50%;" alt="조한림 GitHub Profile"/>
+</a>
+<br/>
+<strong>📚 조한림</strong>
+<br/>
+<a href="https://github.com/chl31031"><sub><b>@chl31031</b></sub></a>
+<br/><br/>
+<img src="https://img.shields.io/badge/Learning-3ECC5F?style=flat-square"/>
+<img src="https://img.shields.io/badge/Education-244c5a?style=flat-square"/>
+</td>
+</tr>
+</table>
+
+</div>
+
+<br/>
+
+<table>
+<tr>
+<td width="50%">
+
+### 🐣 박유빈 · User/Auth/Chatting/Stock <br> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Wishlist/Portfolio/Infra
 
 - 인증/사용자 기반 흐름 담당
 - 종목 기준정보, 관심 종목, 보유 자산 조회 흐름 담당
 - 실시간 채팅 및 배포 인프라 구성 담당
 
 </td>
-</tr>
+<td width="50%">
 
-<tr>
-<td align="center" width="180px">
-
-### 🕯️ 강찬미
-
-</td>
-<td>
-
-### ⚙️ Batch · Ranking
+### 🕯️ 강찬미 · Batch/Ranking
 
 - Spring Batch 기반 운영 Job 설계
 - Portfolio EOD 이후 Ranking 확정 흐름 구현
@@ -161,30 +244,17 @@ Docs
 </tr>
 
 <tr>
-<td align="center" width="180px">
+<td width="50%">
 
-### 📈 박은서
-
-</td>
-<td>
-
-### 📊 Market
+### 📈 박은서 · Market
 
 - 실시간 시세, 시장 랭킹, 장 상태 흐름 담당
 - Kiwoom API 연동 및 Redis 캐시 기반 조회 구조 담당
 
 </td>
-</tr>
+<td width="50%">
 
-<tr>
-<td align="center" width="180px">
-
-### 📰 신예은
-
-</td>
-<td>
-
-### 🗞 News · Notification
+### 📰 신예은 · News/Notification
 
 - 종목별 뉴스 수집 및 조회 기능 담당
 - 알림 생성/발송/읽음 처리 흐름 담당
@@ -193,30 +263,17 @@ Docs
 </tr>
 
 <tr>
-<td align="center" width="180px">
+<td width="50%">
 
-### 💸 김서원
-
-</td>
-<td>
-
-### 💳 Trading
+### 💸 김서원 · Trading
 
 - 계좌, 즉시 주문, 예약 주문, 체결 도메인 담당
 - 멱등성, Outbox, 수수료/거래세, 예약→주문 전환 흐름 담당
 
 </td>
-</tr>
+<td width="50%">
 
-<tr>
-<td align="center" width="180px">
-
-### 📚 조한림
-
-</td>
-<td>
-
-### 🎓 Learning
+### 📚 조한림 · Learning
 
 - 학습 콘텐츠, 퀴즈, 진도 관리 담당
 - 투자 교육 경험과 사용자 학습 흐름 담당
