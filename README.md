@@ -225,7 +225,7 @@ Docs
 <tr>
 <td width="50%">
 
-### 🐣 박유빈 · User/Auth/Chatting/Stock <br> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Wishlist/Portfolio/Infra
+### 🐣 박유빈 · User/Auth/Chatting/Stock <br> Wishlist/Portfolio/Infra
 
 - 인증/사용자 기반 흐름 담당
 - 종목 기준정보, 관심 종목, 보유 자산 조회 흐름 담당
