@@ -9,7 +9,6 @@ import org.profit.candle.market.dto.message.MarketQuoteMessage;
 import org.profit.candle.market.dto.message.StockPriceMessage;
 import org.profit.candle.market.entity.Tick;
 import org.profit.candle.market.publisher.MarketQuotePublisher;
-import org.profit.candle.market.publisher.MarketPriceEventPublisher;
 import org.profit.candle.market.publisher.StockPricePublisher;
 import org.profit.candle.market.repository.TickRepository;
 import org.profit.candle.market.session.MarketSession;
@@ -52,7 +51,6 @@ public class KiwoomWebSocketClient implements RealtimeSubscriptionPort {
     private final KiwoomAuthClient kiwoomAuthClient;
     private final StockPricePublisher stockPricePublisher;
     private final MarketQuotePublisher marketQuotePublisher;
-    private final MarketPriceEventPublisher marketPriceEventPublisher;
     private final MarketSession marketSession;
     private final TickRepository tickRepository;
     private final LiveQuoteSink liveQuoteSink;
@@ -308,8 +306,6 @@ public class KiwoomWebSocketClient implements RealtimeSubscriptionPort {
                     tickedAt
             ));
 
-            // trading-service 지정가/시가예약 체결용 Kafka 이벤트.
-            marketPriceEventPublisher.publish(stockCode, currentPrice);
 
             // 종목 상세 뷰어 팬아웃 (gRPC StreamQuotes)
             liveQuoteSink.publish(new LiveQuote(
