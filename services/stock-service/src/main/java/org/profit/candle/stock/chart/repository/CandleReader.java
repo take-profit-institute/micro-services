@@ -19,4 +19,10 @@ public interface CandleReader {
 
     /** 특정 주기·시각의 아직 확정되지 않은(closed=false) 캔들들. EOD 마감 대상. */
     List<CandleEntity> findOpenAt(String interval, Instant openTime);
+
+    /**
+     * 특정 주기·시각의 캔들 종가 전체(closed 여부 무관). 마감 이벤트 발행 대상이다.
+     * closed 로 거르지 않는 이유는 {@code DefaultDailyCloseService} 주석 참고.
+     */
+    List<CandleClose> findClosesAt(String interval, Instant openTime);
 }

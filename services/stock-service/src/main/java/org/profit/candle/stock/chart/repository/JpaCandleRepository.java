@@ -4,6 +4,7 @@ import org.profit.candle.stock.chart.entity.CandleEntity;
 import org.profit.candle.stock.chart.entity.CandleId;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -81,6 +82,28 @@ public interface JpaCandleRepository extends JpaRepository<CandleEntity, CandleI
               AND c.closed = false
             """)
     List<CandleEntity> findOpenAt(@Param("interval") String interval, @Param("openTime") Instant openTime);
+
+    // 엔티티가 아닌 projection 으로 받는다 — 마감 이벤트 발행에 종목코드/종가 외에는 필요 없고,
+    // 전 종목(수천 건)을 영속성 컨텍스트에 올리면 뒤따르는 outbox insert 마다 dirty checking 이 돈다.
+    @Override
+    @Query("""
+            SELECT new org.profit.candle.stock.chart.repository.CandleClose(c.id.stockCode, c.close)
+            FROM CandleEntity c
+            WHERE c.id.interval = :interval
+              AND c.id.openTime = :openTime
+            ORDER BY c.id.stockCode ASC
+            """)
+    List<CandleClose> findClosesAt(@Param("interval") String interval, @Param("openTime") Instant openTime);
+
+    @Override
+    @Modifying(clearAutomatically = true)
+    @Query("""
+            UPDATE CandleEntity c SET c.closed = true
+            WHERE c.id.interval = :interval
+              AND c.id.openTime = :openTime
+              AND c.closed = false
+            """)
+    int markClosedAt(@Param("interval") String interval, @Param("openTime") Instant openTime);
 
     // 집계는 그룹이 없어 항상 한 행을 돌려준다(데이터 없으면 high/low = NULL). JPQL 도 되지만
     // 종목별 인덱스(stock_code, interval, open_time)를 그대로 타도록 native 로 둔다.

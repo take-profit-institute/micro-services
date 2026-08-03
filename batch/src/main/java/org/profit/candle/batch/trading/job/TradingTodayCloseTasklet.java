@@ -44,8 +44,9 @@ public class TradingTodayCloseTasklet implements Tasklet {
         int processedCount = retryExecutor.execute(
                 () -> tradingBatchClient.processTodayCloseReservations(businessDate)
         );
+        // closedCloseEvents 는 "새로 기록한" 종가 이벤트 수라 재실행 시 0 이 정상이다(멱등).
         log.info(
-                "[Trading Today Close] businessDate={}, closedCandles={}, processedReservations={}",
+                "[Trading Today Close] businessDate={}, closedCloseEvents={}, processedReservations={}",
                 businessDate,
                 closedCount,
                 processedCount

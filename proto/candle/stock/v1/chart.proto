@@ -69,7 +69,9 @@ message CloseDailyCandlesRequest {
 }
 
 message CloseDailyCandlesResponse {
-  int32 closed_count = 1;      // 이번 호출에서 새로 확정한 캔들 수
+  // 이번 호출에서 새로 기록한 종가 이벤트 수. 재실행 시 이미 기록된 종목은 세지 않으므로
+  // 정상 재실행에서는 0 이 나올 수 있다(멱등).
+  int32 closed_count = 1;
 }
 
 // 리스트 화면(관심종목/랭킹)의 미니 차트용 경량 조회. GetCandles 를 종목마다 부르는 대신
