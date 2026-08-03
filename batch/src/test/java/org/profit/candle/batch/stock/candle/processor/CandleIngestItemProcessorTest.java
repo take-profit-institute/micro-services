@@ -1,9 +1,11 @@
 package org.profit.candle.batch.stock.candle.processor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -22,7 +24,12 @@ class CandleIngestItemProcessorTest {
     @Mock CandleBackfillClient backfillClient;
 
     private CandleIngestItemProcessor processor() {
-        return new CandleIngestItemProcessor(backfillClient, new StockCandleRetryExecutor(), CANDLE_COUNT);
+        // 백오프 없이 재시도 횟수만 검증한다.
+        return new CandleIngestItemProcessor(
+                backfillClient,
+                new StockCandleRetryExecutor(Duration.ZERO),
+                CANDLE_COUNT
+        );
     }
 
     @Test
@@ -58,6 +65,18 @@ class CandleIngestItemProcessorTest {
         CandleIngestResult result = processor().process("000003");
 
         assertThat(result.failed()).isTrue();
-        verify(backfillClient, org.mockito.Mockito.times(3)).backfillDaily("000003", CANDLE_COUNT);
+        verify(backfillClient, times(3)).backfillDaily("000003", CANDLE_COUNT);
+    }
+
+    @Test
+    void process_doesNotRetryKiwoomRateLimit() {
+        when(backfillClient.backfillDaily("000004", CANDLE_COUNT))
+                .thenThrow(new StockCandleException(StockCandleErrorCode.EXTERNAL_RATE_LIMITED, null));
+
+        CandleIngestResult result = processor().process("000004");
+
+        // stock-service가 이미 429 백오프를 소진한 뒤라 여기서 또 때리면 예산만 태운다.
+        assertThat(result.failed()).isTrue();
+        verify(backfillClient, times(1)).backfillDaily("000004", CANDLE_COUNT);
     }
 }

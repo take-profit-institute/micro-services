@@ -80,9 +80,15 @@ public class GrpcCandleBackfillClient implements CandleBackfillClient {
 
     private StockCandleException mapException(StatusRuntimeException exception) {
         Status.Code code = exception.getStatus().getCode();
+        if (code == Status.Code.RESOURCE_EXHAUSTED) {
+            // stock-service가 키움 429에 대해 이미 지수 백오프 재시도를 소진한 뒤 돌려주는 신호다
+            // (KIWOOM_RATE_LIMITED). 여기서 또 재시도하면 초당 몇 건뿐인 키움 예산을 태우고
+            // 429를 재생산할 뿐이다. 이 종목은 실패로 넘기고, 다음 실행이 리더의
+            // filterMissingDailyCandles로 아직 안 채워진 종목만 골라 담는다.
+            return new StockCandleException(StockCandleErrorCode.EXTERNAL_RATE_LIMITED, exception);
+        }
         boolean retryable = code == Status.Code.UNAVAILABLE
                 || code == Status.Code.DEADLINE_EXCEEDED
-                || code == Status.Code.RESOURCE_EXHAUSTED
                 || code == Status.Code.ABORTED
                 || code == Status.Code.INTERNAL;
         StockCandleErrorCode errorCode = retryable

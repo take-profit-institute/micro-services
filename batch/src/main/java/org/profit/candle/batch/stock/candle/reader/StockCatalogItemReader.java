@@ -15,13 +15,19 @@ import org.springframework.batch.infrastructure.item.ItemStreamReader;
 
 /**
  * SearchStocks(LISTED)를 page 단위로 훑어 종목코드를 하나씩 방출한다.
- * ExecutionContext에 page/index/finished를 저장해 재시작(restart)에 안전하다.
+ *
+ * <p>이 리더는 멀티스레드 스텝({@code step.taskExecutor})에서 쓰인다. 멀티스레드 스텝은 워커
+ * 스레드마다 자기 청크 루프를 돌리므로 {@code read()} 가 여러 스레드에서 <b>동시에</b> 호출된다.
+ * 커서(page/index/current)는 반드시 동기화되어야 한다 — 그렇지 않으면 같은 페이지를 중복 조회하거나
+ * ({@code index++} 경합) 종목이 누락/중복되고, 최악엔 IndexOutOfBounds 로 스텝이 죽는다.
+ *
+ * <p>커서를 ExecutionContext 에 저장하지 않는다(= saveState=false 규약). 멀티스레드 스텝에서
+ * 저장된 커서는 "여기까지 커밋됐다"를 뜻하지 않는다 — 워커 A가 150번째까지 읽고 커밋하는 동안
+ * 워커 B는 아직 50~100번을 처리 중일 수 있어, 그 커서로 재시작하면 종목이 통째로 누락된다.
+ * 대신 재시작은 {@link #filterMissingDailyCandles} 가 이미 일봉이 적재된 종목을 걸러내므로
+ * 커서 없이도 데이터 수준에서 이어받는다(처음부터 훑되 남은 종목만 처리).
  */
 public class StockCatalogItemReader implements ItemStreamReader<String> {
-
-    private static final String PAGE_KEY = "stockCandle.page";
-    private static final String INDEX_KEY = "stockCandle.index";
-    private static final String FINISHED_KEY = "stockCandle.finished";
 
     private final StockCatalogClient catalogClient;
     private final CandleBackfillClient candleClient;
@@ -50,8 +56,10 @@ public class StockCatalogItemReader implements ItemStreamReader<String> {
         this.targetOpenTime = resolveTargetOpenTime(businessDate, zoneId);
     }
 
+    // 워커 스레드들이 동시에 호출한다. 페이지 조회(gRPC)가 락 안에서 일어나지만 100종목당 1회뿐이라
+    // 병렬 백필의 처리량에는 영향이 없다.
     @Override
-    public String read() {
+    public synchronized String read() {
         while (!finished) {
             if (current == null) {
                 int requestedPage = page;
@@ -78,18 +86,16 @@ public class StockCatalogItemReader implements ItemStreamReader<String> {
         return null;
     }
 
+    /** 커서를 복원하지 않는다 — 클래스 주석 참고. 항상 첫 페이지부터 훑고 필터가 남은 종목만 남긴다. */
     @Override
     public void open(ExecutionContext executionContext) {
-        page = executionContext.getInt(PAGE_KEY, 0);
-        index = executionContext.getInt(INDEX_KEY, 0);
-        finished = executionContext.getInt(FINISHED_KEY, 0) == 1;
+        // no-op
     }
 
+    /** 커서를 저장하지 않는다(saveState=false) — 멀티스레드 스텝에서 커서 재시작은 종목 누락을 만든다. */
     @Override
     public void update(ExecutionContext executionContext) {
-        executionContext.putInt(PAGE_KEY, page);
-        executionContext.putInt(INDEX_KEY, index);
-        executionContext.putInt(FINISHED_KEY, finished ? 1 : 0);
+        // no-op
     }
 
     private List<String> filterMissingDailyCandles(List<String> codes) {

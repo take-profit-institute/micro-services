@@ -72,8 +72,10 @@ public class StockCandleIngestJobConfiguration {
                 .reader(reader)
                 .processor(processor)
                 .writer(writer)
-                // (a) 청크 내 종목별 키움 백필 콜을 executor로 병렬 처리 — 동시성=풀 크기.
-                // 리더는 청크당 단일 스레드로 읽히므로 별도 동기화가 필요 없다(재시작도 안전).
+                // (a) 멀티스레드 스텝 — 워커 스레드마다 자기 청크를 돌린다(동시성=풀 크기).
+                // 아이템 단위 병렬이 아니라 청크 단위 병렬이며, read()는 워커들이 동시에 호출하므로
+                // 리더가 내부에서 동기화한다. 커서 재시작은 불가라 리더가 상태를 저장하지 않는다
+                // (재실행 시 이미 적재된 종목은 리더의 filterMissingDailyCandles가 걸러낸다).
                 .taskExecutor(stepTaskExecutor)
                 // (c) 종목 단위 백필 실패는 processor가 예외 대신 실패 결과로 흘려보내고 writer가 상한을 판정한다
                 // (예외로 던지면 청크 롤백 후 1건씩 재실행되며 청크 전체의 키움 호출이 통째로 반복된다).
