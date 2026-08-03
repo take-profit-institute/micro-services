@@ -2205,7 +2205,7 @@ npm run start
 | Overview | `README.md`, `ARCHITECTURE.md`, `COMMUNICATION.md`, `TROUBLESHOOTING.md` |
 | Investment Core | `market-service.md`, `STOCK_SERVICE.md`, `TRADING_SERVICE.md`, `PORTFOLIO_SERVICE.md`, `RANKING_SERVICE.md`, `WISHLIST_SERVICE.md`, `NEWS_SERVICE.md` |
 | Experience Platform | `AUTH_SERVICE.md`, `USER_SERVICE.md`, `learning-service-guide.md`, `CHATTING_SERVICE.md`, `NOTIFICATION_SERVICE.md` |
-| Operation Layer | `BATCH_ARCHITECTURE.md`, `TRADING_BATCH.md`, `PORTFOLIO_EOD_BATCH.md`, `RANKING_BATCH.md`, `STOCK_SYNC_BATCH.md`, `BATCH_MANUAL_OPERATION.md` |
+| Operation Layer | `BATCH_ARCHITECTURE.md`, `TRADING_BATCH.md`, `PORTFOLIO_EOD_BATCH.md`, `RANKING_BATCH.md`, `STOCK_SYNC_BATCH.md`, `STOCK_CANDLE_INGEST.md`, `BATCH_MANUAL_OPERATION.md` |
 | Infra | `DEPLOYMENT.md`, `CI_CD.md`, `LOCAL_ENVIRONMENT.md` |
 
 <div align="right">

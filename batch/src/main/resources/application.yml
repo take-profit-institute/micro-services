@@ -49,7 +49,8 @@ spring:
 batch:
   ranking:
     enabled: ${BATCH_RANKING_ENABLED:false}
-    cron: "${BATCH_RANKING_CRON:0 20 16 * * MON-FRI}"
+    # portfolio-eod(16:20) 완료 후. 실행 시점에 PortfolioEodCompletionGuard가 완료 여부를 한 번 더 확인한다.
+    cron: "${BATCH_RANKING_CRON:0 40 16 * * MON-FRI}"
     grpc-target: ranking
     deadline-millis: ${BATCH_RANKING_DEADLINE_MILLIS:120000}
   schedule:
@@ -57,19 +58,27 @@ batch:
     smoke:
       enabled: ${BATCH_SMOKE_ENABLED:true}
       cron: "${BATCH_SMOKE_CRON:0 */1 * * * *}"
+    # EOD 스냅샷. stock-candle 적재(15:45~)가 끝난 뒤 돌아야 보유 종목 종가를 DB에서 읽는다.
+    # 앞서 돌면 종목마다 stock-service가 키움 on-demand 백필을 타 같은 rate limit 예산을 두 번 태운다.
     portfolio-eod:
       enabled: ${BATCH_PORTFOLIO_EOD_ENABLED:false}
-      cron: "${BATCH_PORTFOLIO_EOD_CRON:0 0 16 * * MON-FRI}"
+      cron: "${BATCH_PORTFOLIO_EOD_CRON:0 20 16 * * MON-FRI}"
       chunk-size: ${BATCH_PORTFOLIO_EOD_CHUNK_SIZE:100}
       symbol-batch-size: ${BATCH_PORTFOLIO_EOD_SYMBOL_BATCH_SIZE:500}
+    # 종목 마스터 싱크. 캔들 적재 리더가 SearchStocks(LISTED)로 이 테이블을 훑으므로 적재보다 먼저 돈다
+    # (뒤에 돌면 당일 신규 상장 종목의 일봉을 하루 늦게 적재하게 된다).
     stock-sync:
       enabled: ${BATCH_STOCK_SYNC_ENABLED:false}
-      cron: "${BATCH_STOCK_SYNC_CRON:0 30 16 * * MON-FRI}"
+      cron: "${BATCH_STOCK_SYNC_CRON:0 35 15 * * MON-FRI}"
     # 일봉 캔들 적재(백필). 마감 확정(today-close 22:10)/EOD 전에 그날 일봉을 stock-service에 적재.
-    # 데모 연장 마감(22:00) 직전 21:55에 돌려 마감 확정이 확정할 대상을 확보한다.
+    #
+    # 실 정규장 마감은 15:30(KST)이고 키움 일봉은 그 시점에 확정된다(CandleInterval.MARKET_CLOSE).
+    # 데모 세션이 22:00까지 열려 있어도 키움 일봉과는 무관하므로 마감 직후에 돌린다.
+    # 종목 수(≈2,800) / 키움 rate limit(3req/s) 때문에 정상 동작해도 최소 15분대가 걸린다.
+    # today-close(22:10)까지 6시간 이상을 확보해 재시도/재실행 여지를 둔다.
     stock-candle:
       enabled: ${BATCH_STOCK_CANDLE_INGEST_ENABLED:false}
-      cron: "${BATCH_STOCK_CANDLE_INGEST_CRON:0 55 21 * * MON-FRI}"
+      cron: "${BATCH_STOCK_CANDLE_INGEST_CRON:0 45 15 * * MON-FRI}"
       chunk-size: ${BATCH_STOCK_CANDLE_INGEST_CHUNK_SIZE:50}
       page-size: ${BATCH_STOCK_CANDLE_INGEST_PAGE_SIZE:100}
       candle-count: ${BATCH_STOCK_CANDLE_INGEST_CANDLE_COUNT:10}
