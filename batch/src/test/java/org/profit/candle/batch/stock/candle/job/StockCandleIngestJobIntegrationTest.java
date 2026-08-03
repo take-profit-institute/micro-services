@@ -9,7 +9,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.profit.candle.batch.portfolio.eod.client.SeedCapitalProvider;
@@ -30,7 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * 캔들 적재 잡의 (a) 청크 내 병렬 처리와 (c) 실패 종목 skip을 end-to-end로 검증한다.
+ * 캔들 적재 잡의 (a) 병렬 처리와 (c) 실패 종목 흡수를 end-to-end로 검증한다.
  * JobOperator는 테스트에서 동기지만(=BatchTestExecutorConfiguration), step 내부 executor는 여전히
  * 병렬로 돌기 때문에 동시성이 관측된다.
  */
@@ -73,6 +75,7 @@ class StockCandleIngestJobIntegrationTest {
 
     private final AtomicInteger inFlight = new AtomicInteger();
     private final AtomicInteger maxInFlight = new AtomicInteger();
+    private final Map<String, AtomicInteger> callsPerCode = new ConcurrentHashMap<>();
 
     @Autowired
     StockCandleIngestJobIntegrationTest(
@@ -98,6 +101,7 @@ class StockCandleIngestJobIntegrationTest {
 
         when(backfillClient.backfillDaily(anyString(), anyInt())).thenAnswer(invocation -> {
             String code = invocation.getArgument(0);
+            callsPerCode.computeIfAbsent(code, k -> new AtomicInteger()).incrementAndGet();
             int current = inFlight.incrementAndGet();
             maxInFlight.accumulateAndGet(current, Math::max);
             try {
@@ -120,11 +124,15 @@ class StockCandleIngestJobIntegrationTest {
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
 
         StepExecution step = execution.getStepExecutions().iterator().next();
-        // (c) 실패한 3종목은 skip으로 흡수된다.
-        assertThat(step.getSkipCount()).isEqualTo(FAILING.size());
-        // 성공 종목은 write까지 도달한다.
-        assertThat(step.getWriteCount()).isEqualTo(TOTAL - FAILING.size());
+        // (c) 실패 종목은 예외가 아니라 실패 결과로 흐르므로 skip/rollback이 발생하지 않는다.
+        assertThat(step.getSkipCount()).isZero();
+        assertThat(step.getRollbackCount()).isZero();
+        // 실패 종목까지 포함해 모든 종목이 write까지 도달한다(집계는 writer가 한다).
+        assertThat(step.getWriteCount()).isEqualTo(TOTAL);
         // (a) 청크 내 백필이 실제로 동시에 실행됐다(동기라면 최대 1).
         assertThat(maxInFlight.get()).isGreaterThan(1);
+        // 핵심: 실패가 있어도 청크 스캔이 일어나지 않아 종목당 키움 호출은 정확히 1회다.
+        assertThat(callsPerCode.keySet()).hasSize(TOTAL);
+        assertThat(callsPerCode.values()).allSatisfy(calls -> assertThat(calls.get()).isEqualTo(1));
     }
 }

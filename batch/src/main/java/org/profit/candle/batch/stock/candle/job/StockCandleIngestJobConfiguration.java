@@ -75,7 +75,9 @@ public class StockCandleIngestJobConfiguration {
                 // (a) 청크 내 종목별 키움 백필 콜을 executor로 병렬 처리 — 동시성=풀 크기.
                 // 리더는 청크당 단일 스레드로 읽히므로 별도 동기화가 필요 없다(재시작도 안전).
                 .taskExecutor(stepTaskExecutor)
-                // (c) 한 종목이 실패해도 잡 전체를 죽이지 않고 skip; 누적이 skipLimit을 넘으면 그때 FAILED.
+                // (c) 종목 단위 백필 실패는 processor가 예외 대신 실패 결과로 흘려보내고 writer가 상한을 판정한다
+                // (예외로 던지면 청크 롤백 후 1건씩 재실행되며 청크 전체의 키움 호출이 통째로 반복된다).
+                // 여기 skip은 카탈로그 페이지 read 실패 전용으로만 남는다 — read skip은 청크 스캔을 유발하지 않는다.
                 .faultTolerant()
                 .skip(StockCandleException.class)
                 .skipLimit(skipLimit)
@@ -128,8 +130,12 @@ public class StockCandleIngestJobConfiguration {
         return new CandleIngestItemProcessor(backfillClient, retryExecutor, candleCount);
     }
 
+    /** 실패 카운터를 들고 있어 스텝 스코프로 둔다 — 실행마다 0에서 다시 센다. */
     @Bean(name = WRITER)
-    public CandleIngestItemWriter stockCandleItemWriter() {
-        return new CandleIngestItemWriter();
+    @StepScope
+    public CandleIngestItemWriter stockCandleItemWriter(
+            @Value("${batch.schedule.stock-candle.failure-limit:200}") int failureLimit
+    ) {
+        return new CandleIngestItemWriter(failureLimit);
     }
 }
