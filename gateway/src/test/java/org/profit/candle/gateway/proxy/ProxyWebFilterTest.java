@@ -70,6 +70,24 @@ class ProxyWebFilterTest {
     }
 
     @Test
+    void isGatewayLocalPath_actuatorPathsAreNotProxied() {
+        // k8s probe가 쓰는 경로 — 프록시되면 bff로 넘어가 404가 된다.
+        assertThat(ProxyWebFilter.isGatewayLocalPath("/actuator/health")).isTrue();
+        assertThat(ProxyWebFilter.isGatewayLocalPath("/actuator")).isTrue();
+        assertThat(ProxyWebFilter.isGatewayLocalPath("/actuator/info")).isTrue();
+    }
+
+    @Test
+    void isGatewayLocalPath_applicationPathsAreProxied() {
+        assertThat(ProxyWebFilter.isGatewayLocalPath("/api/v1/auth/login")).isFalse();
+        assertThat(ProxyWebFilter.isGatewayLocalPath("/api/auth/me")).isFalse();
+        assertThat(ProxyWebFilter.isGatewayLocalPath("/chat/rooms/1")).isFalse();
+        assertThat(ProxyWebFilter.isGatewayLocalPath("/")).isFalse();
+        // 접두사만 같고 실제로는 애플리케이션 경로인 경우까지 가로채면 안 된다
+        assertThat(ProxyWebFilter.isGatewayLocalPath("/actuatorfoo")).isFalse();
+    }
+
+    @Test
     void copyResponseHeaders_excludesHopByHopHeaders() {
         HttpHeaders source = new HttpHeaders();
         source.add(HttpHeaders.CONTENT_TYPE, "application/json");

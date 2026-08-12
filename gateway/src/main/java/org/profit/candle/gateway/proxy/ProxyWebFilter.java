@@ -49,6 +49,13 @@ public class ProxyWebFilter implements WebFilter, Ordered {
         String path = request.getPath().value();
         String query = request.getURI().getRawQuery();
 
+        // 게이트웨이 자신이 처리해야 하는 경로는 업스트림으로 넘기지 않고 체인에 위임한다.
+        // 이 필터는 그 외 모든 요청을 프록시하므로, 위임이 없으면 액추에이터 핸들러까지 도달하지
+        // 못한다. /actuator/health가 bff로 프록시돼 404가 되고, k8s probe가 전부 실패한다.
+        if (isGatewayLocalPath(path)) {
+            return chain.filter(exchange);
+        }
+
         String targetBase;
         String targetPath;
         if (path.startsWith("/api/v1/auth/")) {
@@ -119,6 +126,14 @@ public class ProxyWebFilter implements WebFilter, Ordered {
             target.remove(name);
             target.addAll(name, copiedValues);
         });
+    }
+
+    /**
+     * 게이트웨이 로컬 엔드포인트(프록시 대상이 아님).
+     * 액추에이터는 k8s startup/liveness/readiness probe가 사용하므로 반드시 게이트웨이가 직접 응답해야 한다.
+     */
+    static boolean isGatewayLocalPath(String path) {
+        return path.equals("/actuator") || path.startsWith("/actuator/");
     }
 
     private static boolean isAuthServicePath(String path) {
