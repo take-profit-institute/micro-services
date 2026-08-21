@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.profit.candle.common.error.CandleException;
 import org.profit.candle.proto.user.v1.GetMeRequest;
 import org.profit.candle.proto.user.v1.GetMeResponse;
+import org.profit.candle.proto.user.v1.ListAdminUsersRequest;
+import org.profit.candle.proto.user.v1.ListAdminUsersResponse;
 import org.profit.candle.proto.user.v1.UpdateProfileRequest;
 import org.profit.candle.proto.user.v1.UpdateProfileResponse;
 import org.profit.candle.proto.user.v1.UserProfile;
@@ -16,7 +18,9 @@ import org.profit.candle.proto.common.v1.Audit;
 import org.profit.candle.user.idempotency.IdempotencyContext;
 import org.profit.candle.user.idempotency.IdempotencyExecutor;
 import org.profit.candle.user.profile.dto.UpdateProfileCommand;
+import org.profit.candle.user.profile.dto.UserPageResult;
 import org.profit.candle.user.profile.dto.UserProfileResult;
+import org.profit.candle.user.profile.dto.UserSearchQuery;
 import org.profit.candle.user.profile.exception.UserErrorCode;
 import org.profit.candle.user.profile.service.UserProfileService;
 import org.springframework.stereotype.Component;
@@ -56,6 +60,37 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
                         return UpdateProfileResponse.newBuilder().setProfile(toProto(result)).build();
                     });
             observer.onNext(response);
+            observer.onCompleted();
+        } catch (CandleException e) {
+            observer.onError(toGrpcStatus(e).asRuntimeException());
+        }
+    }
+
+    /**
+     * 관리자 콘솔 전용 회원 목록.
+     *
+     * <p>{@link #getMe}/{@link #updateProfile}와 달리 <b>actor 일치 검증을 하지 않는다</b> —
+     * 관리자는 정의상 남의 프로필을 본다. 인가는 BFF의 admin 라우트 가드(ADMIN|SUPER_ADMIN JWT)가
+     * 담당하며, 이 gRPC 포트는 클러스터 내부에만 열려 있다. learning-service의 ListAdminContents와
+     * 같은 신뢰 경계다. 이 RPC를 외부에 직접 노출하게 되면 여기에 role 검증을 추가해야 한다.
+     */
+    @Override
+    public void listAdminUsers(ListAdminUsersRequest request, StreamObserver<ListAdminUsersResponse> observer) {
+        // proto3 기본값(빈 문자열/0)이 곧 "미지정"이다. 정규화는 UserSearchQuery가 맡는다.
+        var query = new UserSearchQuery(
+                request.getQuery(),
+                request.hasDeleted() ? request.getDeleted() : null,
+                request.getPage(),
+                request.getSize());
+
+        try {
+            UserPageResult result = userProfileService.listUsers(query);
+            ListAdminUsersResponse.Builder response = ListAdminUsersResponse.newBuilder()
+                    .setTotalCount((int) result.totalCount())
+                    .setPage(result.page())
+                    .setSize(result.size());
+            result.users().forEach(user -> response.addUsers(toProto(user)));
+            observer.onNext(response.build());
             observer.onCompleted();
         } catch (CandleException e) {
             observer.onError(toGrpcStatus(e).asRuntimeException());
