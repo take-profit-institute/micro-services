@@ -707,7 +707,7 @@
     </div>
 
         <!-- Added Slide: User-facing Features -->
-    <div class="slide" id="feature-overview">
+    <div class="slide" id="s4">
         <div class="s-title">📱 <span>Candle에서 무엇을 할 수 있나요?</span></div>
         <p class="s-subtitle">초보 투자자가 탐색·학습·모의투자를 한곳에서 경험</p>
         <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr); font-size: .8rem; gap: 12px;">
@@ -746,7 +746,7 @@
     </div>
 
     <!-- Added Slide: User Journey -->
-    <div class="slide" id="user-journey">
+    <div class="slide" id="s5">
         <div class="s-title">🧑‍💻 <span>처음 시작해도 투자 경험이 이어집니다</span></div>
         <p class="s-subtitle">종목을 배우고, 가상으로 투자하고, 결과를 확인하는 사용자 흐름</p>
         <div class="flow-row" style="gap: 10px; margin-bottom: 28px;">
@@ -787,7 +787,7 @@
     </div>
 
     <!-- Slide 4: Micro-services Overview -->
-    <div class="slide" id="s4">
+    <div class="slide" id="s6">
         <div class="s-title">📦 <span>서비스 도메인 개요</span></div>
         <p class="s-subtitle">독립적이고 응집도 높은 13개의 핵심 마이크로서비스 기술 구성</p>
         <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr); font-size: 0.8rem; gap: 12px;">
@@ -820,7 +820,7 @@
     </div>
 
     <!-- Slide 5: System Architecture -->
-    <div class="slide" id="s5">
+    <div class="slide" id="s7">
         <div class="s-title">🌐 <span>전체 시스템 아키텍처</span></div>
         <p class="s-subtitle">CloudFront → API Gateway → BFF → Istio Mesh(EKS)까지 이어지는 요청 경로와 인프라 전 구성</p>
 
@@ -926,7 +926,7 @@
     </div>
 
     <!-- Slide 6: Monorepo & Packaging -->
-    <div class="slide" id="s6">
+    <div class="slide" id="s8">
         <div class="s-title">📂 <span>모노레포 및 패키지 구조</span></div>
         <p class="s-subtitle">의존성을 철저히 분리한 도메인 중심 디렉토리 설계</p>
         
@@ -966,7 +966,7 @@
     </div>
 
     <!-- Slide 7: gRPC & Proto-based Contract -->
-    <div class="slide" id="s7">
+    <div class="slide" id="s9">
         <div class="s-title">🤝 <span>gRPC 도입 및 계약 중심 설계</span></div>
         <p class="s-subtitle">REST를 넘어선 고성능 계약 중심 협업 모델</p>
         
@@ -1002,7 +1002,7 @@
     </div>
 
     <!-- Slide 8: Event-Driven Architecture -->
-    <div class="slide" id="s8">
+    <div class="slide" id="s10">
         <div class="s-title">📡 <span>이벤트 기반 비동기 아키텍처</span></div>
         <p class="s-subtitle">Kafka를 활용한 장애 고립과 유연한 도메인 확장성</p>
         
@@ -1040,7 +1040,7 @@
     </div>
 
     <!-- Slide 10: Distributed Consistency Problems -->
-    <div class="slide" id="s10">
+    <div class="slide" id="s11">
         <div class="s-title">🔥 <span>분산 정합성 문제와 실태</span></div>
         <p class="s-subtitle">신뢰할 수 없는 분산 환경에서의 데이터 손실 요인</p>
         
@@ -1062,7 +1062,7 @@
     </div>
 
     <!-- Slide 11: Idempotency Pattern -->
-    <div class="slide" id="s11">
+    <div class="slide" id="s12">
         <div class="s-title">🛡️ <span>해결책 1 - 멱등성(Idempotency)</span></div>
         <p class="s-subtitle">모든 쓰기 RPC에 공통 적용되는 재시도 안전장치</p>
         
@@ -1095,7 +1095,7 @@
     </div>
 
     <!-- Slide 12: Transactional Outbox Pattern -->
-    <div class="slide" id="s12">
+    <div class="slide" id="s13">
         <div class="s-title">📦 <span>해결책 2 - Transactional Outbox</span></div>
         <p class="s-subtitle">로컬 트랜잭션을 활용하여 DB 쓰기와 이벤트 발행을 동기화</p>
         
@@ -1121,7 +1121,7 @@
     </div>
 
     <!-- Slide 13: Database Design & Isolation -->
-    <div class="slide" id="s13">
+    <div class="slide" id="s14">
         <div class="s-title">💾 <span>데이터베이스 설계 및 격리 수준</span></div>
         <p class="s-subtitle">도메인 불변성 확보 및 동시성 제어 정책</p>
         
@@ -1143,7 +1143,7 @@
     </div>
 
     <!-- Slide 14: Interface Segregation Principle -->
-    <div class="slide" id="s14">
+    <div class="slide" id="s15">
         <div class="s-title">⚙️ <span>인터페이스 분리 원칙 (ISP)</span></div>
         <p class="s-subtitle">유연한 테스트 인프라와 결합도 최소화 규칙</p>
         
@@ -1189,7 +1189,7 @@
     </div>
 
     <!-- Slide 15: Validation & Transaction Policies -->
-    <div class="slide" id="s15">
+    <div class="slide" id="s16">
         <div class="s-title">🚦 <span>예외 처리 및 트랜잭션 규칙</span></div>
         <p class="s-subtitle">견고한 유효성 검증 체인 및 투명한 예외 공표</p>
         
@@ -1215,7 +1215,7 @@
     </div>
 
         <!-- Slide 9: My Core Areas -->
-    <div class="slide" id="s9">
+    <div class="slide" id="s17">
         <div class="s-title">🔥 <span>핵심 구현 영역 - Trading & Advisory</span></div>
         <p class="s-subtitle">거래 신뢰성과 설명 가능한 추천을 담당</p>
         
@@ -1253,7 +1253,7 @@
     </div>
 
     <!-- Slide 10: Trading Consistency -->
-    <div class="slide" id="s10">
+    <div class="slide" id="s18">
         <div class="s-title">🔒 <span>동시 주문에서도 잔액은 한 번만 사용</span></div>
         <p class="s-subtitle">트랜잭션과 비관적 락으로 주문·잔고 정합성 보장</p>
         
@@ -1288,7 +1288,7 @@
     </div>
 
     <!-- Slide 11: Idempotency -->
-    <div class="slide" id="s11">
+    <div class="slide" id="s19">
         <div class="s-title">🔑 <span>재시도는 허용하고, 주문은 한 번만 처리</span></div>
         <p class="s-subtitle">멱등성 키와 요청 Hash로 중복 주문·키 오용 방지</p>
         
@@ -1320,7 +1320,7 @@
     </div>
 
     <!-- Slide 12: Reservation Outbox Flow -->
-    <div class="slide" id="s12">
+    <div class="slide" id="s20">
         <div class="s-title">📦 <span>예약 주문 전환은 유실 없이, 중복에는 안전하게</span></div>
         <p class="s-subtitle">Transactional Outbox와 Kafka 기반 비동기 상태 전환</p>
         
@@ -1346,7 +1346,7 @@
     </div>
 
     <!-- Slide 13: Advisory Workflow -->
-    <div class="slide" id="s13">
+    <div class="slide" id="s21">
         <div class="s-title">🧭 <span>AI가 고르는 추천이 아닌, 근거를 추적할 수 있는 추천</span></div>
         <p class="s-subtitle">검색·점수화·설명 생성·검증을 분리한 LangGraph Workflow</p>
         
@@ -1370,7 +1370,7 @@
     </div>
 
     <!-- Slide 14: Hybrid Search and Scoring -->
-    <div class="slide" id="s14">
+    <div class="slide" id="s22">
         <div class="s-title">🔎 <span>자연어 검색은 유연하게, 최종 순위는 결정적으로</span></div>
         <p class="s-subtitle">Embedding 검색과 순수함수 스코어링의 역할 분리</p>
         
@@ -1400,7 +1400,7 @@
     </div>
 
     <!-- Slide 15: Controlled AI Workflow -->
-    <div class="slide" id="s15">
+    <div class="slide" id="s23">
         <div class="s-title">⚖️ <span>자율성보다 재현성과 설명 가능성을 선택</span></div>
         <p class="s-subtitle">AI Agent 대신 통제된 AI Workflow를 적용한 이유</p>
         
@@ -1427,7 +1427,7 @@
     </div>
 
     <!-- Slide 16: Service Tech Stack 1 -->
-    <div class="slide" id="s16">
+    <div class="slide" id="s24">
         <div class="s-title">🔑 <span>서비스 기술 분석 - 인증 & 회원</span></div>
         <p class="s-subtitle">분산 결합도를 철저히 격리한 사용자 기반 인프라</p>
         <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
@@ -1451,7 +1451,7 @@
     </div>
 
     <!-- Slide 17: Service Tech Stack 2 -->
-    <div class="slide" id="s17">
+    <div class="slide" id="s25">
         <div class="s-title">📈 <span>서비스 기술 분석 - 시세 & 주문</span></div>
         <p class="s-subtitle">고성능 트래픽 수용 및 엄격한 거래 데이터 잠금 장치</p>
         <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
@@ -1475,7 +1475,7 @@
     </div>
 
     <!-- Slide 18: Service Tech Stack 3 -->
-    <div class="slide" id="s18">
+    <div class="slide" id="s26">
         <div class="s-title">🏆 <span>서비스 기술 분석 - 분석 & 소셜</span></div>
         <p class="s-subtitle">대규모 분석 연산 회피 및 리액티브 대량 소켓 제어</p>
         <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
@@ -1499,7 +1499,7 @@
     </div>
 
     <!-- Slide 19: Service Tech Stack 4 -->
-    <div class="slide" id="s19">
+    <div class="slide" id="s27">
         <div class="s-title">🎮 <span>서비스 기술 분석 - 교육 & 유틸리티</span></div>
         <p class="s-subtitle">비즈니스 흐름 분리와 시스템 결합도 격리</p>
         <div class="feat-grid" style="grid-template-columns: repeat(3, 1fr);">
@@ -1523,7 +1523,7 @@
     </div>
 
     <!-- Slide 20: Spring Batch Architecture -->
-    <div class="slide" id="s20">
+    <div class="slide" id="s28">
         <div class="s-title">⚙️ <span>Spring Batch 기반 독립 배치 아키텍처</span></div>
         <p class="s-subtitle">스케줄 기반 Job 실행과 서비스별 도메인 책임 분리</p>
         
@@ -1568,7 +1568,7 @@
     </div>
 
     <!-- Slide 21: Batch Job Implementation -->
-    <div class="slide" id="s21">
+    <div class="slide" id="s29">
         <div class="s-title">🔄 <span>Candle Batch 4대 핵심 Job 상세</span></div>
         <p class="s-subtitle">08:30 → 16:30 KST 실행 시각·선행 조건·실패 격리 범위</p>
         <div style="display: flex; gap: 10px; margin-bottom: 12px; font-size: .68rem; color: var(--text-faint);">
@@ -1618,7 +1618,7 @@
     </div>
 
     <!-- Slide 22: Build & Deployment Env -->
-    <div class="slide" id="s22">
+    <div class="slide" id="s30">
         <div class="s-title">🐳 <span>개발 및 배포 환경</span></div>
         <p class="s-subtitle">신속한 일괄 로컬 구동 및 Gradle 모노레포 구축</p>
         
@@ -1658,7 +1658,7 @@
     </div>
 
     <!-- Slide 23: dev/prod Infrastructure Architecture -->
-    <div class="slide" id="s23">
+    <div class="slide" id="s31">
         <div class="s-title">☁️ <span>dev/prod 인프라 아키텍처</span></div>
         <p class="s-subtitle">Terraform으로 AWS 기반을 만들고, ArgoCD가 EKS 위 워크로드를 GitOps로 동기화</p>
 
@@ -1716,7 +1716,7 @@
     </div>
 
     <!-- Slide 24: Secret & Runtime Injection -->
-    <div class="slide" id="s24">
+    <div class="slide" id="s32">
         <div class="s-title">🔐 <span>시크릿·변수 주입 구조</span></div>
         <p class="s-subtitle">Secrets Manager 값을 External Secrets Operator가 Kubernetes Secret으로 동기화하고, Helm 차트가 런타임 env로 주입</p>
 
@@ -1770,7 +1770,7 @@
     </div>
 
     <!-- Slide 25: CI/CD & Operations -->
-    <div class="slide" id="s25">
+    <div class="slide" id="s33">
         <div class="s-title">🚀 <span>CI/CD 및 무중단 운영 전략</span></div>
         <p class="s-subtitle">GitHub Actions → ECR → candle-k8s tag bump → ArgoCD sync → Kubernetes RollingUpdate</p>
 
@@ -1824,7 +1824,7 @@
     </div>
 
     <!-- Slide 26: Future Roadmaps -->
-    <div class="slide" id="s26">
+    <div class="slide" id="s34">
         <div class="s-title">🗺️ <span>향후 개선 및 확장 계획</span></div>
         <p class="s-subtitle">더 안정적이고 고도화된 프로덕션 품질을 향한 과제</p>
         
@@ -1846,7 +1846,7 @@
     </div>
 
     <!-- Slide 27: Closing (Q&A) -->
-    <div class="slide" id="s27">
+    <div class="slide" id="s35">
         <div class="cover-bg"></div>
         <div style="position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center;">
             <div class="closing-icons">
